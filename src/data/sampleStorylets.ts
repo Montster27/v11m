@@ -186,6 +186,115 @@ export const sampleStorylets: Record<string, Storylet> = {
     ]
   },
 
+  // Coffee Shop Encounter
+  coffee_shop_encounter: {
+    id: "coffee_shop_encounter",
+    name: "Coffee Shop Encounter",
+    trigger: { type: "time", conditions: { day: 3 } },
+    description: "While studying at your favorite coffee shop, you notice a classmate struggling with the same assignment you just finished. They look stressed and frustrated. What do you do?",
+    choices: [
+      {
+        id: "offer_help",
+        text: "Offer to help them",
+        effects: [
+          { type: "resource", key: "social", delta: 10 },
+          { type: "resource", key: "energy", delta: -5 },
+          { type: "skillXp", key: "allianceBuilding", amount: 3 },
+          { type: "flag", key: "helped_classmate", value: true }
+        ],
+        nextStoryletId: "coffee_shop_followup"
+      },
+      {
+        id: "ignore",
+        text: "Focus on your own work",
+        effects: [
+          { type: "resource", key: "knowledge", delta: 5 },
+          { type: "resource", key: "stress", delta: -3 },
+          { type: "skillXp", key: "perseverance", amount: 2 },
+          { type: "flag", key: "ignored_classmate", value: true }
+        ]
+      },
+      {
+        id: "suggest_study_group",
+        text: "Suggest forming a study group",
+        effects: [
+          { type: "resource", key: "social", delta: 15 },
+          { type: "resource", key: "knowledge", delta: 3 },
+          { type: "skillXp", key: "allianceBuilding", amount: 5 },
+          { type: "flag", key: "formed_study_group", value: true }
+        ]
+      }
+    ]
+  },
+
+  // Follow-up storylet
+  coffee_shop_followup: {
+    id: "coffee_shop_followup",
+    name: "Study Group Results",
+    trigger: { type: "flag", conditions: { flags: ["helped_classmate"] } },
+    description: "Your classmate is grateful for your help and suggests meeting regularly to study together. This could be the start of a valuable friendship.",
+    choices: [
+      {
+        id: "accept_partnership",
+        text: "Accept the study partnership",
+        effects: [
+          { type: "resource", key: "social", delta: 20 },
+          { type: "resource", key: "knowledge", delta: 10 },
+          { type: "skillXp", key: "allianceBuilding", amount: 4 },
+          { type: "flag", key: "study_partner_acquired", value: true }
+        ]
+      },
+      {
+        id: "politely_decline",
+        text: "Politely decline",
+        effects: [
+          { type: "resource", key: "social", delta: 5 },
+          { type: "resource", key: "energy", delta: 5 },
+          { type: "skillXp", key: "perseverance", amount: 2 }
+        ]
+      }
+    ]
+  },
+
+  // Library Study Session
+  library_study_session: {
+    id: "library_study_session",
+    name: "Late Night Library Session",
+    trigger: { type: "resource", conditions: { knowledge: { min: 250 } } },
+    description: "You're deep into a research session at the library when you discover a restricted section. The librarian is nowhere to be seen, and you notice some advanced materials that could really help with your studies. What do you do?",
+    choices: [
+      {
+        id: "sneak_peek",
+        text: "Quietly browse the restricted materials",
+        effects: [
+          { type: "resource", key: "knowledge", delta: 20 },
+          { type: "resource", key: "stress", delta: 5 },
+          { type: "skillXp", key: "operationalSecurity", amount: 4 },
+          { type: "flag", key: "accessed_restricted_materials", value: true }
+        ]
+      },
+      {
+        id: "ask_permission",
+        text: "Wait and ask the librarian for permission",
+        effects: [
+          { type: "resource", key: "knowledge", delta: 10 },
+          { type: "resource", key: "social", delta: 5 },
+          { type: "skillXp", key: "bureaucraticNavigation", amount: 3 },
+          { type: "flag", key: "followed_library_rules", value: true }
+        ]
+      },
+      {
+        id: "leave_alone",
+        text: "Respect the rules and continue with available materials",
+        effects: [
+          { type: "resource", key: "knowledge", delta: 8 },
+          { type: "resource", key: "stress", delta: -3 },
+          { type: "skillXp", key: "perseverance", amount: 2 }
+        ]
+      }
+    ]
+  },
+
   // === RESOURCE-BASED STORYLETS ===
 
   // 7. High Stress Warning

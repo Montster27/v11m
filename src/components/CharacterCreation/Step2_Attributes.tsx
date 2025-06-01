@@ -3,6 +3,19 @@ import React, { useEffect, useState } from 'react';
 import { useCharacterStore } from '../../store/characterStore';
 import { Card, Button, Slider } from '../ui';
 
+// Helper functions to improve readability
+const getPointsUsedStyles = (remainingPoints: number) => {
+  if (remainingPoints === 0) return 'bg-green-100 text-green-800';
+  if (remainingPoints > 0) return 'bg-blue-100 text-blue-800';
+  return 'bg-red-100 text-red-800';
+};
+
+const getRemainingPointsStyles = (remainingPoints: number) => {
+  if (remainingPoints === 0) return 'bg-green-100 text-green-800';
+  if (remainingPoints > 0) return 'bg-yellow-100 text-yellow-800';
+  return 'bg-red-100 text-red-800';
+};
+
 const attributeList = [
   { key: 'intelligence', label: 'Intelligence', description: 'Problem-solving and learning ability' },
   { key: 'creativity', label: 'Creativity', description: 'Innovation and artistic thinking' },
@@ -71,16 +84,10 @@ const Step2_Attributes: React.FC = () => {
           </p>
           
           <div className="flex justify-center items-center space-x-6 mb-4">
-            <div className={`px-4 py-2 rounded-lg font-medium ${
-              remainingPoints === 0 ? 'bg-green-100 text-green-800' : 
-              remainingPoints > 0 ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'
-            }`}>
+            <div className={`px-4 py-2 rounded-lg font-medium ${getPointsUsedStyles(remainingPoints)}`}>
               Points Used: {totalPoints}/100
             </div>
-            <div className={`px-4 py-2 rounded-lg font-medium ${
-              remainingPoints === 0 ? 'bg-green-100 text-green-800' : 
-              remainingPoints > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
-            }`}>
+            <div className={`px-4 py-2 rounded-lg font-medium ${getRemainingPointsStyles(remainingPoints)}`}>
               Remaining: {remainingPoints}
             </div>
           </div>

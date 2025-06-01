@@ -68,9 +68,9 @@ const CurrentEventPanel: React.FC = () => {
               
               {/* Consequences */}
               <div className="flex flex-wrap gap-2 mb-2">
-                {choice.consequences.map((consequence, idx) => (
+                {choice.consequences.map((consequence) => (
                   <span
-                    key={idx}
+                    key={`${consequence.stat}-${consequence.value}`}
                     className={`px-2 py-1 text-xs font-bold text-white rounded ${consequence.color}`}
                   >
                     {consequence.stat}: {consequence.value > 0 ? '+' : ''}{consequence.value}

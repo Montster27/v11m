@@ -24,6 +24,101 @@ interface StoryletState {
   applyEffect: (effect: Effect) => void;            // apply a single effect
 }
 
+// Helper functions to reduce cognitive complexity
+const getAppState = () => {
+  try {
+    if (typeof window !== 'undefined' && (window as any).useAppStore) {
+      return (window as any).useAppStore.getState();
+    }
+    return null;
+  } catch (error) {
+    console.warn('Could not access app store:', error);
+    return null;
+  }
+};
+
+const shouldSkipStorylet = (storylet: Storylet, state: any, appState: any) => {
+  // Skip if already active
+  if (state.activeStoryletIds.includes(storylet.id)) {
+    return true;
+  }
+  
+  // Skip if on cooldown
+  if (state.storyletCooldowns[storylet.id] && appState && appState.day < state.storyletCooldowns[storylet.id]) {
+    return true;
+  }
+  
+  // Skip if completed and it's a one-time storylet
+  if (state.completedStoryletIds.includes(storylet.id)) {
+    // Allow resource-based storylets to repeat, but not time/flag-based chains
+    if (storylet.trigger.type !== 'resource') {
+      return true;
+    }
+  }
+  
+  return false;
+};
+
+const evaluateTimeTrigger = (trigger: any, appState: any) => {
+  if (!appState) return false;
+  
+  if (trigger.conditions.day && appState.day >= trigger.conditions.day) {
+    return true;
+  }
+  if (trigger.conditions.week && appState.day >= (trigger.conditions.week * 7)) {
+    return true;
+  }
+  return false;
+};
+
+const evaluateFlagTrigger = (trigger: any, activeFlags: any) => {
+  if (trigger.conditions.flags && Array.isArray(trigger.conditions.flags)) {
+    // Check if ANY of the flags are true (OR logic)
+    return trigger.conditions.flags.some((flagKey: string) => activeFlags[flagKey]);
+  }
+  return false;
+};
+
+const evaluateResourceTrigger = (trigger: any, appState: any) => {
+  if (!appState || !trigger.conditions) return false;
+  
+  // Check resource conditions (e.g., { energy: { max: 25 }, stress: { min: 75 } })
+  return Object.entries(trigger.conditions).every(([resourceKey, condition]) => {
+    if (typeof condition !== 'object') return true;
+    
+    const resourceValue = appState.resources[resourceKey as keyof typeof appState.resources];
+    if (resourceValue === undefined) return false;
+    
+    // Check min condition
+    if (condition.min !== undefined && resourceValue < condition.min) {
+      return false;
+    }
+    
+    // Check max condition  
+    if (condition.max !== undefined && resourceValue > condition.max) {
+      return false;
+    }
+    
+    return true;
+  });
+};
+
+const evaluateStoryletTrigger = (trigger: any, activeFlags: any, appState: any) => {
+  switch (trigger.type) {
+    case 'time':
+      return evaluateTimeTrigger(trigger, appState);
+      
+    case 'flag':
+      return evaluateFlagTrigger(trigger, activeFlags);
+      
+    case 'resource':
+      return evaluateResourceTrigger(trigger, appState);
+      
+    default:
+      return false;
+  }
+};
+
 export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   // Initial state
   allStorylets: sampleStorylets,
@@ -34,92 +129,16 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   
   // Evaluate storylets - check triggers and unlock eligible storylets
   evaluateStorylets: () => {
-    const { allStorylets, activeFlags, activeStoryletIds, completedStoryletIds, storyletCooldowns } = get();
-    
-    // Get current game state from app store
-    const getAppState = () => {
-      try {
-        if (typeof window !== 'undefined' && (window as any).useAppStore) {
-          return (window as any).useAppStore.getState();
-        }
-        return null;
-      } catch (error) {
-        console.warn('Could not access app store:', error);
-        return null;
-      }
-    };
-    
+    const state = get();
     const appState = getAppState();
     const newActiveIds: string[] = [];
     
-    Object.values(allStorylets).forEach((storylet) => {
-      // Skip if already active
-      if (activeStoryletIds.includes(storylet.id)) {
+    Object.values(state.allStorylets).forEach((storylet) => {
+      if (shouldSkipStorylet(storylet, state, appState)) {
         return;
       }
       
-      // Skip if on cooldown
-      if (storyletCooldowns[storylet.id] && appState && appState.day < storyletCooldowns[storylet.id]) {
-        return;
-      }
-      
-      // Skip if completed and it's a one-time storylet (has nextStoryletId or is part of a chain)
-      if (completedStoryletIds.includes(storylet.id)) {
-        // Allow resource-based storylets to repeat, but not time/flag-based chains
-        if (storylet.trigger.type !== 'resource') {
-          return;
-        }
-      }
-      
-      // Check trigger conditions
-      const trigger = storylet.trigger;
-      let conditionsMet = false;
-      
-      switch (trigger.type) {
-        case 'time':
-          if (appState && trigger.conditions.day && appState.day >= trigger.conditions.day) {
-            conditionsMet = true;
-          }
-          if (appState && trigger.conditions.week && appState.day >= (trigger.conditions.week * 7)) {
-            conditionsMet = true;
-          }
-          break;
-          
-        case 'flag':
-          if (trigger.conditions.flags && Array.isArray(trigger.conditions.flags)) {
-            // Check if ANY of the flags are true (OR logic)
-            conditionsMet = trigger.conditions.flags.some((flagKey: string) => activeFlags[flagKey]);
-          }
-          break;
-          
-        case 'resource':
-          if (appState && trigger.conditions) {
-            conditionsMet = true;
-            // Check resource conditions (e.g., { energy: { max: 25 }, stress: { min: 75 } })
-            Object.entries(trigger.conditions).forEach(([resourceKey, condition]) => {
-              if (typeof condition === 'object') {
-                const resourceValue = appState.resources[resourceKey as keyof typeof appState.resources];
-                if (resourceValue === undefined) {
-                  conditionsMet = false;
-                  return;
-                }
-                
-                // Check min condition
-                if (condition.min !== undefined && resourceValue < condition.min) {
-                  conditionsMet = false;
-                }
-                
-                // Check max condition  
-                if (condition.max !== undefined && resourceValue > condition.max) {
-                  conditionsMet = false;
-                }
-              }
-            });
-          }
-          break;
-      }
-      
-      if (conditionsMet) {
+      if (evaluateStoryletTrigger(storylet.trigger, state.activeFlags, appState)) {
         newActiveIds.push(storylet.id);
       }
     });

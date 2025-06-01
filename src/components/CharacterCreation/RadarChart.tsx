@@ -92,8 +92,8 @@ const RadarChart: React.FC<RadarChartProps> = ({ attributes, size = 300 }) => {
         ))}
         
         {/* Axis lines */}
-        {axisLines.map((axis, index) => (
-          <g key={index}>
+        {axisLines.map((axis) => (
+          <g key={`axis-${axis.label}`}>
             <path
               d={axis.line}
               stroke="#9ca3af"
@@ -123,8 +123,8 @@ const RadarChart: React.FC<RadarChartProps> = ({ attributes, size = 300 }) => {
         />
         
         {/* Data points */}
-        {dataPoints.map((point, index) => (
-          <g key={index}>
+        {dataPoints.map((point) => (
+          <g key={`point-${point.label}`}>
             <circle
               cx={point.x}
               cy={point.y}

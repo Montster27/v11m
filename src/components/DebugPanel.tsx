@@ -52,11 +52,13 @@ const DebugPanel: React.FC = () => {
       isExpanded ? 'w-96' : 'w-auto'
     }`}>
       {/* Debug Tab */}
-      <div 
-        className={`bg-gray-900 text-white cursor-pointer transition-all duration-300 ${
+      <button
+        className={`bg-gray-900 text-white cursor-pointer transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
           isExpanded ? 'rounded-l-lg' : 'rounded-l-lg'
         }`}
         onClick={() => setIsExpanded(!isExpanded)}
+        aria-label={isExpanded ? 'Collapse debug panel' : 'Expand debug panel'}
+        type="button"
       >
         <div className={`p-2 text-xs font-mono flex items-center ${
           isExpanded ? 'justify-between' : 'justify-center'
@@ -68,7 +70,7 @@ const DebugPanel: React.FC = () => {
             </span>
           )}
         </div>
-      </div>
+      </button>
 
       {/* Debug Content */}
       {isExpanded && (

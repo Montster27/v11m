@@ -169,9 +169,9 @@ const Step3_Questionnaire: React.FC = () => {
                     {option.text}
                   </span>
                   <div className="flex flex-wrap gap-1 ml-4">
-                    {option.attributeEffects.map((effect, index) => (
+                    {option.attributeEffects.map((effect) => (
                       <span
-                        key={index}
+                        key={`${effect.attribute}-${effect.change}`}
                         className={`px-2 py-1 text-xs rounded font-medium ${
                           effect.change > 0 
                             ? 'bg-green-100 text-green-800' 
