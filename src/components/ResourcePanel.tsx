@@ -40,7 +40,7 @@ const ResourcePanel: React.FC = () => {
       key: 'knowledge', 
       label: 'Knowledge', 
       color: 'blue' as const,
-      max: 100,
+      max: 1000,
       icon: '📚',
       critical: false,
       warning: false
@@ -49,7 +49,7 @@ const ResourcePanel: React.FC = () => {
       key: 'social', 
       label: 'Social', 
       color: 'purple' as const,
-      max: 100,
+      max: 1000,
       icon: '👥',
       critical: false,
       warning: resources.social <= 20

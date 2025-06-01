@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { useStoryletStore } from '../store/useStoryletStore';
+import '../test-integration'; // Import test functions
 
 const DebugPanel: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -74,6 +75,36 @@ const DebugPanel: React.FC = () => {
         <div className="bg-gray-900 text-white max-h-96 overflow-y-auto text-xs font-mono border-l border-t border-b border-gray-700 rounded-bl-lg">
           <div className="p-4">
             <h4 className="font-semibold mb-2 text-green-400">🔍 Debug Panel</h4>
+            
+            {/* Test Buttons */}
+            <div className="mb-4 space-y-2">
+              <div className="text-yellow-400 font-semibold text-xs">Integration Tests:</div>
+              <div className="flex flex-col space-y-1">
+                <button
+                  onClick={() => (window as any).testIntegration?.()}
+                  className="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs transition-colors"
+                >
+                  Run Integration Test
+                </button>
+                <button
+                  onClick={() => (window as any).resetGameState?.()}
+                  className="bg-orange-600 hover:bg-orange-700 px-2 py-1 rounded text-xs transition-colors"
+                >
+                  Reset Game State
+                </button>
+                <button
+                  onClick={() => {
+                    console.log('Current Debug Data:', debugData);
+                    console.log('App Store:', useAppStore.getState());
+                    console.log('Storylet Store:', useStoryletStore.getState());
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 px-2 py-1 rounded text-xs transition-colors"
+                >
+                  Log State to Console
+                </button>
+              </div>
+            </div>
+            
             <div className="space-y-2">
               <div>
                 <div className="text-yellow-400 font-semibold">Store State:</div>

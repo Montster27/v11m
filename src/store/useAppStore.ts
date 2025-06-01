@@ -167,8 +167,8 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     energy: 75,
     stress: 25,
     money: 150,
-    knowledge: 30,
-    social: 50
+    knowledge: 100,  // Better starting value to show 1000 max
+    social: 200       // Better starting value to show 1000 max
   },
   
   storyletFlags: {},

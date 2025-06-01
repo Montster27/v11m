@@ -80,12 +80,16 @@ export const testIntegration = () => {
   
   appStore.updateResource('energy', 50);
   appStore.updateResource('stress', 75);
-  appStore.updateResource('knowledge', 200);
+  appStore.updateResource('knowledge', 500);  // Test with higher value for 1000 max
+  appStore.updateResource('money', 750);      // Test with higher value for 1000 max
+  appStore.updateResource('social', 300);     // Test with higher value for 1000 max
   
   console.log('✅ Resources updated:', {
     energy: appStore.resources.energy,
     stress: appStore.resources.stress,
-    knowledge: appStore.resources.knowledge
+    knowledge: appStore.resources.knowledge,
+    money: appStore.resources.money,
+    social: appStore.resources.social
   });
 
   // 5. Test Skill XP System
@@ -205,8 +209,8 @@ export const resetGameState = () => {
     appStore.updateResource('energy', 75);
     appStore.updateResource('stress', 25);
     appStore.updateResource('money', 150);
-    appStore.updateResource('knowledge', 30);
-    appStore.updateResource('social', 50);
+    appStore.updateResource('knowledge', 100);  // Higher starting value to show 1000 max
+    appStore.updateResource('social', 200);     // Higher starting value to show 1000 max
   }
   
   if (storyletStore) {
