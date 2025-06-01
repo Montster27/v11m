@@ -1,0 +1,28 @@
+/* /Users/montysharma/V11M2/src/App.css */
+/* Custom app styles can go here if needed */
+/* Most styling should be done with Tailwind utility classes */
+
+/* Page transition animations */
+.page-container {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Smooth transitions for navigation */
+.nav-link {
+  transition: all 0.2s ease-in-out;
+}
+
+.nav-link:hover {
+  transform: translateY(-1px);
+}
