@@ -1,7 +1,7 @@
 // /Users/montysharma/V11M2/src/components/CharacterCreation/Step2_Attributes.tsx
 import React, { useEffect, useState } from 'react';
 import { useCharacterStore } from '../../store/characterStore';
-import { Card, Button, Slider } from '../ui';
+import { Card, Button } from '../ui';
 
 // Helper functions to improve readability
 const getPointsUsedStyles = (remainingPoints: number) => {
@@ -100,28 +100,68 @@ const Step2_Attributes: React.FC = () => {
 
       <Card className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {attributeList.map((attr) => (
-            <div key={attr.key} className="space-y-2">
-              <div className="flex justify-between items-center">
-                <label className="text-sm font-medium text-gray-700">
-                  {attr.label}
-                </label>
-                <span className="text-sm font-bold text-gray-900">
-                  {attributes[attr.key] || 1}
-                </span>
+          {attributeList.map((attr) => {
+            const currentValue = attributes[attr.key] || 1;
+            
+            const handleDecrease = () => {
+              if (currentValue > 1) {
+                handleAttributeChange(attr.key, currentValue - 1);
+              }
+            };
+            
+            const handleIncrease = () => {
+              if (currentValue < 10) {
+                handleAttributeChange(attr.key, currentValue + 1);
+              }
+            };
+            
+            return (
+              <div key={attr.key} className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium text-gray-700">
+                    {attr.label}
+                  </label>
+                  <div className="flex items-center space-x-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDecrease}
+                      disabled={currentValue <= 1}
+                      className="w-8 h-8 p-0 flex items-center justify-center"
+                    >
+                      −
+                    </Button>
+                    <div className="w-8 text-center">
+                      <span className="text-lg font-bold text-gray-900">
+                        {currentValue}
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleIncrease}
+                      disabled={currentValue >= 10}
+                      className="w-8 h-8 p-0 flex items-center justify-center"
+                    >
+                      +
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Visual Progress Bar */}
+                <div className="mb-2">
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-500 h-2 rounded-full transition-all duration-200 ease-in-out"
+                      style={{ width: `${(currentValue / 10) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+                
+                <p className="text-xs text-gray-500">{attr.description}</p>
               </div>
-              
-              <Slider
-                min={1}
-                max={10}
-                value={attributes[attr.key] || 1}
-                onChange={(value) => handleAttributeChange(attr.key, value)}
-                showValue={false}
-              />
-              
-              <p className="text-xs text-gray-500">{attr.description}</p>
-            </div>
-          ))}
+            );  
+            })}
         </div>
       </Card>
 

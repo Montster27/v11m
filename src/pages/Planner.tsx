@@ -8,6 +8,7 @@ import TimeAllocationPanel from '../components/TimeAllocationPanel';
 import StoryletPanel from '../components/StoryletPanel';
 import ResourcePanel from '../components/ResourcePanel';
 import SkillsPanel from '../components/SkillsPanel';
+import DebugPanel from '../components/DebugPanel';
 import { Button } from '../components/ui';
 import { calculateResourceDeltas, type ResourceDeltas } from '../utils/resourceCalculations';
 import { validateSliderSum, checkCrashConditions } from '../utils/validation';
@@ -96,8 +97,14 @@ const Planner: React.FC = () => {
   
   // Update local day when store day changes
   useEffect(() => {
+    console.log('🔄 Day changed in store:', day);
     setLocalDay(day);
-  }, [day]);
+    // Re-evaluate storylets when day changes
+    setTimeout(() => {
+      console.log('🎭 Re-evaluating storylets due to day change:', day);
+      evaluateStorylets();
+    }, 100);
+  }, [day, evaluateStorylets]);
   
   // Initialize storylet system and re-evaluate when day changes
   useEffect(() => {
@@ -137,6 +144,7 @@ const Planner: React.FC = () => {
     const currentState = useAppStore.getState();
     const currentResources = currentState.resources;
     const currentAllocations = currentState.allocations;
+    const currentDay = currentState.day;
     
     if (!currentCharacter) {
       console.log('No current character, but continuing with default behavior');
@@ -144,7 +152,7 @@ const Planner: React.FC = () => {
       console.log('Character found:', currentCharacter.name);
     }
     
-    console.log('Current day:', day);
+    console.log('Current day:', currentDay);
     console.log('Current resources BEFORE:', currentResources);
     
     // Calculate resource changes using fresh state
@@ -163,15 +171,18 @@ const Planner: React.FC = () => {
     const newSocial = Math.max(0, Math.min(100, currentResources.social + deltas.social));
     const newMoney = Math.max(0, currentResources.money + deltas.money);
     
+    const newDay = currentDay + 1;
+    
     console.log('New resources will be:', {
       energy: newEnergy,
       stress: newStress,
       knowledge: newKnowledge,
       social: newSocial,
-      money: newMoney
+      money: newMoney,
+      day: newDay
     });
     
-    // Update all resources and day in a single store update
+    // Update all resources AND day in a single store update
     useAppStore.setState((state) => ({
       resources: {
         energy: newEnergy,
@@ -179,20 +190,18 @@ const Planner: React.FC = () => {
         knowledge: newKnowledge,
         social: newSocial,
         money: newMoney
-      }
+      },
+      day: newDay
     }));
     
-    // Increment day
-    setLocalDay(prev => {
-      const newDay = prev + 1;
-      console.log('Setting local day from', prev, 'to', newDay);
-      return newDay;
-    });
+    // Update local day to sync
+    setLocalDay(newDay);
     
-    // Trigger storylet evaluation after resource changes
+    // Trigger storylet evaluation after both resource AND day changes
     setTimeout(() => {
+      console.log('🎭 Triggering storylet evaluation after day', newDay);
       evaluateStorylets();
-    }, 200);
+    }, 300);
     
     // Check for crash conditions
     if (newEnergy <= 0) {
@@ -292,38 +301,13 @@ const Planner: React.FC = () => {
     <div className="page-container min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
-        <header className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-teal-800 mb-6">
+        <header className="text-center mb-6">
+          <h1 className="text-4xl font-bold text-teal-800 mb-4">
             Time & Resource Allocation Dashboard
           </h1>
           
-          {/* Character Info & Status Cards */}
-          <div className="flex justify-center items-center space-x-8 mb-6">
-            <div className="flex items-center space-x-4">
-              <div className="text-2xl">👤</div>
-              <span className="text-xl font-semibold text-gray-700">
-                {activeCharacter ? activeCharacter.name : (currentCharacter ? currentCharacter.name : 'No Character Selected')}
-              </span>
-            </div>
-            
-            <div className="flex space-x-4">
-              <div className="bg-purple-100 text-purple-800 px-4 py-2 rounded-lg">
-                <div className="text-sm font-medium">Level</div>
-                <div className="text-lg font-bold">{userLevel}</div>
-              </div>
-              <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg">
-                <div className="text-sm font-medium">XP</div>
-                <div className="text-lg font-bold">{experience}</div>
-              </div>
-              <div className="bg-teal-100 text-teal-800 px-4 py-2 rounded-lg">
-                <div className="text-sm font-medium">Day</div>
-                <div className="text-lg font-bold">{day}</div>
-              </div>
-            </div>
-          </div>
-          
           {/* Level Progress Bar */}
-          <div className="max-w-md mx-auto mb-6">
+          <div className="max-w-md mx-auto mb-4">
             <div className="flex justify-between text-sm text-gray-600 mb-1">
               <span>Level {userLevel} Progress</span>
               <span>{currentLevelProgress}/{nextLevelXP}</span>
@@ -338,19 +322,19 @@ const Planner: React.FC = () => {
           
           {/* Validation Messages */}
           {validation.message && (
-            <div className={`mb-4 text-sm font-medium ${getValidationMessageClass()}`}>
+            <div className={`mb-3 text-sm font-medium ${getValidationMessageClass()}`}>
               {validation.message}
             </div>
           )}
           
           {crashCheck.message && crashCheck.type !== 'success' && (
-            <div className={`mb-4 text-sm font-medium ${getCrashCheckClass()}`}>
+            <div className={`mb-3 text-sm font-medium ${getCrashCheckClass()}`}>
               {crashCheck.message}
             </div>
           )}
           
           {/* Play/Pause Button */}
-          <div className="mb-8">
+          <div className="mb-4">
             <Button 
               onClick={toggleSimulation}
               variant={isPlaying ? "outline" : "primary"}
@@ -436,6 +420,38 @@ const Planner: React.FC = () => {
               >
                 Test Storylets (Console)
               </button>
+              <button
+                onClick={() => {
+                  const currentState = useAppStore.getState();
+                  const newDay = currentState.day + 1;
+                  useAppStore.setState({ day: newDay });
+                  console.log('📅 MANUAL: Advanced day to:', newDay);
+                  setTimeout(() => {
+                    const storyletStore = useStoryletStore.getState();
+                    storyletStore.evaluateStorylets();
+                    console.log('🎭 MANUAL: Re-evaluated storylets after day advance');
+                  }, 200);
+                }}
+                className="bg-blue-200 text-blue-800 px-3 py-1 rounded text-sm hover:bg-blue-300"
+              >
+                📅 Advance Day Manually
+              </button>
+              <button
+                onClick={() => {
+                  const currentState = useAppStore.getState();
+                  const newDay = currentState.day + 7;
+                  useAppStore.setState({ day: newDay });
+                  console.log('📅 MANUAL: Advanced week to day:', newDay);
+                  setTimeout(() => {
+                    const storyletStore = useStoryletStore.getState();
+                    storyletStore.evaluateStorylets();
+                    console.log('🎭 MANUAL: Re-evaluated storylets after week advance');
+                  }, 200);
+                }}
+                className="bg-indigo-200 text-indigo-800 px-3 py-1 rounded text-sm hover:bg-indigo-300"
+              >
+                📅 Skip to Next Week
+              </button>
             </div>
           </div>
         )}
@@ -455,6 +471,9 @@ const Planner: React.FC = () => {
         onComplete={handleCrashRecovery}
         type={crashType}
       />
+      
+      {/* Debug Panel */}
+      <DebugPanel />
     </div>
   );
 };

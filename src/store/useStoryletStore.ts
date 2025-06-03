@@ -3,7 +3,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Storylet, Effect } from '../types/storylet';
-import { sampleStorylets } from '../data/sampleStorylets';
+import { collegeStorylets } from '../data/collegeStorylets';
+import { immediateStorylets } from '../data/immediateStorylets';
+import { frequentStorylets } from '../data/frequentStorylets';
 
 interface StoryletState {
   // Core storylet data
@@ -17,6 +19,7 @@ interface StoryletState {
   evaluateStorylets: () => void;                    // scan and unlock storylets based on triggers
   chooseStorylet: (storyletId: string, choiceId: string) => void;  // make a choice in a storylet
   unlockStorylet: (storyletId: string) => void;     // manually unlock a storylet
+  addStorylet: (storylet: Storylet) => void;        // add a new storylet to the catalog
   setFlag: (key: string, value: boolean) => void;   // manually set a flag
   getFlag: (key: string) => boolean;                // get a flag value
   getCurrentStorylet: () => Storylet | null;        // get the first active storylet
@@ -60,14 +63,37 @@ const shouldSkipStorylet = (storylet: Storylet, state: any, appState: any) => {
 };
 
 const evaluateTimeTrigger = (trigger: any, appState: any) => {
-  if (!appState) return false;
+  if (!appState) {
+    console.log('❌ No app state for time trigger evaluation');
+    return false;
+  }
   
-  if (trigger.conditions.day && appState.day >= trigger.conditions.day) {
-    return true;
+  const currentDay = appState.day;
+  const conditions = trigger.conditions;
+  
+  console.log('⏰ Evaluating time trigger:', {
+    currentDay,
+    conditions,
+    dayCondition: conditions.day,
+    weekCondition: conditions.week
+  });
+  
+  // Check day-based trigger (exact day match)
+  if (conditions.day !== undefined) {
+    const meets = currentDay >= conditions.day;
+    console.log(`📅 Day trigger: current=${currentDay}, required=${conditions.day}, meets=${meets}`);
+    return meets;
   }
-  if (trigger.conditions.week && appState.day >= (trigger.conditions.week * 7)) {
-    return true;
+  
+  // Check week-based trigger (convert weeks to days)
+  if (conditions.week !== undefined) {
+    const requiredDay = conditions.week * 7;
+    const meets = currentDay >= requiredDay;
+    console.log(`📅 Week trigger: current=${currentDay}, required=${requiredDay} (week ${conditions.week}), meets=${meets}`);
+    return meets;
   }
+  
+  console.log('❌ No time conditions found');
   return false;
 };
 
@@ -89,12 +115,12 @@ const evaluateResourceTrigger = (trigger: any, appState: any) => {
     const resourceValue = appState.resources[resourceKey as keyof typeof appState.resources];
     if (resourceValue === undefined) return false;
     
-    // Check min condition
+    // Check min condition (inclusive)
     if (condition.min !== undefined && resourceValue < condition.min) {
       return false;
     }
     
-    // Check max condition  
+    // Check max condition (inclusive)
     if (condition.max !== undefined && resourceValue > condition.max) {
       return false;
     }
@@ -121,7 +147,7 @@ const evaluateStoryletTrigger = (trigger: any, activeFlags: any, appState: any) 
 
 export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   // Initial state
-  allStorylets: sampleStorylets,
+  allStorylets: { ...immediateStorylets, ...frequentStorylets, ...collegeStorylets },
   activeFlags: {},
   activeStoryletIds: [],
   completedStoryletIds: [],
@@ -133,21 +159,94 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     const appState = getAppState();
     const newActiveIds: string[] = [];
     
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🎭 ===== EVALUATING STORYLETS =====');
+      console.log('📊 Current state:', {
+        currentDay: appState?.day,
+        resources: appState?.resources,
+        activeFlags: state.activeFlags,
+        activeStorylets: state.activeStoryletIds,
+        completedStorylets: state.completedStoryletIds,
+        totalStorylets: Object.keys(state.allStorylets).length
+      });
+    }
+    
     Object.values(state.allStorylets).forEach((storylet) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`\n🔍 Checking storylet: ${storylet.id} (${storylet.name})`);
+      }
+      
       if (shouldSkipStorylet(storylet, state, appState)) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`⏭️ Skipping ${storylet.id}:`, {
+            alreadyActive: state.activeStoryletIds.includes(storylet.id),
+            onCooldown: state.storyletCooldowns[storylet.id] && appState && appState.day < state.storyletCooldowns[storylet.id],
+            alreadyCompleted: state.completedStoryletIds.includes(storylet.id) && storylet.trigger.type !== 'resource',
+            cooldownDay: state.storyletCooldowns[storylet.id]
+          });
+        }
         return;
       }
       
-      if (evaluateStoryletTrigger(storylet.trigger, state.activeFlags, appState)) {
+      const canTrigger = evaluateStoryletTrigger(storylet.trigger, state.activeFlags, appState);
+      
+      if (process.env.NODE_ENV === 'development') {
+        const triggerDetails = {
+          trigger: storylet.trigger,
+          canTrigger,
+          currentState: {
+            day: appState?.day,
+            resources: appState?.resources,
+            flags: state.activeFlags
+          }
+        };
+        
+        // Add specific trigger evaluation details
+        if (storylet.trigger.type === 'time') {
+          triggerDetails.timeEvaluation = {
+            required: storylet.trigger.conditions,
+            current: { day: appState?.day },
+            met: evaluateTimeTrigger(storylet.trigger, appState)
+          };
+        } else if (storylet.trigger.type === 'flag') {
+          triggerDetails.flagEvaluation = {
+            required: storylet.trigger.conditions.flags,
+            current: state.activeFlags,
+            met: evaluateFlagTrigger(storylet.trigger, state.activeFlags)
+          };
+        } else if (storylet.trigger.type === 'resource') {
+          triggerDetails.resourceEvaluation = {
+            required: storylet.trigger.conditions,
+            current: appState?.resources,
+            met: evaluateResourceTrigger(storylet.trigger, appState)
+          };
+        }
+        
+        console.log(`📝 ${storylet.id} evaluation:`, triggerDetails);
+      }
+      
+      if (canTrigger) {
         newActiveIds.push(storylet.id);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`✅ 🎉 UNLOCKING STORYLET: ${storylet.id} - ${storylet.name}`);
+        }
+      } else {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`❌ Cannot trigger ${storylet.id}`);
+        }
       }
     });
     
     // Add newly unlocked storylets to active list
     if (newActiveIds.length > 0) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`🎆 Activating ${newActiveIds.length} new storylets:`, newActiveIds);
+      }
       set((state) => ({
         activeStoryletIds: [...state.activeStoryletIds, ...newActiveIds]
       }));
+    } else if (process.env.NODE_ENV === 'development') {
+      console.log('😴 No new storylets activated');
     }
   },
   
@@ -178,6 +277,15 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     choice.effects.forEach((effect) => {
       get().applyEffect(effect);
     });
+    
+    // Convert storylet choice to quest achievement
+    try {
+      if (typeof window !== 'undefined' && (window as any).useAppStore) {
+        (window as any).useAppStore.getState().convertStoryletToQuest(storyletId, choiceId);
+      }
+    } catch (error) {
+      console.warn('Could not convert storylet to quest:', error);
+    }
     
     // Mark storylet as completed
     const newActiveIds = activeStoryletIds.filter(id => id !== storyletId);
@@ -277,6 +385,20 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     }));
   },
   
+  // Add a new storylet to the catalog
+  addStorylet: (storylet: Storylet) => {
+    set((state) => ({
+      allStorylets: {
+        ...state.allStorylets,
+        [storylet.id]: storylet
+      }
+    }));
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`✅ Added new storylet: ${storylet.id}`);
+    }
+  },
+  
   // Flag management
   setFlag: (key: string, value: boolean) => {
     set((state) => ({
@@ -301,6 +423,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   
   // Reset storylets for testing
   resetStorylets: () => {
+    console.log('🔄 Resetting storylet store...');
     set({
       activeFlags: {},
       activeStoryletIds: [],
@@ -312,6 +435,8 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     setTimeout(() => {
       get().evaluateStorylets();
     }, 100);
+    
+    console.log('✅ Storylet store reset complete');
   }
 }), {
   name: 'storylet-store',

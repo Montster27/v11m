@@ -3,7 +3,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navigation from './components/Navigation';
 import DebugPanel from './components/DebugPanel';
-import { Home, CharacterCreation, Planner, Quests, Skills } from './pages';
+import { Home, CharacterCreation, Planner, Quests, Skills, StoryletDeveloper } from './pages';
 
 function App() {
   return (
@@ -16,6 +16,7 @@ function App() {
           <Route path="/quests" element={<Quests />} />
           <Route path="/skills" element={<Skills />} />
           <Route path="/character-creation" element={<CharacterCreation />} />
+          <Route path="/storylet-developer" element={<StoryletDeveloper />} />
         </Routes>
         
         {/* Debug Panel - only in development */}

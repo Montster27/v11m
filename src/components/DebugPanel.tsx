@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { useStoryletStore } from '../store/useStoryletStore';
 import '../test-integration'; // Import test functions
+import '../utils/storyletTesting'; // Import storylet testing utilities
 
 const DebugPanel: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -80,7 +81,79 @@ const DebugPanel: React.FC = () => {
             
             {/* Test Buttons */}
             <div className="mb-4 space-y-2">
-              <div className="text-yellow-400 font-semibold text-xs">Integration Tests:</div>
+              <div className="text-yellow-400 font-semibold text-xs">Storylet Tests:</div>
+              <div className="flex flex-col space-y-1">
+                <button
+                  onClick={() => {
+                    const storyletStore = useStoryletStore.getState();
+                    storyletStore.evaluateStorylets();
+                    console.log('🎭 Manually evaluated storylets');
+                  }}
+                  className="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs transition-colors"
+                >
+                  🎭 Evaluate Storylets
+                </button>
+                <button
+                  onClick={() => {
+                    const appStore = useAppStore.getState();
+                    const newDay = appStore.day + 1;
+                    useAppStore.setState({ day: newDay });
+                    console.log('📅 Advanced day to:', newDay);
+                    setTimeout(() => {
+                      useStoryletStore.getState().evaluateStorylets();
+                    }, 100);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs transition-colors"
+                >
+                  📅 Advance Day
+                </button>
+                <button
+                  onClick={() => {
+                    const appStore = useAppStore.getState();
+                    const newDay = appStore.day + 7;
+                    useAppStore.setState({ day: newDay });
+                    console.log('📅 Advanced week to day:', newDay);
+                    setTimeout(() => {
+                      useStoryletStore.getState().evaluateStorylets();
+                    }, 100);
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-700 px-2 py-1 rounded text-xs transition-colors"
+                >
+                  📅 Advance Week
+                </button>
+                <button
+                  onClick={() => {
+                    const storyletStore = useStoryletStore.getState();
+                    storyletStore.resetStorylets();
+                    console.log('🔄 Reset storylets');
+                  }}
+                  className="bg-orange-600 hover:bg-orange-700 px-2 py-1 rounded text-xs transition-colors"
+                >
+                  🔄 Reset Storylets
+                </button>
+                <button
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && (window as any).testStoryletSystem) {
+                      (window as any).testStoryletSystem();
+                    }
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 px-2 py-1 rounded text-xs transition-colors"
+                >
+                  🧪 Run Full Test
+                </button>
+                <button
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && (window as any).advanceToDay) {
+                      (window as any).advanceToDay(15);
+                    }
+                  }}
+                  className="bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-xs transition-colors"
+                >
+                  🚀 Jump to Day 15
+                </button>
+              </div>
+              
+              <div className="text-yellow-400 font-semibold text-xs mt-3">Integration Tests:</div>
               <div className="flex flex-col space-y-1">
                 <button
                   onClick={() => (window as any).testIntegration?.()}
@@ -96,13 +169,36 @@ const DebugPanel: React.FC = () => {
                 </button>
                 <button
                   onClick={() => {
-                    console.log('Current Debug Data:', debugData);
+                    console.log('🔍 === DEBUG STATE LOG ===');
+                    console.log('Debug Data:', debugData);
                     console.log('App Store:', useAppStore.getState());
                     console.log('Storylet Store:', useStoryletStore.getState());
+                    
+                    // Test storylet evaluation specifically
+                    const appState = useAppStore.getState();
+                    const storyletState = useStoryletStore.getState();
+                    console.log('🎭 === STORYLET ANALYSIS ===');
+                    console.log('Current Day:', appState.day);
+                    console.log('Total Storylets:', Object.keys(storyletState.allStorylets).length);
+                    console.log('Active Storylets:', storyletState.activeStoryletIds.length);
+                    console.log('Completed Storylets:', storyletState.completedStoryletIds.length);
+                    
+                    // Check time-based storylets specifically
+                    const timeBasedStorylets = Object.values(storyletState.allStorylets).filter(
+                      (s: any) => s.trigger.type === 'time'
+                    );
+                    console.log('Time-based storylets:', timeBasedStorylets.length);
+                    timeBasedStorylets.forEach((s: any) => {
+                      const dayReq = s.trigger.conditions.day;
+                      const weekReq = s.trigger.conditions.week;
+                      const eligible = dayReq ? appState.day >= dayReq : 
+                                      weekReq ? appState.day >= (weekReq * 7) : false;
+                      console.log(`📅 ${s.id}: day=${dayReq}, week=${weekReq}, eligible=${eligible}`);
+                    });
                   }}
                   className="bg-purple-600 hover:bg-purple-700 px-2 py-1 rounded text-xs transition-colors"
                 >
-                  Log State to Console
+                  🔍 Log State & Analysis
                 </button>
               </div>
             </div>

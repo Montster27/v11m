@@ -27,7 +27,7 @@ const Navigation: React.FC = () => {
           <div className="flex items-center space-x-6">
             <Link to="/" className="flex items-center space-x-2">
               <div className="text-2xl">🎮</div>
-              <span className="text-xl font-bold text-gray-900">Life Simulator</span>
+              <span className="text-xl font-bold text-gray-900">MMV</span>
             </Link>
             
             {/* Active Character */}
@@ -58,6 +58,12 @@ const Navigation: React.FC = () => {
             <Link to="/character-creation" className={navLinkClass('/character-creation')}>
               New Character
             </Link>
+            {/* Developer Tools - only in development */}
+            {process.env.NODE_ENV === 'development' && (
+              <Link to="/storylet-developer" className={navLinkClass('/storylet-developer')}>
+                📖 Dev
+              </Link>
+            )}
           </div>
           
           {/* Status Indicators */}

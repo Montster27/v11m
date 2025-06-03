@@ -1,7 +1,7 @@
 # Product Context
 
 ## Project Purpose
-Web-based life simulator prototype - a digital tool to help users plan, track, and gamify their personal life goals and activities.
+MMV (formerly Life Simulator) - a web-based life simulation prototype - a digital tool to help users plan, track, and gamify their personal life goals and activities.
 
 ## Problems It Solves
 - Lack of engaging personal productivity tools

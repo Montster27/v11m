@@ -1,9 +1,11 @@
 // /Users/montysharma/V11M2/src/components/QuestManager.tsx
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppStore, Quest } from '../store/useAppStore';
 import { Button, Card } from './ui';
+import QuestEditor from './QuestEditor';
+import QuestFilters from './QuestFilters';
 
-type TabType = 'active' | 'completed' | 'create' | 'templates';
+type TabType = 'active' | 'completed' | 'storylets' | 'create' | 'templates';
 
 interface QuestFormData {
   title: string;
@@ -23,17 +25,66 @@ const QuestManager: React.FC = () => {
     difficulty: 'easy',
     category: 'General'
   });
+  
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedDifficulty, setSelectedDifficulty] = useState('All');
 
   const { 
     activeQuests, 
     completedQuests, 
     addQuest, 
+    updateQuest,
+    deleteQuest,
     completeQuest 
   } = useAppStore();
 
+  // Filter quests based on search and filter criteria
+  const filteredActiveQuests = useMemo(() => {
+    return activeQuests.filter(quest => {
+      const matchesSearch = quest.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           quest.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategory === 'All' || quest.category === selectedCategory;
+      const matchesDifficulty = selectedDifficulty === 'All' || quest.difficulty === selectedDifficulty;
+      
+      return matchesSearch && matchesCategory && matchesDifficulty;
+    });
+  }, [activeQuests, searchTerm, selectedCategory, selectedDifficulty]);
+  
+  const filteredCompletedQuests = useMemo(() => {
+    return completedQuests.filter(quest => !quest.id.startsWith('storylet_')).filter(quest => {
+      const matchesSearch = quest.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           quest.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategory === 'All' || quest.category === selectedCategory;
+      const matchesDifficulty = selectedDifficulty === 'All' || quest.difficulty === selectedDifficulty;
+      
+      return matchesSearch && matchesCategory && matchesDifficulty;
+    });
+  }, [completedQuests, searchTerm, selectedCategory, selectedDifficulty]);
+  
+  // Filter storylet achievements (completed quests from storylets)
+  const storyletAchievements = useMemo(() => {
+    return completedQuests.filter(quest => quest.id.startsWith('storylet_')).filter(quest => {
+      const matchesSearch = quest.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           quest.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategory === 'All' || quest.category === selectedCategory;
+      const matchesDifficulty = selectedDifficulty === 'All' || quest.difficulty === selectedDifficulty;
+      
+      return matchesSearch && matchesCategory && matchesDifficulty;
+    });
+  }, [completedQuests, searchTerm, selectedCategory, selectedDifficulty]);
+  
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedCategory('All');
+    setSelectedDifficulty('All');
+  };
+
   const tabs = [
-    { id: 'active' as TabType, label: 'Active Quests', count: activeQuests.length },
-    { id: 'completed' as TabType, label: 'Completed', count: completedQuests.length },
+    { id: 'active' as TabType, label: 'Active Quests', count: filteredActiveQuests.length },
+    { id: 'completed' as TabType, label: 'Completed', count: filteredCompletedQuests.length },
+    { id: 'storylets' as TabType, label: 'Storylet Achievements', count: storyletAchievements.length },
     { id: 'create' as TabType, label: 'Create Quest', count: null },
     { id: 'templates' as TabType, label: 'Templates', count: null }
   ];
@@ -132,6 +183,17 @@ const QuestManager: React.FC = () => {
 
   const renderActiveQuests = () => (
     <div className="space-y-4">
+      {/* Filters for Active Quests */}
+      <QuestFilters
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        selectedCategory={selectedCategory}
+        onCategoryChange={setSelectedCategory}
+        selectedDifficulty={selectedDifficulty}
+        onDifficultyChange={setSelectedDifficulty}
+        onClearFilters={clearFilters}
+      />
+      
       {activeQuests.length === 0 ? (
         <div className="text-center py-8">
           <p className="text-gray-500 mb-4">No active quests yet</p>
@@ -142,8 +204,18 @@ const QuestManager: React.FC = () => {
             Create Your First Quest
           </Button>
         </div>
+      ) : filteredActiveQuests.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-gray-500 mb-4">No quests match your current filters</p>
+          <Button 
+            onClick={clearFilters}
+            variant="outline"
+          >
+            Clear Filters
+          </Button>
+        </div>
       ) : (
-        activeQuests.map((quest) => (
+        filteredActiveQuests.map((quest) => (
           <Card key={quest.id} className="border border-gray-200 hover:border-blue-300 transition-colors">
             <div className="flex justify-between items-start mb-3">
               <h3 className="text-lg font-semibold text-gray-900">{quest.title}</h3>
@@ -151,14 +223,28 @@ const QuestManager: React.FC = () => {
                 <span className={`px-2 py-1 text-xs rounded-full ${getDifficultyColor(quest.difficulty)}`}>
                   {quest.difficulty}
                 </span>
-                <Button
-                  onClick={() => setEditingQuest(quest)}
-                  size="sm"
-                  variant="outline"
-                  className="text-xs"
-                >
-                  Edit
-                </Button>
+                <div className="flex space-x-1">
+                  <Button
+                    onClick={() => setEditingQuest(quest)}
+                    size="sm"
+                    variant="outline"
+                    className="text-xs"
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to delete this quest?')) {
+                        deleteQuest(quest.id);
+                      }
+                    }}
+                    size="sm"
+                    variant="outline"
+                    className="text-xs text-red-600 hover:bg-red-50"
+                  >
+                    Delete
+                  </Button>
+                </div>
               </div>
             </div>
             
@@ -189,13 +275,34 @@ const QuestManager: React.FC = () => {
 
   const renderCompletedQuests = () => (
     <div className="space-y-3">
-      {completedQuests.length === 0 ? (
+      {/* Filters for Completed Quests */}
+      <QuestFilters
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        selectedCategory={selectedCategory}
+        onCategoryChange={setSelectedCategory}
+        selectedDifficulty={selectedDifficulty}
+        onDifficultyChange={setSelectedDifficulty}
+        onClearFilters={clearFilters}
+      />
+      
+      {completedQuests.filter(quest => !quest.id.startsWith('storylet_')).length === 0 ? (
         <div className="text-center py-8">
-          <p className="text-gray-500">No completed quests yet</p>
+          <p className="text-gray-500">No manually completed quests yet</p>
           <p className="text-sm text-gray-400 mt-2">Complete some active quests to see them here</p>
         </div>
+      ) : filteredCompletedQuests.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-gray-500 mb-4">No completed quests match your current filters</p>
+          <Button 
+            onClick={clearFilters}
+            variant="outline"
+          >
+            Clear Filters
+          </Button>
+        </div>
       ) : (
-        completedQuests.slice().reverse().map((quest) => (
+        filteredCompletedQuests.slice().reverse().map((quest) => (
           <Card key={quest.id} className="bg-green-50 border-green-200">
             <div className="flex justify-between items-start">
               <div className="flex-1">
@@ -214,6 +321,72 @@ const QuestManager: React.FC = () => {
               <div className="text-right ml-4">
                 <div className="text-green-600 font-semibold">+{quest.experienceReward} XP</div>
                 <div className="text-xs text-gray-500">Completed</div>
+              </div>
+            </div>
+          </Card>
+        ))
+      )}
+    </div>
+  );
+
+  const renderStoryletAchievements = () => (
+    <div className="space-y-3">
+      {/* Info banner */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+        <div className="flex items-start">
+          <div className="flex-shrink-0">
+            <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-blue-800">Storylet Achievements</h3>
+            <div className="mt-1 text-sm text-blue-700">
+              <p>These achievements are automatically created when you complete storylet choices. They represent your narrative decisions and their outcomes in quest form.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Filters for Storylet Achievements */}
+      <QuestFilters
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        selectedCategory={selectedCategory}
+        onCategoryChange={setSelectedCategory}
+        selectedDifficulty={selectedDifficulty}
+        onDifficultyChange={setSelectedDifficulty}
+        onClearFilters={clearFilters}
+      />
+      
+      {storyletAchievements.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-gray-500">No storylet achievements yet</p>
+          <p className="text-sm text-gray-400 mt-2">Complete some storylets on the Home page to see achievements here</p>
+        </div>
+      ) : (
+        storyletAchievements.slice().reverse().map((quest) => (
+          <Card key={quest.id} className="bg-purple-50 border-purple-200">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <h4 className="font-semibold text-gray-900 flex items-center">
+                  <span className="text-purple-600 mr-2">🎭</span>
+                  {quest.title}
+                </h4>
+                <p className="text-sm text-gray-600 mt-1">{quest.description}</p>
+                <div className="flex items-center space-x-3 mt-2">
+                  <span className="text-xs text-gray-500">{quest.category}</span>
+                  <span className={`px-2 py-1 text-xs rounded-full ${getDifficultyColor(quest.difficulty)}`}>
+                    {quest.difficulty}
+                  </span>
+                  <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                    Storylet Achievement
+                  </span>
+                </div>
+              </div>
+              <div className="text-right ml-4">
+                <div className="text-purple-600 font-semibold">+{quest.experienceReward} XP</div>
+                <div className="text-xs text-gray-500">Auto-Completed</div>
               </div>
             </div>
           </Card>
@@ -393,38 +566,21 @@ const QuestManager: React.FC = () => {
       <div className="min-h-96">
         {activeTab === 'active' && renderActiveQuests()}
         {activeTab === 'completed' && renderCompletedQuests()}
+        {activeTab === 'storylets' && renderStoryletAchievements()}
         {activeTab === 'create' && renderCreateQuest()}
         {activeTab === 'templates' && renderTemplates()}
       </div>
 
-      {/* Edit Quest Modal (if needed) */}
-      {editingQuest && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Edit Quest</h3>
-            <p className="text-gray-600 mb-4">
-              Quest editing functionality coming soon. For now, you can complete the quest or create a new one.
-            </p>
-            <div className="flex space-x-3">
-              <Button 
-                onClick={() => setEditingQuest(null)}
-                variant="outline"
-              >
-                Close
-              </Button>
-              <Button 
-                onClick={() => {
-                  completeQuest(editingQuest.id);
-                  setEditingQuest(null);
-                }}
-                variant="primary"
-              >
-                Complete Quest
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Quest Editor Modal */}
+      <QuestEditor
+        quest={editingQuest}
+        isOpen={!!editingQuest}
+        onClose={() => setEditingQuest(null)}
+        onSave={(updatedQuest) => {
+          updateQuest(updatedQuest.id, updatedQuest);
+          setEditingQuest(null);
+        }}
+      />
     </div>
   );
 };

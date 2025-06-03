@@ -87,12 +87,16 @@ interface AppState {
   setCurrentEvent: (event: Event | null) => void;
   handleEventChoice: (choice: EventChoice) => void;
   addQuest: (quest: Quest) => void;
+  updateQuest: (questId: string, updatedQuest: Quest) => void;
+  deleteQuest: (questId: string) => void;
   completeQuest: (questId: string) => void;
+  convertStoryletToQuest: (storyletId: string, choiceId: string) => void;
   addGoal: (goal: Goal) => void;
   addTask: (task: Task) => void;
   toggleTaskComplete: (taskId: string) => void;
   simulateDay: () => void;
   incrementDay: () => void;
+  resetGame: () => void;
   
   // New simulation methods
   setSimulationRunning: (running: boolean) => void;
@@ -336,6 +340,100 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     activeQuests: [...state.activeQuests, quest]
   })),
   
+  updateQuest: (questId, updatedQuest) => set((state) => ({
+    activeQuests: state.activeQuests.map(quest => 
+      quest.id === questId ? updatedQuest : quest
+    )
+  })),
+  
+  deleteQuest: (questId) => set((state) => ({
+    activeQuests: state.activeQuests.filter(quest => quest.id !== questId)
+  })),
+  
+  convertStoryletToQuest: (storyletId, choiceId) => {
+    try {
+      // Get storylet data from storylet store
+      if (typeof window !== 'undefined' && (window as any).useStoryletStore) {
+        const storyletStore = (window as any).useStoryletStore.getState();
+        const storylet = storyletStore.allStorylets[storyletId];
+        const choice = storylet?.choices.find((c: any) => c.id === choiceId);
+        
+        if (storylet && choice) {
+          // Calculate XP reward based on choice effects
+          const skillXpEffects = choice.effects.filter((e: any) => e.type === 'skillXp');
+          const totalSkillXp = skillXpEffects.reduce((sum: number, effect: any) => sum + effect.amount, 0);
+          const baseXp = Math.max(25, totalSkillXp * 10); // Convert skill XP to quest XP
+          
+          // Determine difficulty based on effects and complexity
+          let difficulty: 'easy' | 'medium' | 'hard' = 'easy';
+          const effectCount = choice.effects.length;
+          const hasNegativeEffects = choice.effects.some((e: any) => 
+            e.type === 'resource' && e.delta < 0
+          );
+          
+          if (effectCount >= 4 || totalSkillXp >= 5) {
+            difficulty = 'hard';
+          } else if (effectCount >= 2 || totalSkillXp >= 3 || hasNegativeEffects) {
+            difficulty = 'medium';
+          }
+          
+          // Map storylet themes to quest categories
+          const categoryMap: Record<string, string> = {
+            'midterm': 'Learning',
+            'study': 'Learning',
+            'library': 'Learning',
+            'coffee': 'Social',
+            'rival': 'Social',
+            'dorm': 'Social',
+            'stress': 'Health',
+            'energy': 'Health',
+            'sleep': 'Health',
+            'money': 'Finance',
+            'work': 'Career',
+            'knowledge': 'Learning'
+          };
+          
+          let category = 'General';
+          for (const [keyword, cat] of Object.entries(categoryMap)) {
+            if (storylet.name.toLowerCase().includes(keyword) || 
+                storylet.description.toLowerCase().includes(keyword)) {
+              category = cat;
+              break;
+            }
+          }
+          
+          const completedQuest: Quest = {
+            id: `storylet_${storyletId}_${choiceId}_${Date.now()}`,
+            title: `${storylet.name}: ${choice.text}`,
+            description: `Completed storylet choice: ${storylet.description.substring(0, 100)}...`,
+            experienceReward: baseXp,
+            difficulty,
+            category,
+            completed: true
+          };
+          
+          // Add to completed quests and award experience
+          set((state) => {
+            const newExperience = state.experience + completedQuest.experienceReward;
+            const newLevel = Math.floor(newExperience / 100) + 1;
+            
+            return {
+              completedQuests: [...state.completedQuests, completedQuest],
+              experience: newExperience,
+              userLevel: newLevel > state.userLevel ? newLevel : state.userLevel
+            };
+          });
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`🎯 Converted storylet to quest: ${completedQuest.title} (+${completedQuest.experienceReward} XP)`);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Could not convert storylet to quest:', error);
+    }
+  },
+  
   completeQuest: (questId) => set((state) => {
     const quest = state.activeQuests.find(q => q.id === questId);
     if (!quest) return state;
@@ -374,11 +472,11 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   simulateDay: () => {
     const { day, allocations, resources, updateResource } = get();
     
-    // Simulate daily effects based on time allocation
+    // Simulate daily effects based on time allocation (increased growth rates)
     const energyChange = (allocations.rest * 0.8) - (allocations.work * 0.5) - (allocations.study * 0.3);
     const stressChange = (allocations.work * 0.3) + (allocations.study * 0.2) - (allocations.rest * 0.5);
-    const knowledgeChange = allocations.study * 0.1;
-    const socialChange = (allocations.social * 0.2) - (allocations.study * 0.05);
+    const knowledgeChange = allocations.study * 0.5; // Increased from 0.1 to 0.5
+    const socialChange = (allocations.social * 0.8) - (allocations.study * 0.05); // Increased from 0.2 to 0.8
     const moneyChange = allocations.work * 2;
     
     updateResource('energy', resources.energy + energyChange);
@@ -409,6 +507,113 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       return { day: newDay };
     });
     console.log('After set - day is now:', get().day);
+  },
+
+  resetGame: () => {
+    console.log('🔄 Resetting entire game state...');
+    
+    // Reset app store to initial state
+    set({
+      userLevel: 1,
+      experience: 0,
+      day: 1,
+      activeCharacter: null,
+      allocations: {
+        study: 40,
+        work: 25,
+        social: 15,
+        rest: 15,
+        exercise: 5
+      },
+      resources: {
+        energy: 75,
+        stress: 25,
+        money: 150,
+        knowledge: 100,
+        social: 200
+      },
+      storyletFlags: {},
+      activeStoryletIds: [],
+      skills: {
+        bureaucraticNavigation: {
+          id: 'bureaucraticNavigation',
+          name: 'Bureaucratic Navigation',
+          description: 'Mastery of institutional systems, form-filling, and navigating complex bureaucratic structures efficiently.',
+          xp: 0,
+          level: 1,
+          xpToNextLevel: 100
+        },
+        resourceAcquisition: {
+          id: 'resourceAcquisition',
+          name: 'Resource Acquisition',
+          description: 'Skill in finding, securing, and optimizing access to materials, funding, and opportunities.',
+          xp: 0,
+          level: 1,
+          xpToNextLevel: 100
+        },
+        informationWarfare: {
+          id: 'informationWarfare',
+          name: 'Information Warfare',
+          description: 'Strategic intelligence gathering, data analysis, and leveraging information for competitive advantage.',
+          xp: 0,
+          level: 1,
+          xpToNextLevel: 100
+        },
+        allianceBuilding: {
+          id: 'allianceBuilding',
+          name: 'Alliance Building',
+          description: 'Creating and maintaining strategic partnerships, networking, and coalition formation.',
+          xp: 0,
+          level: 1,
+          xpToNextLevel: 100
+        },
+        operationalSecurity: {
+          id: 'operationalSecurity',
+          name: 'Operational Security',
+          description: 'Protecting sensitive activities, maintaining discretion, and managing risk in complex operations.',
+          xp: 0,
+          level: 1,
+          xpToNextLevel: 100
+        },
+        perseverance: {
+          id: 'perseverance',
+          name: 'Perseverance',
+          description: 'Mental toughness and determination to push through difficult challenges and setbacks.',
+          xp: 0,
+          level: 1,
+          xpToNextLevel: 100
+        }
+      },
+      skillEvents: [],
+      currentEvent: null,
+      activeQuests: [],
+      completedQuests: [],
+      goals: [],
+      tasks: [],
+      isSimulationRunning: false,
+      lastEventCheck: 0
+    });
+    
+    // Reset storylets via storylet store
+    try {
+      if (typeof window !== 'undefined' && (window as any).useStoryletStore) {
+        (window as any).useStoryletStore.getState().resetStorylets();
+      }
+    } catch (error) {
+      console.warn('Could not reset storylets:', error);
+    }
+    
+    // Clear localStorage persistence
+    try {
+      localStorage.removeItem('life-sim-store');
+      localStorage.removeItem('storylet-store');
+      localStorage.removeItem('character-store');
+    } catch (error) {
+      console.warn('Could not clear localStorage:', error);
+    }
+    
+    console.log('✅ Game reset complete! Refresh page for full reset.');
+    alert('Game has been reset! Please refresh the page to see the clean state.');
   },
   
   // New simulation methods
