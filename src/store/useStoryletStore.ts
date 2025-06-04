@@ -273,6 +273,15 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       console.log('📋 Effects to apply:', choice.effects);
     }
     
+    // Record storylet completion in save system
+    try {
+      if (typeof window !== 'undefined' && (window as any).useSaveStore) {
+        (window as any).useSaveStore.getState().recordStoryletCompletion(storyletId, choiceId, choice);
+      }
+    } catch (error) {
+      console.warn('Could not record storylet completion:', error);
+    }
+    
     // Apply effects
     choice.effects.forEach((effect) => {
       get().applyEffect(effect);

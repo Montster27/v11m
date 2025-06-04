@@ -497,6 +497,20 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
         console.warn('Could not trigger storylet evaluation:', error);
       }
     }, 100);
+    
+    // Auto-save current game if there's an active save
+    setTimeout(() => {
+      try {
+        if (typeof window !== 'undefined' && (window as any).useSaveStore) {
+          const saveStore = (window as any).useSaveStore.getState();
+          if (saveStore.currentSaveId) {
+            saveStore.updateCurrentSave();
+          }
+        }
+      } catch (error) {
+        console.warn('Could not auto-save:', error);
+      }
+    }, 200);
   },
   
   incrementDay: () => {
