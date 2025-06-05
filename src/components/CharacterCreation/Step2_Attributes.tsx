@@ -45,7 +45,13 @@ const Step2_Attributes: React.FC = () => {
     getTotalAttributePoints 
   } = useCharacterStore();
   
-  const [attributes, setAttributes] = useState(currentCharacter?.attributes || {});
+  const [attributes, setAttributes] = useState(currentCharacter?.attributes || {
+    intelligence: 6, creativity: 6, memory: 6, focus: 6,
+    strength: 6, agility: 6, endurance: 6, dexterity: 6,
+    charisma: 6, empathy: 6, communication: 6,
+    emotionalStability: 6, perseverance: 6, stressTolerance: 6,
+    adaptability: 6, selfControl: 4
+  });
   const totalPoints = getTotalAttributePoints();
   const remainingPoints = 100 - totalPoints;
   const canProceed = isStepValid(2);
@@ -101,7 +107,7 @@ const Step2_Attributes: React.FC = () => {
       <Card className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {attributeList.map((attr) => {
-            const currentValue = attributes[attr.key] || 1;
+            const currentValue = attributes[attr.key as keyof typeof attributes] || 1;
             
             const handleDecrease = () => {
               if (currentValue > 1) {

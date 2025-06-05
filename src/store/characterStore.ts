@@ -1,6 +1,73 @@
 // /Users/montysharma/V11M2/src/store/characterStore.ts
 import { create } from 'zustand';
-import { Character } from '../types/character';
+import { Character, QuestionnaireQuestion } from '../types/character';
+
+// Export Character type for other files
+export type { Character } from '../types/character';
+
+// Questionnaire data
+export const questionnaireData: QuestionnaireQuestion[] = [
+  {
+    id: 'study_approach',
+    question: 'How do you typically approach studying for an important exam?',
+    options: [
+      {
+        id: 'methodical',
+        text: 'Create a detailed study schedule and stick to it religiously',
+        attributeEffects: [
+          { attribute: 'focus', change: 2 },
+          { attribute: 'perseverance', change: 1 }
+        ]
+      },
+      {
+        id: 'creative',
+        text: 'Use mind maps, flashcards, and creative memory techniques',
+        attributeEffects: [
+          { attribute: 'creativity', change: 2 },
+          { attribute: 'memory', change: 1 }
+        ]
+      },
+      {
+        id: 'group',
+        text: 'Form study groups and learn through discussion',
+        attributeEffects: [
+          { attribute: 'communication', change: 2 },
+          { attribute: 'charisma', change: 1 }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'stress_response',
+    question: 'When facing a high-pressure deadline, you tend to:',
+    options: [
+      {
+        id: 'calm',
+        text: 'Stay calm and work systematically through the tasks',
+        attributeEffects: [
+          { attribute: 'stressTolerance', change: 2 },
+          { attribute: 'emotionalStability', change: 1 }
+        ]
+      },
+      {
+        id: 'energized',
+        text: 'Feel energized and work with intense focus',
+        attributeEffects: [
+          { attribute: 'focus', change: 2 },
+          { attribute: 'endurance', change: 1 }
+        ]
+      },
+      {
+        id: 'collaborative',
+        text: 'Seek help and collaborate with others',
+        attributeEffects: [
+          { attribute: 'empathy', change: 1 },
+          { attribute: 'communication', change: 2 }
+        ]
+      }
+    ]
+  }
+];
 
 // Simple UUID generator
 const generateUUID = (): string => {
