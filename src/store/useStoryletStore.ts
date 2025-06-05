@@ -7,6 +7,8 @@ import { collegeStorylets } from '../data/collegeStorylets';
 import { immediateStorylets } from '../data/immediateStorylets';
 import { frequentStorylets } from '../data/frequentStorylets';
 import { minigameStorylets } from '../data/minigameStorylets';
+import { integratedStorylets } from '../data/integratedStorylets';
+import { developmentTriggeredStorylets } from '../data/developmentTriggeredStorylets';
 
 interface StoryletState {
   // Core storylet data
@@ -159,7 +161,14 @@ const evaluateStoryletTrigger = (trigger: any, activeFlags: any, appState: any) 
 
 export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   // Initial state
-  allStorylets: { ...immediateStorylets, ...frequentStorylets, ...collegeStorylets, ...minigameStorylets },
+  allStorylets: { 
+    ...immediateStorylets, 
+    ...frequentStorylets, 
+    ...collegeStorylets, 
+    ...minigameStorylets, 
+    ...integratedStorylets,
+    ...developmentTriggeredStorylets 
+  },
   activeFlags: {},
   activeStoryletIds: [],
   completedStoryletIds: [],
@@ -399,12 +408,33 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
         
       case 'skillXp':
         try {
+          // Check if using integrated character system (V2)
+          if (typeof window !== 'undefined' && (window as any).useIntegratedCharacterStore) {
+            const integratedStore = (window as any).useIntegratedCharacterStore.getState();
+            if (integratedStore.currentCharacter && integratedStore.currentCharacter.version === 2) {
+              integratedStore.addSkillXP(effect.key, effect.amount);
+              return;
+            }
+          }
+          
+          // Fallback to V1 system
           if (typeof window !== 'undefined' && (window as any).useAppStore) {
             const appStore = (window as any).useAppStore.getState();
             appStore.addSkillXp(effect.key, effect.amount, 'Storylet');
           }
         } catch (error) {
           console.warn('Could not add skill XP:', error);
+        }
+        break;
+        
+      case 'domainXp':
+        // New effect type for integrated character system
+        try {
+          if (typeof window !== 'undefined' && (window as any).addDevelopmentXP) {
+            (window as any).addDevelopmentXP(effect.domain, effect.amount, 'Storylet');
+          }
+        } catch (error) {
+          console.warn('Could not add domain XP:', error);
         }
         break;
         

@@ -200,8 +200,18 @@ export const useIntegratedCharacterStore = create<IntegratedCharacterState>()(
         // Update character
         get().updateCharacter(result.character);
         
-        // Update development stats
-        if (result.stageAdvanced) {
+        // Update development stats and set storylet flags for stage advancement
+        if (result.stageAdvanced && result.newStage) {
+          // Set flag for storylet system integration
+          try {
+            if (typeof window !== 'undefined' && (window as any).useStoryletStore) {
+              const storyletStore = (window as any).useStoryletStore.getState();
+              storyletStore.setFlag(`${domainKey}_stage_${result.newStage}`, true);
+            }
+          } catch (error) {
+            console.warn('Could not set storylet flag:', error);
+          }
+          
           set(state => ({
             developmentStats: {
               ...state.developmentStats,

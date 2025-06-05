@@ -22,6 +22,7 @@ export type Effect =
   | { type: "resource"; key: "energy" | "stress" | "knowledge" | "social" | "money"; delta: number }
   | { type: "flag"; key: string; value: boolean }    // set or clear a game flag
   | { type: "skillXp"; key: string; amount: number } // award XP to a skill
+  | { type: "domainXp"; domain: "intellectualCompetence" | "physicalCompetence" | "emotionalIntelligence" | "socialCompetence" | "personalAutonomy" | "identityClarity" | "lifePurpose"; amount: number } // award XP to a domain (V2 characters)
   | { type: "unlock"; storyletId: string }           // unlock a new storylet immediately
   | { type: "minigame"; gameId: string; onSuccess?: Effect[]; onFailure?: Effect[] }; // launch a minigame
 
