@@ -11,7 +11,7 @@ import TimeAllocationPanel from '../components/TimeAllocationPanel';
 import DebugPanel from '../components/DebugPanel';
 
 const Home: React.FC = () => {
-  const { activeCharacter, setActiveCharacter, addExperience } = useAppStore();
+  const { activeCharacter, setActiveCharacter, addExperience, isTimePaused } = useAppStore();
   const { evaluateStorylets } = useStoryletStore();
   
   // Evaluate storylets when component mounts and periodically
@@ -22,11 +22,14 @@ const Home: React.FC = () => {
     
     // Re-evaluate storylets every 10 seconds to catch time-based triggers
     const interval = setInterval(() => {
-      evaluateStorylets();
+      // Don't evaluate storylets if time is paused (minigame active)
+      if (!isTimePaused) {
+        evaluateStorylets();
+      }
     }, 10000);
     
     return () => clearInterval(interval);
-  }, [evaluateStorylets]);
+  }, [evaluateStorylets, isTimePaused]);
 
   const handleCreateCharacter = () => {
     // Navigate to character creation - this should set activeCharacter when done

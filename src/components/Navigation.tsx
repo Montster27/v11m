@@ -9,7 +9,7 @@ import StoryletProgress from './StoryletProgress';
 
 const Navigation: React.FC = () => {
   const location = useLocation();
-  const { userLevel, experience, day, activeCharacter } = useAppStore();
+  const { userLevel, experience, day, activeCharacter, isTimePaused } = useAppStore();
   const { currentCharacter } = useCharacterStore();
   const [showSaveManager, setShowSaveManager] = useState(false);
   const [showStoryletProgress, setShowStoryletProgress] = useState(false);
@@ -30,7 +30,7 @@ const Navigation: React.FC = () => {
           <div className="flex justify-between items-center h-16">
             {/* Logo/Brand and Character Info */}
             <div className="flex items-center space-x-6">
-              <Link to="/" className="flex items-center space-x-2">
+              <Link to="/planner" className="flex items-center space-x-2">
                 <div className="text-2xl">🎮</div>
                 <span className="text-xl font-bold text-gray-900">MMV</span>
               </Link>
@@ -48,9 +48,6 @@ const Navigation: React.FC = () => {
             
             {/* Navigation Links */}
             <div className="flex items-center space-x-2">
-              <Link to="/" className={navLinkClass('/')}>
-                Home
-              </Link>
               <Link to="/planner" className={navLinkClass('/planner')}>
                 Planner
               </Link>
@@ -92,6 +89,14 @@ const Navigation: React.FC = () => {
               <ProgressBadge title="Level" value={userLevel} color="purple" />
               <ProgressBadge title="XP" value={experience} color="blue" />
               <ProgressBadge title="Day" value={day} color="teal" />
+              
+              {/* Time Pause Indicator */}
+              {isTimePaused && (
+                <div className="flex items-center space-x-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-md text-sm font-medium">
+                  <span>⏸️</span>
+                  <span>Time Paused</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

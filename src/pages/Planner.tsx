@@ -74,7 +74,8 @@ const Planner: React.FC = () => {
     day,
     updateTimeAllocation,
     incrementDay,
-    activeCharacter
+    activeCharacter,
+    isTimePaused
   } = useAppStore();
   
   const { currentCharacter } = useCharacterStore();
@@ -93,7 +94,7 @@ const Planner: React.FC = () => {
   const crashCheck = checkCrashConditions(resources.energy, resources.stress);
   
   // Determine if Play button should be disabled
-  const canPlay = validation.isValid && !isCrashRecovery && crashCheck.isValid;
+  const canPlay = validation.isValid && !isCrashRecovery && crashCheck.isValid && !isTimePaused;
   
   // Update local day when store day changes
   useEffect(() => {
@@ -142,6 +143,13 @@ const Planner: React.FC = () => {
     
     // Get fresh state from the store each tick
     const currentState = useAppStore.getState();
+    
+    // Don't simulate if time is paused (minigame active)
+    if (currentState.isTimePaused) {
+      console.log('⏸️ Simulation tick skipped - time is paused');
+      return;
+    }
+    
     const currentResources = currentState.resources;
     const currentAllocations = currentState.allocations;
     const currentDay = currentState.day;
@@ -287,6 +295,18 @@ const Planner: React.FC = () => {
     }
   }, [resources.energy, resources.stress, isPlaying]);
 
+  // Auto-pause if time is paused (minigame active)
+  useEffect(() => {
+    if (isPlaying && isTimePaused) {
+      console.log('⏸️ Auto-pausing simulation because time is paused');
+      setIsPlaying(false);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+  }, [isTimePaused, isPlaying]);
+
   const getValidationMessageClass = () => {
     if (validation.type === 'error') return 'text-red-600';
     if (validation.type === 'warning') return 'text-amber-600';
@@ -301,62 +321,71 @@ const Planner: React.FC = () => {
     <div className="page-container min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
-        <header className="text-center mb-6">
-          <h1 className="text-4xl font-bold text-teal-800 mb-4">
-            Time & Resource Allocation Dashboard
-          </h1>
-          
-          {/* Level Progress Bar */}
-          <div className="max-w-md mx-auto mb-4">
-            <div className="flex justify-between text-sm text-gray-600 mb-1">
-              <span>Level {userLevel} Progress</span>
-              <span>{currentLevelProgress}/{nextLevelXP}</span>
+        <header className="mb-6">
+          {/* Top Row: Play Button & Date (Left) | Title & XP (Right) */}
+          <div className="flex justify-between items-start mb-4">
+            {/* Left Side: Play Button and Date */}
+            <div className="flex flex-col items-start">
+              <Button 
+                onClick={toggleSimulation}
+                variant={isPlaying ? "outline" : "primary"}
+                disabled={!canPlay && !isPlaying}
+                className="px-8 py-3 text-lg font-bold mb-2"
+              >
+                {isPlaying ? 'PAUSE' : 'PLAY'}
+              </Button>
+              
+              {/* Game Date Display */}
+              <div className="text-lg font-semibold text-gray-700">
+                {getFormattedDate(localDay)}
+              </div>
+              <div className="text-sm text-gray-500">
+                Day {localDay}
+              </div>
+              
+              {!canPlay && !isPlaying && (
+                <div className="text-xs text-gray-500 mt-2 max-w-xs">
+                  {!validation.isValid ? 'Reduce allocations to ≤ 100% before playing' : 
+                   !crashCheck.isValid ? 'Resolve crash conditions before playing' :
+                   isTimePaused ? 'Time is paused (minigame active)' :
+                   'Cannot play during recovery'}
+                </div>
+              )}
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <div 
-                className="bg-purple-500 h-3 rounded-full transition-all duration-300"
-                style={{ width: `${(currentLevelProgress / nextLevelXP) * 100}%` }}
-              />
+            
+            {/* Right Side: Title and Level Progress */}
+            <div className="text-right">
+              <h1 className="text-4xl font-bold text-teal-800 mb-4">
+                Time & Resource Allocation Dashboard
+              </h1>
+              
+              {/* Level Progress Bar */}
+              <div className="max-w-md ml-auto mb-2">
+                <div className="flex justify-between text-sm text-gray-600 mb-1">
+                  <span>Level {userLevel} Progress</span>
+                  <span>{currentLevelProgress}/{nextLevelXP}</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div 
+                    className="bg-purple-500 h-3 rounded-full transition-all duration-300"
+                    style={{ width: `${(currentLevelProgress / nextLevelXP) * 100}%` }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
           
-          {/* Validation Messages */}
-          {validation.message && (
-            <div className={`mb-3 text-sm font-medium ${getValidationMessageClass()}`}>
-              {validation.message}
-            </div>
-          )}
-          
-          {crashCheck.message && crashCheck.type !== 'success' && (
-            <div className={`mb-3 text-sm font-medium ${getCrashCheckClass()}`}>
-              {crashCheck.message}
-            </div>
-          )}
-          
-          {/* Play/Pause Button */}
-          <div className="mb-4">
-            <Button 
-              onClick={toggleSimulation}
-              variant={isPlaying ? "outline" : "primary"}
-              disabled={!canPlay && !isPlaying}
-              className="px-8 py-3 text-lg font-bold"
-            >
-              {isPlaying ? 'PAUSE' : 'PLAY'}
-            </Button>
+          {/* Validation Messages - Centered */}
+          <div className="text-center">
+            {validation.message && (
+              <div className={`mb-3 text-sm font-medium ${getValidationMessageClass()}`}>
+                {validation.message}
+              </div>
+            )}
             
-            {/* Game Date Display */}
-            <div className="mt-3 text-lg font-semibold text-gray-700">
-              {getFormattedDate(localDay)}
-            </div>
-            <div className="text-sm text-gray-500">
-              Day {localDay}
-            </div>
-            
-            {!canPlay && !isPlaying && (
-              <div className="text-xs text-gray-500 mt-2">
-                {!validation.isValid ? 'Reduce allocations to ≤ 100% before playing' : 
-                 !crashCheck.isValid ? 'Resolve crash conditions before playing' :
-                 'Cannot play during recovery'}
+            {crashCheck.message && crashCheck.type !== 'success' && (
+              <div className={`mb-3 text-sm font-medium ${getCrashCheckClass()}`}>
+                {crashCheck.message}
               </div>
             )}
           </div>

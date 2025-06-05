@@ -1,11 +1,13 @@
 // /Users/montysharma/V11M2/src/components/CharacterCreation/Step3_Review.tsx
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCharacterStore } from '../../store/characterStore';
 import { useAppStore } from '../../store/useAppStore';
 import { Card, Button } from '../ui';
 import RadarChart from './RadarChart';
 
 const Step3_Review: React.FC = () => {
+  const navigate = useNavigate();
   const { currentCharacter, prevStep, saveCharacter } = useCharacterStore();
   const { setActiveCharacter } = useAppStore();
   const [showJson, setShowJson] = useState(false);
@@ -168,12 +170,20 @@ const Step3_Review: React.FC = () => {
                 {isCreating ? 'Creating Character...' : 'Create Character'}
               </Button>
             ) : (
-              <Button
-                onClick={() => window.location.reload()}
-                variant="primary"
-              >
-                Create Another Character
-              </Button>
+              <div className="flex space-x-3">
+                <Button
+                  onClick={() => navigate('/planner')}
+                  variant="primary"
+                >
+                  Start Playing
+                </Button>
+                <Button
+                  onClick={() => window.location.reload()}
+                  variant="outline"
+                >
+                  Create Another Character
+                </Button>
+              </div>
             )}
           </div>
         </div>

@@ -1,10 +1,13 @@
 // /Users/montysharma/V11M2/src/pages/CharacterCreation.tsx
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCharacterStore } from '../store/characterStore';
+import { useAppStore } from '../store/useAppStore';
 import { Card, Button } from '../components/ui';
 import CharacterCreationFlow from '../components/CharacterCreation';
 
 const CharacterCreationPage: React.FC = () => {
+  const navigate = useNavigate();
   const { 
     savedCharacters, 
     createNewCharacter, 
@@ -12,6 +15,7 @@ const CharacterCreationPage: React.FC = () => {
     deleteCharacter,
     currentCharacter 
   } = useCharacterStore();
+  const { setActiveCharacter } = useAppStore();
   
   const [mode, setMode] = useState<'menu' | 'create' | 'edit'>('menu');
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
@@ -41,6 +45,11 @@ const CharacterCreationPage: React.FC = () => {
     } catch (error) {
       console.warn('Failed to update localStorage:', error);
     }
+  };
+
+  const handleSelectCharacter = (character: any) => {
+    setActiveCharacter(character);
+    navigate('/planner');
   };
 
   if (mode === 'create' || mode === 'edit') {
@@ -85,7 +94,7 @@ const CharacterCreationPage: React.FC = () => {
             <Card title="Saved Characters" variant="elevated">
               <div className="space-y-4">
                 <p className="text-gray-600 mb-4">
-                  Edit or manage your existing characters:
+                  Select an existing character to start playing, or edit to customize:
                 </p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -111,23 +120,33 @@ const CharacterCreationPage: React.FC = () => {
                           </div>
                         </div>
                         
-                        <div className="flex space-x-2">
+                        <div className="space-y-2">
                           <Button
-                            onClick={() => handleEditCharacter(character.id)}
-                            variant="outline"
+                            onClick={() => handleSelectCharacter(character)}
+                            variant="primary"
                             size="sm"
-                            className="flex-1"
+                            className="w-full"
                           >
-                            Edit
+                            Select Character
                           </Button>
-                          <Button
-                            onClick={() => handleDeleteCharacter(character.id)}
-                            variant="outline"
-                            size="sm"
-                            className="text-red-600 border-red-200 hover:bg-red-50"
-                          >
-                            Delete
-                          </Button>
+                          <div className="flex space-x-2">
+                            <Button
+                              onClick={() => handleEditCharacter(character.id)}
+                              variant="outline"
+                              size="sm"
+                              className="flex-1"
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              onClick={() => handleDeleteCharacter(character.id)}
+                              variant="outline"
+                              size="sm"
+                              className="text-red-600 border-red-200 hover:bg-red-50"
+                            >
+                              Delete
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -138,24 +157,34 @@ const CharacterCreationPage: React.FC = () => {
           )}
 
           {/* Instructions */}
-          <Card title="How Character Creation Works" className="mt-8" variant="outlined">
+          <Card title="How Character Management Works" className="mt-8" variant="outlined">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2">🎯 Step 1: Name Your Character</h3>
+                <h3 className="font-semibold text-gray-900 mb-2">🚀 Quick Start</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Have existing characters? Simply click "Select Character" to jump straight into the game with your chosen character.
+                </p>
+                
+                <h3 className="font-semibold text-gray-900 mb-2">🎯 Creating New Characters</h3>
                 <p className="text-sm text-gray-600 mb-4">
                   Choose a unique name that will represent you throughout the life simulation.
                 </p>
                 
-                <h3 className="font-semibold text-gray-900 mb-2">📊 Step 2: Distribute Attributes</h3>
+                <h3 className="font-semibold text-gray-900 mb-2">📊 Attribute Distribution</h3>
                 <p className="text-sm text-gray-600">
                   Allocate 100 points across 16 different attributes including cognitive, physical, social, and mental traits.
                 </p>
               </div>
               
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2">✅ Step 3: Review & Create</h3>
+                <h3 className="font-semibold text-gray-900 mb-2">✅ Review & Create</h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Review your character's final attributes with a visual radar chart and create your character for the simulation.
+                  Review your character's final attributes with a visual radar chart before finalizing.
+                </p>
+                
+                <h3 className="font-semibold text-gray-900 mb-2">✏️ Edit Existing Characters</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Want to modify a character? Use the "Edit" button to change their attributes and settings.
                 </p>
                 
                 <h3 className="font-semibold text-gray-900 mb-2">💾 Character Management</h3>

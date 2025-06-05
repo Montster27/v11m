@@ -70,6 +70,9 @@ interface AppState {
   isSimulationRunning: boolean;
   lastEventCheck: number;
   
+  // Time control
+  isTimePaused: boolean;
+  
   // Skill actions
   addSkillXp: (skillId: string, amount: number, source?: string) => void;
   addSkillEvent: (event: { skillId: string; amount: number; timestamp: number; source: string }) => void;
@@ -97,6 +100,8 @@ interface AppState {
   simulateDay: () => void;
   incrementDay: () => void;
   resetGame: () => void;
+  pauseTime: () => void;
+  resumeTime: () => void;
   
   // New simulation methods
   setSimulationRunning: (running: boolean) => void;
@@ -240,6 +245,8 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   
   isSimulationRunning: false,
   lastEventCheck: 0,
+  
+  isTimePaused: false,
   
   // Actions
   setTheme: (theme) => set({ theme }),
@@ -470,7 +477,13 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   })),
   
   simulateDay: () => {
-    const { day, allocations, resources, updateResource } = get();
+    const { day, allocations, resources, updateResource, isTimePaused } = get();
+    
+    // Don't simulate if time is paused
+    if (isTimePaused) {
+      console.log('⏸️ Day simulation skipped - time is paused');
+      return;
+    }
     
     // Simulate daily effects based on time allocation (increased growth rates)
     const energyChange = (allocations.rest * 0.8) - (allocations.work * 0.5) - (allocations.study * 0.3);
@@ -514,6 +527,14 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   },
   
   incrementDay: () => {
+    const { isTimePaused } = get();
+    
+    // Don't increment day if time is paused
+    if (isTimePaused) {
+      console.log('⏸️ Day increment skipped - time is paused');
+      return;
+    }
+    
     console.log('incrementDay called - current day:', get().day);
     set((state) => {
       const newDay = state.day + 1;
@@ -605,7 +626,8 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       goals: [],
       tasks: [],
       isSimulationRunning: false,
-      lastEventCheck: 0
+      lastEventCheck: 0,
+      isTimePaused: false
     });
     
     // Reset storylets via storylet store
@@ -703,6 +725,17 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       .filter(event => event.skillId === skillId)
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, limit);
+  },
+  
+  // Time control functions
+  pauseTime: () => {
+    console.log('⏸️ Time paused');
+    set({ isTimePaused: true });
+  },
+  
+  resumeTime: () => {
+    console.log('▶️ Time resumed');
+    set({ isTimePaused: false });
   }
 }), {
   name: 'life-sim-store',
@@ -714,7 +747,8 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     storyletFlags: state.storyletFlags,
     day: state.day,
     userLevel: state.userLevel,
-    experience: state.experience
+    experience: state.experience,
+    isTimePaused: state.isTimePaused
   })
 }));
 

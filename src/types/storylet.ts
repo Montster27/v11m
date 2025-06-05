@@ -22,4 +22,17 @@ export type Effect =
   | { type: "resource"; key: "energy" | "stress" | "knowledge" | "social" | "money"; delta: number }
   | { type: "flag"; key: string; value: boolean }    // set or clear a game flag
   | { type: "skillXp"; key: string; amount: number } // award XP to a skill
-  | { type: "unlock"; storyletId: string };           // unlock a new storylet immediately
+  | { type: "unlock"; storyletId: string }           // unlock a new storylet immediately
+  | { type: "minigame"; gameId: string; onSuccess?: Effect[]; onFailure?: Effect[] }; // launch a minigame
+
+// Available minigames
+export type MinigameType = 
+  | "memory-cards"
+  | "pattern-sequence" 
+  | "math-quiz"
+  | "reaction-time"
+  | "word-scramble"
+  | "logic-puzzle"
+  | "typing-test"
+  | "color-match"
+  | "stroop-test";

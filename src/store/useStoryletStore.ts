@@ -2,10 +2,11 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Storylet, Effect } from '../types/storylet';
+import type { Storylet, Effect, MinigameType } from '../types/storylet';
 import { collegeStorylets } from '../data/collegeStorylets';
 import { immediateStorylets } from '../data/immediateStorylets';
 import { frequentStorylets } from '../data/frequentStorylets';
+import { minigameStorylets } from '../data/minigameStorylets';
 
 interface StoryletState {
   // Core storylet data
@@ -14,6 +15,14 @@ interface StoryletState {
   activeStoryletIds: string[];                      // IDs of storylets currently unlocked and available
   completedStoryletIds: string[];                   // storylets the player has finished (to prevent repeats)
   storyletCooldowns: Record<string, number>;        // storylet ID -> day when it can trigger again
+  
+  // Minigame state
+  activeMinigame: MinigameType | null;              // currently active minigame
+  minigameContext: {                                // context for the minigame
+    effect: Effect;                                 // the original minigame effect
+    storyletId: string;                            // the storylet this came from
+    choiceId: string;                              // the choice this came from
+  } | null;
   
   // Actions
   evaluateStorylets: () => void;                    // scan and unlock storylets based on triggers
@@ -25,6 +34,9 @@ interface StoryletState {
   getCurrentStorylet: () => Storylet | null;        // get the first active storylet
   resetStorylets: () => void;                       // reset storylet system for testing
   applyEffect: (effect: Effect) => void;            // apply a single effect
+  launchMinigame: (gameId: MinigameType, effect: Effect, storyletId: string, choiceId: string) => void;
+  completeMinigame: (success: boolean, stats?: any) => void;
+  closeMinigame: () => void;
 }
 
 // Helper functions to reduce cognitive complexity
@@ -147,11 +159,15 @@ const evaluateStoryletTrigger = (trigger: any, activeFlags: any, appState: any) 
 
 export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   // Initial state
-  allStorylets: { ...immediateStorylets, ...frequentStorylets, ...collegeStorylets },
+  allStorylets: { ...immediateStorylets, ...frequentStorylets, ...collegeStorylets, ...minigameStorylets },
   activeFlags: {},
   activeStoryletIds: [],
   completedStoryletIds: [],
   storyletCooldowns: {},
+  
+  // Minigame state
+  activeMinigame: null,
+  minigameContext: null,
   
   // Evaluate storylets - check triggers and unlock eligible storylets
   evaluateStorylets: () => {
@@ -282,7 +298,29 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       console.warn('Could not record storylet completion:', error);
     }
     
-    // Apply effects
+    // Check if there's a minigame effect that needs to be handled
+    const hasMinigameEffect = choice.effects.some(effect => effect.type === 'minigame');
+    
+    if (hasMinigameEffect) {
+      // Find and launch the minigame, but don't complete the storylet yet
+      const minigameEffect = choice.effects.find(effect => effect.type === 'minigame');
+      if (minigameEffect) {
+        console.log(`🎮 Launching minigame: ${minigameEffect.gameId} from storylet ${storyletId}`);
+        get().launchMinigame(minigameEffect.gameId as MinigameType, minigameEffect, storyletId, choiceId);
+        
+        // Apply non-minigame effects immediately
+        choice.effects.forEach((effect) => {
+          if (effect.type !== 'minigame') {
+            get().applyEffect(effect);
+          }
+        });
+        
+        // Don't complete the storylet yet - it will be completed when the minigame finishes
+        return;
+      }
+    }
+    
+    // Apply all effects (no minigame)
     choice.effects.forEach((effect) => {
       get().applyEffect(effect);
     });
@@ -373,6 +411,11 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       case 'unlock':
         get().unlockStorylet(effect.storyletId);
         break;
+        
+      case 'minigame':
+        // Minigame effects are handled in chooseStorylet, not here
+        console.warn('Minigame effect should be handled in chooseStorylet, not applyEffect');
+        break;
     }
   },
   
@@ -437,7 +480,9 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       activeFlags: {},
       activeStoryletIds: [],
       completedStoryletIds: [],
-      storyletCooldowns: {}
+      storyletCooldowns: {},
+      activeMinigame: null,
+      minigameContext: null
     });
     
     // Re-evaluate after reset
@@ -446,6 +491,153 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     }, 100);
     
     console.log('✅ Storylet store reset complete');
+  },
+  
+  // Launch a minigame
+  launchMinigame: (gameId: MinigameType, effect: Effect, storyletId: string, choiceId: string) => {
+    console.log(`🎮 Launching minigame: ${gameId}`);
+    
+    // Pause time when launching minigame
+    try {
+      if (typeof window !== 'undefined' && (window as any).useAppStore) {
+        (window as any).useAppStore.getState().pauseTime();
+      }
+    } catch (error) {
+      console.warn('Could not pause time:', error);
+    }
+    
+    set({
+      activeMinigame: gameId,
+      minigameContext: {
+        effect,
+        storyletId,
+        choiceId
+      }
+    });
+  },
+  
+  // Complete a minigame
+  completeMinigame: (success: boolean, stats?: any) => {
+    const { minigameContext, activeStoryletIds, completedStoryletIds, allStorylets } = get();
+    
+    if (!minigameContext) {
+      console.warn('No minigame context found');
+      return;
+    }
+    
+    console.log(`🎮 Minigame completed: ${success ? 'SUCCESS' : 'FAILURE'}`, stats);
+    
+    const { effect, storyletId, choiceId } = minigameContext;
+    
+    // Apply success or failure effects
+    if (success && effect.onSuccess) {
+      effect.onSuccess.forEach(successEffect => get().applyEffect(successEffect));
+    } else if (!success && effect.onFailure) {
+      effect.onFailure.forEach(failureEffect => get().applyEffect(failureEffect));
+    }
+    
+    // Complete the storylet now that the minigame is done
+    if (storyletId && choiceId) {
+      const storylet = allStorylets[storyletId];
+      if (storylet) {
+        // Convert storylet choice to quest achievement
+        try {
+          if (typeof window !== 'undefined' && (window as any).useAppStore) {
+            (window as any).useAppStore.getState().convertStoryletToQuest(storyletId, choiceId);
+          }
+        } catch (error) {
+          console.warn('Could not convert storylet to quest:', error);
+        }
+        
+        // Mark storylet as completed
+        const newActiveIds = activeStoryletIds.filter(id => id !== storyletId);
+        const newCompletedIds = [...completedStoryletIds, storyletId];
+        
+        // Set cooldown for resource-based storylets (3 days)
+        const cooldownDay = storylet.trigger.type === 'resource' ? 
+          ((() => {
+            try {
+              if (typeof window !== 'undefined' && (window as any).useAppStore) {
+                return (window as any).useAppStore.getState().day + 3;
+              }
+              return 999; // fallback
+            } catch {
+              return 999; // fallback
+            }
+          })()) : undefined;
+        
+        set((state) => ({
+          activeStoryletIds: newActiveIds,
+          completedStoryletIds: newCompletedIds,
+          storyletCooldowns: cooldownDay ? {
+            ...state.storyletCooldowns,
+            [storyletId]: cooldownDay
+          } : state.storyletCooldowns
+        }));
+        
+        // Re-evaluate storylets in case new conditions are met
+        setTimeout(() => {
+          get().evaluateStorylets();
+        }, 100);
+      }
+    }
+    
+    // Resume time when minigame completes
+    try {
+      if (typeof window !== 'undefined' && (window as any).useAppStore) {
+        (window as any).useAppStore.getState().resumeTime();
+      }
+    } catch (error) {
+      console.warn('Could not resume time:', error);
+    }
+    
+    // Clear minigame state
+    set({
+      activeMinigame: null,
+      minigameContext: null
+    });
+  },
+  
+  // Close minigame without completing
+  closeMinigame: () => {
+    const { minigameContext, activeStoryletIds, completedStoryletIds, allStorylets } = get();
+    
+    console.log('🎮 Minigame closed');
+    
+    // Complete the storylet even if minigame was closed (treat as cancellation)
+    if (minigameContext && minigameContext.storyletId && minigameContext.choiceId) {
+      const { storyletId, choiceId } = minigameContext;
+      const storylet = allStorylets[storyletId];
+      if (storylet) {
+        // Mark storylet as completed
+        const newActiveIds = activeStoryletIds.filter(id => id !== storyletId);
+        const newCompletedIds = [...completedStoryletIds, storyletId];
+        
+        set((state) => ({
+          activeStoryletIds: newActiveIds,
+          completedStoryletIds: newCompletedIds
+        }));
+        
+        // Re-evaluate storylets
+        setTimeout(() => {
+          get().evaluateStorylets();
+        }, 100);
+      }
+    }
+    
+    // Resume time when minigame is closed
+    try {
+      if (typeof window !== 'undefined' && (window as any).useAppStore) {
+        (window as any).useAppStore.getState().resumeTime();
+      }
+    } catch (error) {
+      console.warn('Could not resume time:', error);
+    }
+    
+    set({
+      activeMinigame: null,
+      minigameContext: null
+    });
   }
 }), {
   name: 'storylet-store',

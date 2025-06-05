@@ -64,6 +64,9 @@ const StoryletPanel: React.FC = () => {
                     case 'unlock':
                       effectText = `Unlock storylet`;
                       break;
+                    case 'minigame':
+                      effectText = `Play ${effect.gameId.replace('-', ' ')}`;
+                      break;
                   }
                   return effectText;
                 }).join(', ')}

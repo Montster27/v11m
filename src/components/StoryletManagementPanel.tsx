@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useStoryletStore } from '../store/useStoryletStore';
 import { useAppStore } from '../store/useAppStore';
 import { Button, Card } from './ui';
-import type { Storylet, Effect } from '../types/storylet';
+import type { Storylet, Effect, MinigameType } from '../types/storylet';
 import { FileEditingService } from '../services/fileEditingService';
 
 type TabType = 'all' | 'active' | 'completed' | 'debug' | 'create' | 'edit';
@@ -869,6 +869,8 @@ const StoryletManagementPanel: React.FC = () => {
                         <option value="resource">Resource</option>
                         <option value="skillXp">Skill XP</option>
                         <option value="flag">Flag</option>
+                        <option value="unlock">Unlock Storylet</option>
+                        <option value="minigame">Minigame</option>
                       </select>
                       
                       {effect.type === 'resource' && (
@@ -936,6 +938,34 @@ const StoryletManagementPanel: React.FC = () => {
                             <option value="false">False</option>
                           </select>
                         </>
+                      )}
+
+                      {effect.type === 'unlock' && (
+                        <input
+                          type="text"
+                          value={effect.storyletId || ''}
+                          onChange={(e) => updateEffect(choiceIndex, effectIndex, 'storyletId', e.target.value)}
+                          className="px-2 py-1 border border-gray-300 rounded text-sm flex-1"
+                          placeholder="Storylet ID to unlock"
+                        />
+                      )}
+
+                      {effect.type === 'minigame' && (
+                        <select
+                          value={effect.gameId || ''}
+                          onChange={(e) => updateEffect(choiceIndex, effectIndex, 'gameId', e.target.value)}
+                          className="px-2 py-1 border border-gray-300 rounded text-sm flex-1"
+                        >
+                          <option value="">Select a minigame...</option>
+                          <option value="memory-cards">Memory Cards</option>
+                          <option value="pattern-sequence">Pattern Sequence</option>
+                          <option value="math-quiz">Math Quiz</option>
+                          <option value="reaction-time">Reaction Time</option>
+                          <option value="word-scramble">Word Scramble</option>
+                          <option value="logic-puzzle">Logic Puzzle</option>
+                          <option value="typing-test">Typing Test</option>
+                          <option value="color-match">Color Match</option>
+                        </select>
                       )}
                       
                       <Button 
@@ -1334,6 +1364,8 @@ const StoryletManagementPanel: React.FC = () => {
                                   <option value="resource">Resource</option>
                                   <option value="skillXp">Skill XP</option>
                                   <option value="flag">Flag</option>
+                                  <option value="unlock">Unlock Storylet</option>
+                                  <option value="minigame">Minigame</option>
                                 </select>
                                 
                                 {effect.type === 'resource' && (
@@ -1378,12 +1410,12 @@ const StoryletManagementPanel: React.FC = () => {
                                       }}
                                       className="px-2 py-1 border border-gray-300 rounded text-sm"
                                     >
-                                      <option value="bureaucraticNavigation">Bureaucratic Navigation</option>
-                                      <option value="resourceAcquisition">Resource Acquisition</option>
-                                      <option value="informationWarfare">Information Warfare</option>
-                                      <option value="allianceBuilding">Alliance Building</option>
-                                      <option value="operationalSecurity">Operational Security</option>
-                                      <option value="perseverance">Perseverance</option>
+                                      <option value="observation">Observation</option>
+                                      <option value="deception">Deception</option>
+                                      <option value="subterfuge">Subterfuge</option>
+                                      <option value="persuasion">Persuasion</option>
+                                      <option value="research">Research</option>
+                                      <option value="technology">Technology</option>
                                     </select>
                                     <input
                                       type="number"
@@ -1425,6 +1457,42 @@ const StoryletManagementPanel: React.FC = () => {
                                       <option value="false">False</option>
                                     </select>
                                   </>
+                                )}
+
+                                {effect.type === 'unlock' && (
+                                  <input
+                                    type="text"
+                                    value={effect.storyletId || ''}
+                                    onChange={(e) => {
+                                      const newChoices = [...editForm.choices];
+                                      newChoices[choiceIndex].effects[effectIndex].storyletId = e.target.value;
+                                      setEditForm({ ...editForm, choices: newChoices });
+                                    }}
+                                    className="px-2 py-1 border border-gray-300 rounded text-sm flex-1"
+                                    placeholder="Storylet ID to unlock"
+                                  />
+                                )}
+
+                                {effect.type === 'minigame' && (
+                                  <select
+                                    value={effect.gameId || ''}
+                                    onChange={(e) => {
+                                      const newChoices = [...editForm.choices];
+                                      newChoices[choiceIndex].effects[effectIndex].gameId = e.target.value;
+                                      setEditForm({ ...editForm, choices: newChoices });
+                                    }}
+                                    className="px-2 py-1 border border-gray-300 rounded text-sm flex-1"
+                                  >
+                                    <option value="">Select a minigame...</option>
+                                    <option value="memory-cards">Memory Cards</option>
+                                    <option value="pattern-sequence">Pattern Sequence</option>
+                                    <option value="math-quiz">Math Quiz</option>
+                                    <option value="reaction-time">Reaction Time</option>
+                                    <option value="word-scramble">Word Scramble</option>
+                                    <option value="logic-puzzle">Logic Puzzle</option>
+                                    <option value="typing-test">Typing Test</option>
+                                    <option value="color-match">Color Match</option>
+                                  </select>
                                 )}
                                 
                                 <Button 
