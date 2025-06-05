@@ -1,6 +1,7 @@
 // /Users/montysharma/V11M2/src/utils/resourceCalculations.ts
 
 import type { Character } from '../store/characterStore';
+import type { IntegratedCharacter, DomainKey } from '../types/integratedCharacter';
 
 export interface ResourceDeltas {
   energy: number;
@@ -57,7 +58,7 @@ const BASE_RATES = {
   }
 };
 
-// Get character modifiers based on attributes
+// Get character modifiers based on attributes (legacy V1 character)
 export function getCharacterModifiers(character: Character | null, activity: keyof TimeAllocation): number {
   if (!character) return 1;
   
@@ -79,10 +80,64 @@ export function getCharacterModifiers(character: Character | null, activity: key
   }
 }
 
-// Calculate resource deltas per tick based on time allocation
+// Get character modifiers based on integrated character domains (V2 character)
+export function getIntegratedCharacterModifiers(character: IntegratedCharacter | null, activity: keyof TimeAllocation): number {
+  if (!character) return 1;
+  
+  switch (activity) {
+    case 'study':
+      // Study efficiency based on intellectual competence and emotional intelligence
+      return (
+        (character.intellectualCompetence.level * 0.6) + 
+        (character.emotionalIntelligence.level * 0.2) +
+        (character.personalAutonomy.level * 0.2)
+      ) / 100;
+    case 'work':
+      // Work performance based on intellectual competence, autonomy, and emotional intelligence
+      return (
+        (character.intellectualCompetence.level * 0.4) + 
+        (character.personalAutonomy.level * 0.4) +
+        (character.emotionalIntelligence.level * 0.2)
+      ) / 100;
+    case 'social':
+      // Social activities based on social competence and emotional intelligence
+      return (
+        (character.socialCompetence.level * 0.7) + 
+        (character.emotionalIntelligence.level * 0.3)
+      ) / 100;
+    case 'rest':
+      // Rest effectiveness based on emotional intelligence and physical competence
+      return (
+        (character.emotionalIntelligence.level * 0.6) + 
+        (character.physicalCompetence.level * 0.4)
+      ) / 100;
+    case 'exercise':
+      // Exercise effectiveness based on physical competence and personal autonomy
+      return (
+        (character.physicalCompetence.level * 0.8) + 
+        (character.personalAutonomy.level * 0.2)
+      ) / 100;
+    default:
+      return 1;
+  }
+}
+
+// Universal function to get modifiers for any character type
+export function getUniversalCharacterModifiers(character: Character | IntegratedCharacter | null, activity: keyof TimeAllocation): number {
+  if (!character) return 1;
+  
+  // Check character version
+  if ('version' in character && character.version === 2) {
+    return getIntegratedCharacterModifiers(character as IntegratedCharacter, activity);
+  } else {
+    return getCharacterModifiers(character as Character, activity);
+  }
+}
+
+// Calculate resource deltas per tick based on time allocation (supports both character types)
 export function calculateResourceDeltas(
   timeAllocation: TimeAllocation,
-  character: Character | null,
+  character: Character | IntegratedCharacter | null,
   tickDurationHours: number = 1
 ): ResourceDeltas {
   const deltas: ResourceDeltas = {
@@ -97,7 +152,7 @@ export function calculateResourceDeltas(
   Object.entries(timeAllocation).forEach(([activity, percent]) => {
     const activityKey = activity as keyof TimeAllocation;
     const hoursThisTick = tickDurationHours * (percent / 100);
-    const modifier = getCharacterModifiers(character, activityKey);
+    const modifier = getUniversalCharacterModifiers(character, activityKey);
     const rates = BASE_RATES[activityKey];
 
     deltas.energy += rates.energy * hoursThisTick * modifier;
@@ -110,7 +165,16 @@ export function calculateResourceDeltas(
   // Special rest logic - better rest reduces stress more effectively
   if (timeAllocation.rest > 0) {
     const restHours = tickDurationHours * (timeAllocation.rest / 100);
-    const restModifier = character ? (character.attributes.stressTolerance / 10) : 1;
+    let restModifier = 1;
+    
+    if (character && 'version' in character && character.version === 2) {
+      // For integrated characters, use emotional intelligence for stress reduction
+      restModifier = (character as IntegratedCharacter).emotionalIntelligence.level / 100;
+    } else if (character && 'attributes' in character) {
+      // For legacy characters, use stress tolerance
+      restModifier = (character as Character).attributes.stressTolerance / 10;
+    }
+    
     deltas.stress -= restHours * 0.5 * restModifier;
   }
 
@@ -135,10 +199,10 @@ export function percentToHoursPerDay(percent: number): number {
   return (percent / 100) * 24; // 24 hours in a day
 }
 
-// Get activity stats for display
-export function getActivityStats(activity: keyof TimeAllocation, character: Character | null) {
+// Get activity stats for display (supports both character types)
+export function getActivityStats(activity: keyof TimeAllocation, character: Character | IntegratedCharacter | null) {
   const rates = BASE_RATES[activity];
-  const modifier = getCharacterModifiers(character, activity);
+  const modifier = getUniversalCharacterModifiers(character, activity);
   
   const stats = [];
   
@@ -183,4 +247,71 @@ export function getActivityStats(activity: keyof TimeAllocation, character: Char
   }
   
   return stats;
+}
+
+// Enhanced resource calculations for integrated characters with domain-specific effects
+export function calculateDomainResourceEffects(
+  timeAllocation: TimeAllocation,
+  character: IntegratedCharacter,
+  tickDurationHours: number = 1
+): { deltas: ResourceDeltas; domainXP: Record<DomainKey, number> } {
+  const baseDeltas = calculateResourceDeltas(timeAllocation, character, tickDurationHours);
+  
+  // Calculate XP gains for domains based on activities
+  const domainXP: Record<DomainKey, number> = {
+    intellectualCompetence: 0,
+    physicalCompetence: 0,
+    emotionalIntelligence: 0,
+    socialCompetence: 0,
+    personalAutonomy: 0,
+    identityClarity: 0,
+    lifePurpose: 0
+  };
+  
+  // XP gains based on time allocation
+  const studyHours = tickDurationHours * (timeAllocation.study / 100);
+  const workHours = tickDurationHours * (timeAllocation.work / 100);
+  const socialHours = tickDurationHours * (timeAllocation.social / 100);
+  const exerciseHours = tickDurationHours * (timeAllocation.exercise / 100);
+  
+  // Study primarily develops intellectual competence
+  if (studyHours > 0) {
+    domainXP.intellectualCompetence += studyHours * 2;
+    domainXP.personalAutonomy += studyHours * 0.5; // Discipline from studying
+  }
+  
+  // Work develops autonomy and intellectual competence
+  if (workHours > 0) {
+    domainXP.personalAutonomy += workHours * 2;
+    domainXP.intellectualCompetence += workHours * 1;
+    domainXP.socialCompetence += workHours * 0.5; // Workplace interactions
+  }
+  
+  // Social activities develop social competence and emotional intelligence
+  if (socialHours > 0) {
+    domainXP.socialCompetence += socialHours * 3;
+    domainXP.emotionalIntelligence += socialHours * 1.5;
+    domainXP.identityClarity += socialHours * 0.5; // Self-discovery through relationships
+  }
+  
+  // Exercise develops physical competence and emotional intelligence
+  if (exerciseHours > 0) {
+    domainXP.physicalCompetence += exerciseHours * 3;
+    domainXP.emotionalIntelligence += exerciseHours * 1; // Stress relief, mood regulation
+    domainXP.personalAutonomy += exerciseHours * 0.5; // Self-discipline
+  }
+  
+  // Balanced lifestyle develops life purpose
+  const totalActiveHours = studyHours + workHours + socialHours + exerciseHours;
+  if (totalActiveHours > 0) {
+    const balance = 1 - (Math.abs(studyHours - workHours) + Math.abs(socialHours - exerciseHours)) / (totalActiveHours * 2);
+    domainXP.lifePurpose += balance * totalActiveHours * 0.3;
+  }
+  
+  // High-stress situations can develop emotional intelligence
+  if (baseDeltas.stress > 5) {
+    domainXP.emotionalIntelligence += (baseDeltas.stress / 10); // Learning from stress
+  }
+  
+  return { deltas: baseDeltas, domainXP };
 }
