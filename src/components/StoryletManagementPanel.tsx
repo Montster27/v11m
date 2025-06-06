@@ -32,7 +32,8 @@ const StoryletManagementPanel: React.FC = () => {
     description: '',
     deploymentStatus: 'dev',
     trigger: { type: 'time', conditions: {} },
-    choices: []
+    choices: [],
+    storyArc: undefined
   });
 
   const {
@@ -174,7 +175,8 @@ const StoryletManagementPanel: React.FC = () => {
       description: '',
       deploymentStatus: 'dev',
       trigger: { type: 'time', conditions: {} },
-      choices: []
+      choices: [],
+      storyArc: undefined
     });
     setShowCreateForm(true);
     setActiveTab('create');
@@ -768,7 +770,8 @@ const StoryletManagementPanel: React.FC = () => {
         description: formData.description,
         deploymentStatus: formData.deploymentStatus || 'dev',
         trigger: formData.trigger || { type: 'time', conditions: {} },
-        choices: formData.choices || []
+        choices: formData.choices || [],
+        storyArc: formData.storyArc || undefined
       };
 
       if (editingStorylet) {
@@ -790,7 +793,8 @@ const StoryletManagementPanel: React.FC = () => {
         description: '',
         deploymentStatus: 'dev',
         trigger: { type: 'time', conditions: {} },
-        choices: []
+        choices: [],
+        storyArc: undefined
       });
       setActiveTab('manage');
     };
