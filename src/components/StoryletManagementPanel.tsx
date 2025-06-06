@@ -1,5 +1,5 @@
 // /Users/montysharma/V11M2/src/components/StoryletManagementPanel.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStoryletStore } from '../store/useStoryletStore';
 import { Button, Card } from './ui';
 import { StoryletDeploymentStatus, Storylet, Choice, Effect } from '../types/storylet';
@@ -24,6 +24,15 @@ const StoryletManagementPanel: React.FC = () => {
   const [selectedStoryArc, setSelectedStoryArc] = useState<string>('');
   const [showCreateArcModal, setShowCreateArcModal] = useState(false);
   const [newArcName, setNewArcName] = useState('');
+  
+  // Arc testing state
+  const [testingArc, setTestingArc] = useState<string | null>(null);
+  const [testingHistory, setTestingHistory] = useState<Array<{
+    storyletId: string;
+    choiceId?: string;
+    flags: Record<string, boolean>;
+  }>>([]);
+  const [testingFlags, setTestingFlags] = useState<Record<string, boolean>>({});
   
   // Form data state for create/edit
   const [formData, setFormData] = useState<Partial<Storylet>>({
@@ -54,6 +63,11 @@ const StoryletManagementPanel: React.FC = () => {
     removeStoryArc,
     getStoryletsByArc
   } = useStoryletStore();
+
+  // Debug testingArc changes
+  useEffect(() => {
+    console.log('🧪 useEffect - testingArc changed to:', testingArc);
+  }, [testingArc]);
 
   // Search and filter logic
   const searchStorylets = (storylets: Storylet[], query: string) => {
@@ -197,6 +211,141 @@ const StoryletManagementPanel: React.FC = () => {
         setSelectedStoryArc('');
       }
     }
+  };
+
+  // Arc testing functions
+  const startTestingArc = (arcName: string) => {
+    console.log('🧪 Starting test for arc:', arcName);
+    console.log('🧪 Current testingArc before:', testingArc);
+    setTestingArc(arcName);
+    setTestingHistory([]);
+    setTestingFlags({});
+    setActiveTab('arcs'); // Stay on arcs tab for testing
+    console.log('🧪 Testing arc state should be set to:', arcName);
+  };
+
+  const stopTestingArc = () => {
+    setTestingArc(null);
+    setTestingHistory([]);
+    setTestingFlags({});
+  };
+
+  const getAvailableStoryletsForTesting = (arcName: string) => {
+    const arcStorylets = getStoryletsByArc(arcName);
+    return arcStorylets.filter(storylet => {
+      // Check if storylet can trigger with current testing flags
+      switch (storylet.trigger.type) {
+        case 'time':
+          // For testing, assume all time conditions are met
+          return true;
+        case 'flag':
+          const requiredFlags = storylet.trigger.conditions.flags || [];
+          return requiredFlags.some(flag => testingFlags[flag]);
+        case 'resource':
+          // For testing, assume all resource conditions are met
+          return true;
+        default:
+          return true;
+      }
+    });
+  };
+
+  const getCurrentTestingStorylet = () => {
+    if (!testingArc || testingHistory.length === 0) {
+      return null;
+    }
+    const lastEntry = testingHistory[testingHistory.length - 1];
+    return allStorylets[lastEntry.storyletId];
+  };
+
+  const makeTestingChoice = (storyletId: string, choiceId: string) => {
+    const storylet = allStorylets[storyletId];
+    const choice = storylet?.choices.find(c => c.id === choiceId);
+    
+    if (!storylet || !choice) return;
+
+    // Apply flag effects to testing flags
+    const newFlags = { ...testingFlags };
+    choice.effects.forEach(effect => {
+      if (effect.type === 'flag') {
+        newFlags[effect.key] = effect.value;
+      }
+    });
+
+    console.log('🧪 Made choice:', choice.text, 'New flags:', newFlags);
+
+    // Find the next storylet that can trigger with these new flags
+    const arcStorylets = getStoryletsByArc(testingArc!);
+    const visitedStoryletIds = testingHistory.map(entry => entry.storyletId);
+    
+    const nextStorylet = arcStorylets.find(nextStorylet => {
+      // Don't go to the same storylet or already visited storylets (unless it's a repeatable one)
+      if (nextStorylet.id === storyletId) return false;
+      if (visitedStoryletIds.includes(nextStorylet.id)) return false;
+      
+      // Check if this storylet can trigger with the new flags
+      switch (nextStorylet.trigger.type) {
+        case 'flag':
+          const requiredFlags = nextStorylet.trigger.conditions.flags || [];
+          return requiredFlags.some(flag => newFlags[flag]);
+        case 'time':
+          // For testing, assume time conditions are always met if no visited storylets
+          return true;
+        case 'resource':
+          // For testing, assume resource conditions are always met  
+          return true;
+        default:
+          return false;
+      }
+    });
+
+    console.log('🧪 Next storylet found:', nextStorylet?.name || 'None');
+
+    if (nextStorylet) {
+      // Add the choice to history and move to next storylet
+      setTestingHistory(prev => [...prev, {
+        storyletId,
+        choiceId,
+        flags: { ...newFlags }
+      }, {
+        storyletId: nextStorylet.id,
+        flags: { ...newFlags }
+      }]);
+    } else {
+      // No next storylet found, just add the choice
+      setTestingHistory(prev => [...prev, {
+        storyletId,
+        choiceId,
+        flags: { ...newFlags }
+      }]);
+    }
+    
+    setTestingFlags(newFlags);
+  };
+
+  const goBackInTesting = () => {
+    if (testingHistory.length <= 1) {
+      // Reset to beginning
+      setTestingHistory([]);
+      setTestingFlags({});
+      return;
+    }
+
+    // Go back one step
+    const newHistory = testingHistory.slice(0, -1);
+    const lastEntry = newHistory[newHistory.length - 1];
+    
+    setTestingHistory(newHistory);
+    setTestingFlags(lastEntry?.flags || {});
+  };
+
+  const startFromStorylet = (storyletId: string) => {
+    console.log('🧪 Starting from storylet:', allStorylets[storyletId]?.name);
+    setTestingHistory([{
+      storyletId,
+      flags: {}
+    }]);
+    setTestingFlags({});
   };
 
   // Helper function to highlight search terms
@@ -698,7 +847,7 @@ const StoryletManagementPanel: React.FC = () => {
                 </div>
               </div>
               
-              <div className="mt-3 pt-3 border-t">
+              <div className="mt-3 pt-3 border-t space-y-2">
                 <Button
                   onClick={() => {
                     setSelectedStoryArc(arc);
@@ -708,6 +857,17 @@ const StoryletManagementPanel: React.FC = () => {
                   className="w-full text-sm"
                 >
                   View Storylets in Arc
+                </Button>
+                
+                <Button
+                  onClick={() => {
+                    console.log('🧪 Button clicked for arc:', arc);
+                    startTestingArc(arc);
+                  }}
+                  variant="primary"
+                  className="w-full text-sm"
+                >
+                  🧪 Test Arc
                 </Button>
               </div>
               
@@ -753,6 +913,191 @@ const StoryletManagementPanel: React.FC = () => {
           </div>
         </Card>
       </div>
+
+      {/* Arc Testing Interface */}
+      {testingArc && (
+        <Card className="p-6 bg-purple-50 border-purple-200">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-purple-900">
+              🧪 Testing Arc: {testingArc}
+            </h3>
+            <div className="space-x-2">
+              <Button
+                onClick={goBackInTesting}
+                variant="outline"
+                className="text-sm text-purple-600 border-purple-300"
+                disabled={testingHistory.length === 0}
+              >
+                ← Go Back
+              </Button>
+              <Button
+                onClick={() => {
+                  setTestingHistory([]);
+                  setTestingFlags({});
+                }}
+                variant="outline"
+                className="text-sm text-blue-600 border-blue-300"
+              >
+                🔄 Restart
+              </Button>
+              <Button
+                onClick={stopTestingArc}
+                variant="outline"
+                className="text-sm text-red-600 border-red-300"
+              >
+                ✕ Stop Testing
+              </Button>
+            </div>
+          </div>
+
+          {/* Testing History */}
+          {testingHistory.length > 0 && (
+            <div className="mb-4 p-3 bg-white rounded border">
+              <h4 className="font-medium text-gray-900 mb-2">Path Taken:</h4>
+              <div className="space-y-1 text-sm">
+                {testingHistory.map((entry, index) => {
+                  const storylet = allStorylets[entry.storyletId];
+                  const choice = entry.choiceId ? storylet?.choices.find(c => c.id === entry.choiceId) : null;
+                  return (
+                    <div key={index} className="flex items-center text-gray-700">
+                      <span className="w-6 text-center">{index + 1}.</span>
+                      <span className="font-medium">{storylet?.name}</span>
+                      {choice && (
+                        <>
+                          <span className="mx-2">→</span>
+                          <span className="text-blue-600">"{choice.text}"</span>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Current Testing Flags */}
+          {Object.keys(testingFlags).length > 0 && (
+            <div className="mb-4 p-3 bg-white rounded border">
+              <h4 className="font-medium text-gray-900 mb-2">Active Flags:</h4>
+              <div className="flex flex-wrap gap-1">
+                {Object.entries(testingFlags)
+                  .filter(([_, value]) => value)
+                  .map(([flag, _]) => (
+                    <span 
+                      key={flag} 
+                      className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded"
+                    >
+                      {flag}
+                    </span>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Available Storylets for Testing */}
+          <div className="space-y-4">
+            {testingHistory.length === 0 ? (
+              <div>
+                <h4 className="font-medium text-gray-900 mb-3">Choose Starting Storylet:</h4>
+                <div className="grid gap-2">
+                  {getStoryletsByArc(testingArc).map(storylet => (
+                    <Button
+                      key={storylet.id}
+                      onClick={() => startFromStorylet(storylet.id)}
+                      variant="outline"
+                      className="text-left p-3 h-auto"
+                    >
+                      <div>
+                        <div className="font-medium">{storylet.name}</div>
+                        <div className="text-sm text-gray-600">
+                          Trigger: {storylet.trigger.type}
+                          {storylet.trigger.type === 'flag' && (
+                            <span className="ml-2 text-purple-600">
+                              Requires: {storylet.trigger.conditions.flags?.join(', ')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div>
+                {(() => {
+                  const currentStorylet = getCurrentTestingStorylet();
+                  if (!currentStorylet) return null;
+
+                  return (
+                    <div>
+                      <div className="p-4 bg-white rounded border mb-4">
+                        <h4 className="font-semibold text-lg text-gray-900 mb-2">
+                          {currentStorylet.name}
+                        </h4>
+                        <p className="text-gray-700 mb-4">
+                          {currentStorylet.description}
+                        </p>
+                        
+                        <div className="space-y-2">
+                          <h5 className="font-medium text-gray-900">Choose your action:</h5>
+                          {currentStorylet.choices.map(choice => (
+                            <Button
+                              key={choice.id}
+                              onClick={() => makeTestingChoice(currentStorylet.id, choice.id)}
+                              variant="outline"
+                              className="w-full text-left p-3 h-auto hover:bg-blue-50"
+                            >
+                              <div>
+                                <div className="font-medium text-blue-700">{choice.text}</div>
+                                {choice.effects.length > 0 && (
+                                  <div className="text-sm text-gray-600 mt-1">
+                                    Effects: {choice.effects.map(effect => {
+                                      if (effect.type === 'flag') {
+                                        return `Set ${effect.key} = ${effect.value}`;
+                                      } else if (effect.type === 'resource') {
+                                        return `${effect.key} ${effect.delta > 0 ? '+' : ''}${effect.delta}`;
+                                      }
+                                      return effect.type;
+                                    }).join(', ')}
+                                  </div>
+                                )}
+                              </div>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Show next available storylets */}
+                      {(() => {
+                        const availableNext = getAvailableStoryletsForTesting(testingArc)
+                          .filter(s => s.id !== currentStorylet.id);
+                        
+                        if (availableNext.length > 0) {
+                          return (
+                            <div className="p-3 bg-blue-50 rounded border">
+                              <h5 className="font-medium text-blue-900 mb-2">
+                                Available Next Storylets:
+                              </h5>
+                              <div className="space-y-1 text-sm">
+                                {availableNext.map(storylet => (
+                                  <div key={storylet.id} className="text-blue-700">
+                                    • {storylet.name}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
     </div>
   );
 
@@ -774,6 +1119,10 @@ const StoryletManagementPanel: React.FC = () => {
         storyArc: formData.storyArc || undefined
       };
 
+      console.log('📝 Submitting storylet:', storylet);
+      console.log('📝 Form data:', formData);
+      console.log('📝 Is editing:', !!editingStorylet);
+
       if (editingStorylet) {
         // Update existing storylet
         updateStorylet(storylet);
@@ -782,6 +1131,7 @@ const StoryletManagementPanel: React.FC = () => {
         // Create new storylet
         addStorylet(storylet);
         console.log(`➕ Created storylet: ${storylet.id}`);
+        console.log(`📚 All storylets after add:`, Object.keys(allStorylets));
       }
 
       // Reset form

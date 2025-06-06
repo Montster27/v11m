@@ -9,6 +9,7 @@ import { frequentStorylets } from '../data/frequentStorylets';
 import { minigameStorylets } from '../data/minigameStorylets';
 import { integratedStorylets } from '../data/integratedStorylets';
 import { developmentTriggeredStorylets } from '../data/developmentTriggeredStorylets';
+import { startingStorylets } from '../data/startingStorylets';
 
 interface StoryletState {
   // Core storylet data
@@ -178,6 +179,7 @@ const evaluateStoryletTrigger = (trigger: any, activeFlags: any, appState: any) 
 export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   // Initial state
   allStorylets: { 
+    ...startingStorylets,
     ...immediateStorylets, 
     ...frequentStorylets, 
     ...collegeStorylets, 
@@ -191,7 +193,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   storyletCooldowns: {},
   
   // Story arc management
-  storyArcs: ['Main Story', 'Side Quests', 'Character Development', 'Academic Journey'],
+  storyArcs: ['Starting', 'Main Story', 'Side Quests', 'Character Development', 'Academic Journey'],
   
   // Development settings
   deploymentFilter: new Set(['live']) as Set<'live' | 'stage' | 'dev'>,
@@ -221,6 +223,15 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     Object.values(state.allStorylets).forEach((storylet) => {
       if (process.env.NODE_ENV === 'development') {
         console.log(`\n🔍 Checking storylet: ${storylet.id} (${storylet.name})`);
+        
+        // Special logging for Starting storylets
+        if (storylet.storyArc === 'Starting') {
+          console.log(`🎯 STARTING STORYLET: ${storylet.id}`, {
+            trigger: storylet.trigger,
+            deploymentStatus: storylet.deploymentStatus,
+            currentDay: appState?.day
+          });
+        }
       }
       
       // Skip storylets based on deployment status
@@ -549,12 +560,21 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   
   // Add a new storylet to the catalog
   addStorylet: (storylet: Storylet) => {
-    set((state) => ({
-      allStorylets: {
-        ...state.allStorylets,
-        [storylet.id]: storylet
-      }
-    }));
+    console.log(`🎯 addStorylet called with:`, storylet);
+    console.log(`🎯 Current allStorylets keys:`, Object.keys(get().allStorylets));
+    
+    set((state) => {
+      const newState = {
+        allStorylets: {
+          ...state.allStorylets,
+          [storylet.id]: storylet
+        }
+      };
+      console.log(`🎯 New allStorylets keys:`, Object.keys(newState.allStorylets));
+      return newState;
+    });
+    
+    console.log(`🎯 After set, allStorylets keys:`, Object.keys(get().allStorylets));
     
     if (process.env.NODE_ENV === 'development') {
       console.log(`✅ Added new storylet: ${storylet.id}`);
@@ -915,17 +935,30 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
 }), {
   name: 'storylet-store',
   partialize: (state) => ({
+    allStorylets: state.allStorylets,
     activeFlags: state.activeFlags,
     completedStoryletIds: state.completedStoryletIds,
     storyletCooldowns: state.storyletCooldowns,
     storyArcs: state.storyArcs,
     deploymentFilter: Array.from(state.deploymentFilter) // Convert Set to Array for serialization
   }),
-  merge: (persistedState: any, currentState: any) => ({
-    ...currentState,
-    ...persistedState,
-    deploymentFilter: new Set(persistedState?.deploymentFilter || ['live']) // Convert Array back to Set
-  })
+  merge: (persistedState: any, currentState: any) => {
+    const mergedStorylets = {
+      ...currentState.allStorylets,
+      ...(persistedState?.allStorylets || {})
+    };
+    console.log('🔄 Merging state - Current storylets:', Object.keys(currentState.allStorylets).length);
+    console.log('🔄 Merging state - Persisted storylets:', Object.keys(persistedState?.allStorylets || {}).length);
+    console.log('🔄 Merging state - Final storylets:', Object.keys(mergedStorylets).length);
+    
+    return {
+      ...currentState,
+      ...persistedState,
+      // Always use current state's allStorylets to include any new storylets added in code
+      allStorylets: mergedStorylets,
+      deploymentFilter: new Set(persistedState?.deploymentFilter || ['live']) // Convert Array back to Set
+    };
+  }
 }));
 
 // Expose global testing function
