@@ -18,6 +18,12 @@ interface StoryletState {
   completedStoryletIds: string[];                   // storylets the player has finished (to prevent repeats)
   storyletCooldowns: Record<string, number>;        // storylet ID -> day when it can trigger again
   
+  // Story arc management
+  storyArcs: string[];                              // list of available story arcs
+  
+  // Development settings
+  deploymentFilter: Set<'live' | 'stage' | 'dev'>;  // which deployment statuses to show (can be multiple)
+  
   // Minigame state
   activeMinigame: MinigameType | null;              // currently active minigame
   minigameContext: {                                // context for the minigame
@@ -31,6 +37,11 @@ interface StoryletState {
   chooseStorylet: (storyletId: string, choiceId: string) => void;  // make a choice in a storylet
   unlockStorylet: (storyletId: string) => void;     // manually unlock a storylet
   addStorylet: (storylet: Storylet) => void;        // add a new storylet to the catalog
+  updateStorylet: (storylet: Storylet) => void;     // update an existing storylet
+  deleteStorylet: (storyletId: string) => void;     // delete a storylet from the catalog
+  addStoryArc: (arcName: string) => void;           // add a new story arc
+  removeStoryArc: (arcName: string) => void;        // remove a story arc (and clear from storylets)
+  getStoryletsByArc: (arcName: string) => Storylet[]; // get all storylets in a specific arc
   setFlag: (key: string, value: boolean) => void;   // manually set a flag
   getFlag: (key: string) => boolean;                // get a flag value
   getCurrentStorylet: () => Storylet | null;        // get the first active storylet
@@ -39,6 +50,11 @@ interface StoryletState {
   launchMinigame: (gameId: MinigameType, effect: Effect, storyletId: string, choiceId: string) => void;
   completeMinigame: (success: boolean, stats?: any) => void;
   closeMinigame: () => void;
+  
+  // Development actions
+  setDeploymentFilter: (filter: Set<'live' | 'stage' | 'dev'>) => void; // set which deployment statuses to show
+  toggleDeploymentStatus: (status: 'live' | 'stage' | 'dev') => void; // toggle a deployment status in the filter
+  updateStoryletDeploymentStatus: (storyletId: string, status: 'dev' | 'stage' | 'live') => void; // update storylet deployment status
 }
 
 // Helper functions to reduce cognitive complexity
@@ -174,6 +190,12 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   completedStoryletIds: [],
   storyletCooldowns: {},
   
+  // Story arc management
+  storyArcs: ['Main Story', 'Side Quests', 'Character Development', 'Academic Journey'],
+  
+  // Development settings
+  deploymentFilter: new Set(['live']) as Set<'live' | 'stage' | 'dev'>,
+  
   // Minigame state
   activeMinigame: null,
   minigameContext: null,
@@ -199,6 +221,20 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     Object.values(state.allStorylets).forEach((storylet) => {
       if (process.env.NODE_ENV === 'development') {
         console.log(`\n🔍 Checking storylet: ${storylet.id} (${storylet.name})`);
+      }
+      
+      // Skip storylets based on deployment status
+      const storyletStatus = storylet.deploymentStatus || 'live';
+      const shouldShowByDeployment = state.deploymentFilter.has(storyletStatus);
+      
+      if (!shouldShowByDeployment) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`🚫 Skipping ${storylet.id} due to deployment filter:`, {
+            storyletStatus,
+            currentFilter: Array.from(state.deploymentFilter)
+          });
+        }
+        return;
       }
       
       if (shouldSkipStorylet(storylet, state, appState)) {
@@ -392,9 +428,9 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
           if (typeof window !== 'undefined' && (window as any).useAppStore) {
             const appStore = (window as any).useAppStore.getState();
             const currentValue = appStore.resources[effect.key];
-            const newValue = effect.key === 'money' || effect.key === 'knowledge' || effect.key === 'social'
-              ? Math.max(0, Math.min(1000, currentValue + effect.delta))  // Knowledge, money, social capped at 1000
-              : Math.max(0, Math.min(100, currentValue + effect.delta));   // Energy and stress capped at 100
+            const newValue = effect.key === 'energy' || effect.key === 'stress'
+              ? Math.max(0, Math.min(100, currentValue + effect.delta))   // Energy and stress capped at 100
+              : Math.max(0, currentValue + effect.delta);                 // Knowledge, social, money can grow unlimited
             (window as any).useAppStore.getState().updateResource(effect.key, newValue);
           }
         } catch (error) {
@@ -417,6 +453,38 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
             }
           }
           
+          // Try V2 Skill System
+          if (typeof window !== 'undefined' && (window as any).useSkillSystemV2Store) {
+            const skillStore = (window as any).useSkillSystemV2Store.getState();
+            // Map old skill names to new competencies
+            const competencyMap: Record<string, string> = {
+              // V2 hyphenated names (direct mapping)
+              'bureaucratic-navigation': 'bureaucratic-navigation',
+              'resource-acquisition': 'resource-acquisition',
+              'information-warfare': 'information-warfare',
+              'alliance-building': 'alliance-building',
+              'operational-security': 'operational-security',
+              // V1 camelCase names (legacy mapping)
+              'bureaucraticNavigation': 'bureaucratic-navigation',
+              'resourceAcquisition': 'resource-acquisition',
+              'informationWarfare': 'information-warfare',
+              'allianceBuilding': 'alliance-building',
+              'operationalSecurity': 'operational-security',
+              'perseverance': 'operational-security' // Map perseverance to operational security
+            };
+            
+            if (competencyMap[effect.key]) {
+              skillStore.addCompetencyXP(competencyMap[effect.key], effect.amount);
+              return;
+            }
+            
+            // Try foundation tracks
+            if (effect.key === 'academic' || effect.key === 'working') {
+              skillStore.addFoundationXP(effect.key, effect.amount);
+              return;
+            }
+          }
+          
           // Fallback to V1 system
           if (typeof window !== 'undefined' && (window as any).useAppStore) {
             const appStore = (window as any).useAppStore.getState();
@@ -424,6 +492,18 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
           }
         } catch (error) {
           console.warn('Could not add skill XP:', error);
+        }
+        break;
+        
+      case 'foundationXp':
+        // Award XP to foundation experiences in V2 skill system
+        try {
+          if (typeof window !== 'undefined' && (window as any).useSkillSystemV2Store) {
+            const skillStore = (window as any).useSkillSystemV2Store.getState();
+            skillStore.addFoundationXP(effect.key, effect.amount);
+          }
+        } catch (error) {
+          console.warn('Could not add foundation XP:', error);
         }
         break;
         
@@ -479,6 +559,86 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     if (process.env.NODE_ENV === 'development') {
       console.log(`✅ Added new storylet: ${storylet.id}`);
     }
+  },
+
+  // Update an existing storylet
+  updateStorylet: (storylet: Storylet) => {
+    set((state) => ({
+      allStorylets: {
+        ...state.allStorylets,
+        [storylet.id]: storylet
+      }
+    }));
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`✏️ Updated storylet: ${storylet.id}`);
+    }
+  },
+
+  // Delete a storylet from the catalog
+  deleteStorylet: (storyletId: string) => {
+    set((state) => {
+      const { [storyletId]: deleted, ...remaining } = state.allStorylets;
+      return {
+        allStorylets: remaining,
+        activeStoryletIds: state.activeStoryletIds.filter(id => id !== storyletId),
+        completedStoryletIds: state.completedStoryletIds.filter(id => id !== storyletId),
+        storyletCooldowns: Object.fromEntries(
+          Object.entries(state.storyletCooldowns).filter(([id]) => id !== storyletId)
+        )
+      };
+    });
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🗑️ Deleted storylet: ${storyletId}`);
+    }
+  },
+
+  // Story arc management
+  addStoryArc: (arcName: string) => {
+    set((state) => {
+      if (!state.storyArcs.includes(arcName)) {
+        return {
+          storyArcs: [...state.storyArcs, arcName]
+        };
+      }
+      return state;
+    });
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📚 Added story arc: ${arcName}`);
+    }
+  },
+
+  removeStoryArc: (arcName: string) => {
+    set((state) => {
+      // Remove arc from list
+      const newStoryArcs = state.storyArcs.filter(arc => arc !== arcName);
+      
+      // Clear arc from all storylets that use it
+      const updatedStorylets = Object.fromEntries(
+        Object.entries(state.allStorylets).map(([id, storylet]) => [
+          id,
+          storylet.storyArc === arcName 
+            ? { ...storylet, storyArc: undefined }
+            : storylet
+        ])
+      );
+      
+      return {
+        storyArcs: newStoryArcs,
+        allStorylets: updatedStorylets
+      };
+    });
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🗑️ Removed story arc: ${arcName}`);
+    }
+  },
+
+  getStoryletsByArc: (arcName: string) => {
+    const { allStorylets } = get();
+    return Object.values(allStorylets).filter(storylet => storylet.storyArc === arcName);
   },
   
   // Flag management
@@ -558,6 +718,28 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     console.log(`🎮 Minigame completed: ${success ? 'SUCCESS' : 'FAILURE'}`, stats);
     
     const { effect, storyletId, choiceId } = minigameContext;
+    
+    // Trigger clue discovery if minigame was successful
+    if (success && effect.gameId) {
+      try {
+        if (typeof window !== 'undefined' && (window as any).triggerClueDiscovery) {
+          const appStore = getAppState();
+          const characterId = appStore?.activeCharacter?.id || 'default';
+          const clueResult = (window as any).triggerClueDiscovery(effect.gameId, storyletId, characterId);
+          
+          if (clueResult) {
+            console.log(`🔍 Clue discovered: ${clueResult.clue.title}`);
+            
+            // Show notification (we'll implement this next)
+            if (typeof window !== 'undefined' && (window as any).showClueNotification) {
+              (window as any).showClueNotification(clueResult);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Could not trigger clue discovery:', error);
+      }
+    }
     
     // Apply success or failure effects
     if (success && effect.onSuccess) {
@@ -668,13 +850,81 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       activeMinigame: null,
       minigameContext: null
     });
+  },
+  
+  // Development actions
+  setDeploymentFilter: (filter: Set<'live' | 'stage' | 'dev'>) => {
+    console.log(`🔧 Setting deployment filter to: ${Array.from(filter).join(', ')}`);
+    set({ deploymentFilter: new Set(filter) });
+    
+    // Re-evaluate storylets with new filter
+    setTimeout(() => {
+      get().evaluateStorylets();
+    }, 100);
+  },
+
+  toggleDeploymentStatus: (status: 'live' | 'stage' | 'dev') => {
+    const { deploymentFilter } = get();
+    const newFilter = new Set(deploymentFilter);
+    
+    if (newFilter.has(status)) {
+      newFilter.delete(status);
+    } else {
+      newFilter.add(status);
+    }
+    
+    // Ensure at least one filter is always active
+    if (newFilter.size === 0) {
+      newFilter.add('live');
+    }
+    
+    console.log(`🔧 Toggled ${status}, new filter: ${Array.from(newFilter).join(', ')}`);
+    set({ deploymentFilter: newFilter });
+    
+    // Re-evaluate storylets with new filter
+    setTimeout(() => {
+      get().evaluateStorylets();
+    }, 100);
+  },
+  
+  updateStoryletDeploymentStatus: (storyletId: string, status: 'dev' | 'stage' | 'live') => {
+    const { allStorylets } = get();
+    const storylet = allStorylets[storyletId];
+    
+    if (storylet) {
+      console.log(`🔧 Updating ${storyletId} deployment status to: ${status}`);
+      
+      set({
+        allStorylets: {
+          ...allStorylets,
+          [storyletId]: {
+            ...storylet,
+            deploymentStatus: status
+          }
+        }
+      });
+      
+      // Re-evaluate storylets
+      setTimeout(() => {
+        get().evaluateStorylets();
+      }, 100);
+    } else {
+      console.warn(`Storylet ${storyletId} not found`);
+    }
   }
 }), {
   name: 'storylet-store',
   partialize: (state) => ({
     activeFlags: state.activeFlags,
     completedStoryletIds: state.completedStoryletIds,
-    storyletCooldowns: state.storyletCooldowns
+    storyletCooldowns: state.storyletCooldowns,
+    storyArcs: state.storyArcs,
+    deploymentFilter: Array.from(state.deploymentFilter) // Convert Set to Array for serialization
+  }),
+  merge: (persistedState: any, currentState: any) => ({
+    ...currentState,
+    ...persistedState,
+    deploymentFilter: new Set(persistedState?.deploymentFilter || ['live']) // Convert Array back to Set
   })
 }));
 
