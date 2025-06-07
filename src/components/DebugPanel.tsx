@@ -3,11 +3,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { useStoryletStore } from '../store/useStoryletStore';
+import ClueManagementPanel from './ClueManagementPanel';
+import BalanceTestingPanel from './BalanceTestingPanel';
+import StoryletManagementPanel from './StoryletManagementPanel';
+import { NPCManagementPanel } from './NPCManagementPanel';
 import '../test-integration'; // Import test functions
 import '../utils/storyletTesting'; // Import storylet testing utilities
 
 const DebugPanel: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<'debug' | 'clues' | 'balance' | 'storylets' | 'npcs'>('debug');
   const [debugData, setDebugData] = useState<any>({});
 
   // Subscribe to store changes
@@ -50,7 +55,7 @@ const DebugPanel: React.FC = () => {
 
   return (
     <div className={`fixed right-0 top-1/2 transform -translate-y-1/2 z-50 transition-all duration-300 ${
-      isExpanded ? 'w-96' : 'w-auto'
+      isExpanded ? 'w-[800px]' : 'w-auto'
     }`}>
       {/* Debug Tab */}
       <button
@@ -75,9 +80,65 @@ const DebugPanel: React.FC = () => {
 
       {/* Debug Content */}
       {isExpanded && (
-        <div className="bg-gray-900 text-white max-h-96 overflow-y-auto text-xs font-mono border-l border-t border-b border-gray-700 rounded-bl-lg">
-          <div className="p-4">
-            <h4 className="font-semibold mb-2 text-green-400">🔍 Debug Panel</h4>
+        <div className="bg-gray-900 text-white max-h-[600px] overflow-y-auto border-l border-t border-b border-gray-700 rounded-bl-lg">
+          {/* Tab Navigation */}
+          <div className="flex border-b border-gray-700">
+            <button
+              onClick={() => setActiveTab('debug')}
+              className={`px-4 py-2 text-xs font-mono transition-colors ${
+                activeTab === 'debug' 
+                  ? 'bg-gray-800 text-green-400 border-b-2 border-green-400' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              🐞 Debug
+            </button>
+            <button
+              onClick={() => setActiveTab('clues')}
+              className={`px-4 py-2 text-xs font-mono transition-colors ${
+                activeTab === 'clues' 
+                  ? 'bg-gray-800 text-blue-400 border-b-2 border-blue-400' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              🔍 Clues
+            </button>
+            <button
+              onClick={() => setActiveTab('balance')}
+              className={`px-4 py-2 text-xs font-mono transition-colors ${
+                activeTab === 'balance' 
+                  ? 'bg-gray-800 text-purple-400 border-b-2 border-purple-400' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              ⚖️ Balance
+            </button>
+            <button
+              onClick={() => setActiveTab('storylets')}
+              className={`px-4 py-2 text-xs font-mono transition-colors ${
+                activeTab === 'storylets' 
+                  ? 'bg-gray-800 text-orange-400 border-b-2 border-orange-400' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              📖 Storylets
+            </button>
+            <button
+              onClick={() => setActiveTab('npcs')}
+              className={`px-4 py-2 text-xs font-mono transition-colors ${
+                activeTab === 'npcs' 
+                  ? 'bg-gray-800 text-pink-400 border-b-2 border-pink-400' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              👥 NPCs
+            </button>
+          </div>
+
+          {/* Tab Content */}
+          {activeTab === 'debug' && (
+            <div className="p-4">
+              <h4 className="font-semibold mb-2 text-green-400">🔍 Debug Panel</h4>
             
             {/* Test Buttons */}
             <div className="mb-4 space-y-2">
@@ -162,6 +223,71 @@ const DebugPanel: React.FC = () => {
                   Run Integration Test
                 </button>
                 <button
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && (window as any).useClueStore) {
+                      (window as any).useClueStore.getState().initializeSampleData();
+                    }
+                  }}
+                  className="bg-cyan-600 hover:bg-cyan-700 px-2 py-1 rounded text-xs transition-colors"
+                >
+                  🔍 Initialize Sample Clues
+                </button>
+                <button
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && (window as any).testClueSystem) {
+                      (window as any).testClueSystem();
+                    }
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-700 px-2 py-1 rounded text-xs transition-colors"
+                >
+                  🧪 Test Clue System
+                </button>
+                <button
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && (window as any).useAppStore) {
+                      const appStore = (window as any).useAppStore.getState();
+                      console.log('🔍 Current Game State:');
+                      console.log('Day:', appStore.day);
+                      console.log('Experience:', appStore.experience);
+                      console.log('User Level:', appStore.userLevel);
+                      console.log('Resources:', appStore.resources);
+                      console.log('Active Character:', appStore.activeCharacter?.name || 'None');
+                    }
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-700 px-2 py-1 rounded text-xs transition-colors"
+                >
+                  🔍 Check Game State
+                </button>
+                <button
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && (window as any).useAppStore) {
+                      const appStore = (window as any).useAppStore.getState();
+                      if (appStore.resetGame) {
+                        appStore.resetGame();
+                        console.log('✅ Game manually reset from debug panel');
+                      }
+                    }
+                  }}
+                  className="bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-xs transition-colors"
+                >
+                  🔄 Manual Reset Game
+                </button>
+                <button
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && (window as any).useAppStore) {
+                      const appStore = (window as any).useAppStore.getState();
+                      const current = appStore.resources;
+                      appStore.updateResource('knowledge', current.knowledge + 50);
+                      appStore.updateResource('social', current.social + 50);
+                      console.log(`📚 Added +50 knowledge (now ${current.knowledge + 50})`);
+                      console.log(`👥 Added +50 social (now ${current.social + 50})`);
+                    }
+                  }}
+                  className="bg-violet-600 hover:bg-violet-700 px-2 py-1 rounded text-xs transition-colors"
+                >
+                  📚 Test Unlimited Growth
+                </button>
+                <button
                   onClick={() => (window as any).resetGameState?.()}
                   className="bg-orange-600 hover:bg-orange-700 px-2 py-1 rounded text-xs transition-colors"
                 >
@@ -203,15 +329,44 @@ const DebugPanel: React.FC = () => {
               </div>
             </div>
             
-            <div className="space-y-2">
-              <div>
-                <div className="text-yellow-400 font-semibold">Store State:</div>
-                <pre className="text-gray-300 whitespace-pre-wrap text-xs leading-tight">
-                  {JSON.stringify(debugData, null, 2)}
-                </pre>
+              <div className="space-y-2">
+                <div>
+                  <div className="text-yellow-400 font-semibold">Store State:</div>
+                  <pre className="text-gray-300 whitespace-pre-wrap text-xs leading-tight">
+                    {JSON.stringify(debugData, null, 2)}
+                  </pre>
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* Clues Tab Content */}
+          {activeTab === 'clues' && (
+            <div className="p-4 bg-white text-black">
+              <ClueManagementPanel />
+            </div>
+          )}
+
+          {/* Balance Tab Content */}
+          {activeTab === 'balance' && (
+            <div className="p-4 bg-white text-black">
+              <BalanceTestingPanel />
+            </div>
+          )}
+
+          {/* Storylets Tab Content */}
+          {activeTab === 'storylets' && (
+            <div className="p-4 bg-white text-black">
+              <StoryletManagementPanel />
+            </div>
+          )}
+
+          {/* NPCs Tab Content */}
+          {activeTab === 'npcs' && (
+            <div className="p-4 bg-white text-black">
+              <NPCManagementPanel />
+            </div>
+          )}
         </div>
       )}
     </div>

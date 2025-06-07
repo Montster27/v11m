@@ -1,4 +1,5 @@
 // /Users/montysharma/V11M2/src/types/storylet.ts
+import type { NPCMemoryInput, NPCStatus } from './npc';
 
 export type StoryletDeploymentStatus = 'dev' | 'stage' | 'live';
 
@@ -6,11 +7,17 @@ export interface Storylet {
   id: string;                     // unique identifier, e.g. "midterm_mastery_1"
   name: string;                   // display title, e.g. "Midterm Mastery: Identify Weakness"
   trigger: {
-    type: "time" | "flag" | "resource";  // what triggers availability
-    conditions: Record<string, any>;     // e.g. { week: 5 } or { flags: ["metTutor"] } or { energy: { min: 20 } }
+    type: "time" | "flag" | "resource" | "npc_relationship" | "npc_availability";  // what triggers availability
+    conditions: Record<string, any>;     // e.g. { week: 5 } or { flags: ["metTutor"] } or { energy: { min: 20 } } or { npcId: "sarah_chen", minLevel: 60 }
   };
   description: string;            // narrative text shown to player
   choices: Choice[];              // array of possible actions in this storylet
+  
+  // NPC integration fields
+  involvedNPCs?: string[];        // NPCs that appear in this storylet
+  primaryNPC?: string;            // main NPC focus
+  locationId?: string;            // where this storylet takes place
+  
   deploymentStatus?: StoryletDeploymentStatus; // deployment status: dev, stage, or live (defaults to live)
   storyArc?: string;              // optional story arc this storylet belongs to
 }
@@ -29,7 +36,13 @@ export type Effect =
   | { type: "foundationXp"; key: string; amount: number } // award XP to a foundation experience (V2 skill system)
   | { type: "domainXp"; domain: "intellectualCompetence" | "physicalCompetence" | "emotionalIntelligence" | "socialCompetence" | "personalAutonomy" | "identityClarity" | "lifePurpose"; amount: number } // award XP to a domain (V2 characters)
   | { type: "unlock"; storyletId: string }           // unlock a new storylet immediately
-  | { type: "minigame"; gameId: string; onSuccess?: Effect[]; onFailure?: Effect[] }; // launch a minigame
+  | { type: "minigame"; gameId: string; onSuccess?: Effect[]; onFailure?: Effect[] } // launch a minigame
+  // NPC-related effects
+  | { type: "npcRelationship"; npcId: string; delta: number; reason?: string }
+  | { type: "npcMemory"; npcId: string; memory: NPCMemoryInput }
+  | { type: "npcFlag"; npcId: string; flag: string; value: boolean }
+  | { type: "npcMood"; npcId: string; mood: NPCStatus["mood"]; duration?: number }
+  | { type: "npcAvailability"; npcId: string; availability: NPCStatus["availability"]; duration?: number };
 
 // Available minigames
 export type MinigameType = 
