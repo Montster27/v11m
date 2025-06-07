@@ -55,7 +55,7 @@ const DebugPanel: React.FC = () => {
 
   return (
     <div className={`fixed right-0 top-1/2 transform -translate-y-1/2 z-50 transition-all duration-300 ${
-      isExpanded ? 'w-[800px]' : 'w-auto'
+      isExpanded ? 'w-[900px]' : 'w-auto'
     }`}>
       {/* Debug Tab */}
       <button
@@ -82,10 +82,10 @@ const DebugPanel: React.FC = () => {
       {isExpanded && (
         <div className="bg-gray-900 text-white max-h-[600px] overflow-y-auto border-l border-t border-b border-gray-700 rounded-bl-lg">
           {/* Tab Navigation */}
-          <div className="flex border-b border-gray-700">
+          <div className="flex border-b border-gray-700 overflow-x-auto">
             <button
               onClick={() => setActiveTab('debug')}
-              className={`px-4 py-2 text-xs font-mono transition-colors ${
+              className={`px-3 py-2 text-xs font-mono transition-colors whitespace-nowrap ${
                 activeTab === 'debug' 
                   ? 'bg-gray-800 text-green-400 border-b-2 border-green-400' 
                   : 'text-gray-400 hover:text-white'
@@ -95,7 +95,7 @@ const DebugPanel: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('clues')}
-              className={`px-4 py-2 text-xs font-mono transition-colors ${
+              className={`px-3 py-2 text-xs font-mono transition-colors whitespace-nowrap ${
                 activeTab === 'clues' 
                   ? 'bg-gray-800 text-blue-400 border-b-2 border-blue-400' 
                   : 'text-gray-400 hover:text-white'
@@ -105,7 +105,7 @@ const DebugPanel: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('balance')}
-              className={`px-4 py-2 text-xs font-mono transition-colors ${
+              className={`px-3 py-2 text-xs font-mono transition-colors whitespace-nowrap ${
                 activeTab === 'balance' 
                   ? 'bg-gray-800 text-purple-400 border-b-2 border-purple-400' 
                   : 'text-gray-400 hover:text-white'
@@ -115,7 +115,7 @@ const DebugPanel: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('storylets')}
-              className={`px-4 py-2 text-xs font-mono transition-colors ${
+              className={`px-3 py-2 text-xs font-mono transition-colors whitespace-nowrap ${
                 activeTab === 'storylets' 
                   ? 'bg-gray-800 text-orange-400 border-b-2 border-orange-400' 
                   : 'text-gray-400 hover:text-white'
@@ -125,7 +125,7 @@ const DebugPanel: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('npcs')}
-              className={`px-4 py-2 text-xs font-mono transition-colors ${
+              className={`px-3 py-2 text-xs font-mono transition-colors whitespace-nowrap ${
                 activeTab === 'npcs' 
                   ? 'bg-gray-800 text-pink-400 border-b-2 border-pink-400' 
                   : 'text-gray-400 hover:text-white'

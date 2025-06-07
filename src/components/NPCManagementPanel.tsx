@@ -167,21 +167,70 @@ export const NPCManagementPanel: React.FC = () => {
   };
 
   const renderOverview = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-4">
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">📊 Statistics</h3>
-          <div className="space-y-1 text-sm">
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <Card className="p-3">
+          <h3 className="text-sm font-semibold text-gray-800 mb-2">📊 Statistics</h3>
+          <div className="space-y-1 text-xs">
             <p>Total NPCs: <span className="font-medium">{stats.totalNPCs}</span></p>
-            <p>Average Relationship: <span className="font-medium">{stats.averageRelationshipLevel}</span></p>
+            <p>Avg Relationship: <span className="font-medium">{stats.averageRelationshipLevel}</span></p>
             <p>Total Memories: <span className="font-medium">{stats.memoriesCount}</span></p>
             <p>Active Flags: <span className="font-medium">{stats.activeFlags}</span></p>
           </div>
         </Card>
 
-        <Card className="p-4">
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">💝 Relationships</h3>
-          <div className="space-y-1 text-xs">
+        <Card className="p-3">
+          <h3 className="text-sm font-semibold text-gray-800 mb-2">🔧 Quick Actions</h3>
+          <div className="space-y-1">
+            <Button 
+              onClick={() => setActiveTab('create')} 
+              variant="primary" 
+              size="sm"
+              className="w-full text-xs"
+            >
+              Create New NPC
+            </Button>
+            <Button 
+              onClick={initializeSampleNPCs} 
+              variant="outline" 
+              size="sm"
+              className="w-full text-xs text-blue-600 border-blue-300 hover:bg-blue-50"
+            >
+              Add Sample NPCs
+            </Button>
+            <div className="flex space-x-1">
+              <Button 
+                onClick={handleExport} 
+                variant="outline" 
+                size="sm"
+                className="flex-1 text-xs"
+              >
+                Export
+              </Button>
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImport}
+                className="hidden"
+                id="import-file"
+              />
+              <Button 
+                onClick={() => document.getElementById('import-file')?.click()} 
+                variant="outline" 
+                size="sm"
+                className="flex-1 text-xs"
+              >
+                Import
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {Object.keys(stats.relationshipDistribution).length > 0 && (
+        <Card className="p-3">
+          <h3 className="text-sm font-semibold text-gray-800 mb-2">💝 Relationships</h3>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
             {Object.entries(stats.relationshipDistribution).map(([type, count]) => (
               <div key={type} className="flex justify-between">
                 <span className="capitalize">{type.replace('_', ' ')}</span>
@@ -190,113 +239,89 @@ export const NPCManagementPanel: React.FC = () => {
             ))}
           </div>
         </Card>
+      )}
 
-        <Card className="p-4">
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">🔧 Quick Actions</h3>
+      {allNPCs.length > 0 && (
+        <Card className="p-3">
+          <h3 className="text-sm font-semibold text-gray-800 mb-2">NPCs ({allNPCs.length})</h3>
           <div className="space-y-2">
-            <Button 
-              onClick={() => setActiveTab('create')} 
-              variant="primary" 
-              size="sm"
-              className="w-full"
-            >
-              Create New NPC
-            </Button>
-            <Button 
-              onClick={handleExport} 
-              variant="outline" 
-              size="sm"
-              className="w-full"
-            >
-              Export Data
-            </Button>
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleImport}
-              className="hidden"
-              id="import-file"
-            />
-            <Button 
-              onClick={() => document.getElementById('import-file')?.click()} 
-              variant="outline" 
-              size="sm"
-              className="w-full"
-            >
-              Import Data
-            </Button>
-            <Button 
-              onClick={initializeSampleNPCs} 
-              variant="outline" 
-              size="sm"
-              className="w-full text-blue-600 border-blue-300 hover:bg-blue-50"
-            >
-              Add Sample NPCs
-            </Button>
+            {allNPCs.slice(0, 3).map(npc => (
+              <div key={npc.id} className="border rounded p-2 hover:bg-gray-50">
+                <div className="flex justify-between items-center mb-1">
+                  <h4 className="font-medium text-xs text-gray-800">{npc.name}</h4>
+                  <span className="text-xs px-1 py-0.5 bg-blue-100 text-blue-800 rounded">
+                    {npc.relationshipLevel}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 truncate">{npc.description}</p>
+              </div>
+            ))}
+            {allNPCs.length > 3 && (
+              <button 
+                onClick={() => setActiveTab('manage')}
+                className="text-xs text-blue-600 hover:text-blue-800 w-full text-center"
+              >
+                View all {allNPCs.length} NPCs →
+              </button>
+            )}
           </div>
         </Card>
-      </div>
+      )}
 
-      <Card className="p-4">
-        <h3 className="text-lg font-semibold text-gray-800 mb-3">Recent NPCs</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {allNPCs.slice(0, 6).map(npc => (
-            <div key={npc.id} className="border rounded-lg p-3 hover:bg-gray-50">
-              <div className="flex justify-between items-start mb-2">
-                <h4 className="font-medium text-gray-800">{npc.name}</h4>
-                <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded">
-                  {npc.relationshipType.replace('_', ' ')}
-                </span>
-              </div>
-              <p className="text-sm text-gray-600 mb-2 line-clamp-2">{npc.description}</p>
-              <div className="flex justify-between items-center text-xs text-gray-500">
-                <span>Level: {npc.relationshipLevel}</span>
-                <span>{npc.memories.length} memories</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
+      {allNPCs.length === 0 && (
+        <Card className="p-4 text-center">
+          <p className="text-gray-500 text-sm mb-3">No NPCs created yet</p>
+          <Button 
+            onClick={initializeSampleNPCs} 
+            variant="primary" 
+            size="sm"
+          >
+            Add Sample NPCs to Get Started
+          </Button>
+        </Card>
+      )}
     </div>
   );
 
   const renderManage = () => (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
+    <div className="space-y-3">
+      <div className="flex flex-col space-y-2">
         <input
           type="text"
           placeholder="Search NPCs..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
-        <div className="space-x-2">
-          <Button onClick={() => setActiveTab('create')} variant="primary">
-            Create New NPC
+        <div className="flex space-x-1">
+          <Button onClick={() => setActiveTab('create')} variant="primary" size="sm" className="text-xs">
+            Create New
           </Button>
           <Button 
             onClick={() => resetAllNPCData()} 
             variant="outline"
-            className="text-red-600 border-red-300 hover:bg-red-50"
+            size="sm"
+            className="text-xs text-red-600 border-red-300 hover:bg-red-50"
           >
-            Reset All Data
+            Reset All
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="space-y-2">
         {filteredNPCs.map(npc => (
-          <Card key={npc.id} className="p-4">
-            <div className="flex justify-between items-start mb-3">
-              <div>
-                <h3 className="font-semibold text-gray-800">{npc.name}</h3>
-                <p className="text-sm text-gray-600">{npc.id}</p>
+          <Card key={npc.id} className="p-3">
+            <div className="flex justify-between items-start mb-2">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm text-gray-800 truncate">{npc.name}</h3>
+                <p className="text-xs text-gray-600 truncate">{npc.description}</p>
               </div>
-              <div className="flex space-x-1">
+              <div className="flex space-x-1 ml-2 flex-shrink-0">
                 <Button 
                   onClick={() => handleEditNPC(npc)} 
                   variant="outline" 
                   size="sm"
+                  className="text-xs"
                 >
                   Edit
                 </Button>
@@ -304,20 +329,18 @@ export const NPCManagementPanel: React.FC = () => {
                   onClick={() => handleDeleteNPC(npc.id)} 
                   variant="outline" 
                   size="sm"
-                  className="text-red-600 border-red-300 hover:bg-red-50"
+                  className="text-xs text-red-600 border-red-300 hover:bg-red-50"
                 >
-                  Delete
+                  Del
                 </Button>
               </div>
             </div>
             
-            <p className="text-sm text-gray-700 mb-3 line-clamp-3">{npc.description}</p>
-            
-            <div className="space-y-2 text-sm">
+            <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="flex justify-between">
-                <span>Relationship:</span>
-                <span className="font-medium capitalize">
-                  {npc.relationshipType.replace('_', ' ')} ({npc.relationshipLevel})
+                <span>Rel:</span>
+                <span className="font-medium">
+                  {npc.relationshipLevel} ({npc.relationshipType.replace('_', ' ')})
                 </span>
               </div>
               <div className="flex justify-between">
@@ -334,28 +357,33 @@ export const NPCManagementPanel: React.FC = () => {
               </div>
             </div>
             
-            <div className="mt-3 pt-3 border-t border-gray-200">
-              <div className="flex space-x-2">
+            <div className="mt-2 pt-2 border-t border-gray-200">
+              <div className="flex space-x-1">
                 <Button 
                   onClick={() => adjustRelationship(npc.id, 10, 'Dev adjustment')} 
                   variant="outline" 
                   size="sm"
-                  className="text-green-600 border-green-300"
+                  className="text-xs text-green-600 border-green-300 flex-1"
                 >
-                  +10 Rel
+                  +10
                 </Button>
                 <Button 
                   onClick={() => adjustRelationship(npc.id, -10, 'Dev adjustment')} 
                   variant="outline" 
                   size="sm"
-                  className="text-red-600 border-red-300"
+                  className="text-xs text-red-600 border-red-300 flex-1"
                 >
-                  -10 Rel
+                  -10
                 </Button>
               </div>
             </div>
           </Card>
         ))}
+        {filteredNPCs.length === 0 && (
+          <div className="text-center py-4 text-gray-500 text-sm">
+            {searchQuery ? 'No NPCs match your search' : 'No NPCs found. Create some first!'}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -660,40 +688,38 @@ export const NPCManagementPanel: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">NPC Management</h1>
-          <p className="text-gray-600 mt-2">Manage non-player characters, relationships, and interactions</p>
+    <div className="bg-gray-50 min-h-96">
+      <div className="mb-4">
+        <h1 className="text-xl font-bold text-gray-900">NPC Management</h1>
+        <p className="text-gray-600 text-sm mt-1">Manage non-player characters, relationships, and interactions</p>
+      </div>
+
+      <div className="bg-white rounded-lg shadow">
+        <div className="border-b border-gray-200">
+          <nav className="flex space-x-4 overflow-x-auto" aria-label="Tabs">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as NPCTabType)}
+                className={`py-3 px-2 border-b-2 font-medium text-xs whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
         </div>
 
-        <div className="bg-white rounded-lg shadow">
-          <div className="border-b border-gray-200">
-            <nav className="flex space-x-8" aria-label="Tabs">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as NPCTabType)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-          </div>
-
-          <div className="p-6">
-            {activeTab === 'overview' && renderOverview()}
-            {activeTab === 'manage' && renderManage()}
-            {activeTab === 'create' && renderCreate()}
-            {activeTab === 'relationships' && renderRelationships()}
-            {activeTab === 'memories' && renderMemories()}
-            {activeTab === 'locations' && renderLocations()}
-          </div>
+        <div className="p-4 max-h-[500px] overflow-y-auto">
+          {activeTab === 'overview' && renderOverview()}
+          {activeTab === 'manage' && renderManage()}
+          {activeTab === 'create' && renderCreate()}
+          {activeTab === 'relationships' && renderRelationships()}
+          {activeTab === 'memories' && renderMemories()}
+          {activeTab === 'locations' && renderLocations()}
         </div>
       </div>
     </div>
