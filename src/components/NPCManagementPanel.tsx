@@ -461,6 +461,35 @@ export const NPCManagementPanel: React.FC = () => {
                 <option value="Senior">Senior</option>
               </select>
             </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Activities (comma separated)
+                <span className="text-xs text-gray-500 ml-1">e.g. Drama Club, Basketball</span>
+              </label>
+              <input
+                type="text"
+                value={formData.background.activities.join(', ')}
+                onChange={(e) => {
+                  const activities = e.target.value
+                    .split(',')
+                    .map(s => s.trim())
+                    .filter(s => s.length > 0);
+                  setFormData({
+                    ...formData, 
+                    background: {
+                      ...formData.background, 
+                      activities
+                    }
+                  });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Campus Radio, Literary Magazine, Study Groups"
+              />
+              <div className="text-xs text-gray-500 mt-1">
+                Current activities: {formData.background.activities.length > 0 ? formData.background.activities.join(', ') : 'None'}
+              </div>
+            </div>
           </div>
           
           <div className="space-y-4">
@@ -514,37 +543,90 @@ export const NPCManagementPanel: React.FC = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Traits (comma separated)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Traits (comma separated)
+                <span className="text-xs text-gray-500 ml-1">e.g. thoughtful, artistic, warm</span>
+              </label>
               <input
                 type="text"
                 value={formData.personality.traits.join(', ')}
-                onChange={(e) => setFormData({
-                  ...formData, 
-                  personality: {
-                    ...formData.personality, 
-                    traits: e.target.value.split(',').map(s => s.trim()).filter(s => s)
-                  }
-                })}
+                onChange={(e) => {
+                  const traits = e.target.value
+                    .split(',')
+                    .map(s => s.trim())
+                    .filter(s => s.length > 0);
+                  setFormData({
+                    ...formData, 
+                    personality: {
+                      ...formData.personality, 
+                      traits
+                    }
+                  });
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="thoughtful, artistic, warm"
+                placeholder="thoughtful, artistic, warm, intelligent"
               />
+              <div className="text-xs text-gray-500 mt-1">
+                Current traits: {formData.personality.traits.length > 0 ? formData.personality.traits.join(', ') : 'None'}
+              </div>
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Interests (comma separated)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Interests (comma separated)
+                <span className="text-xs text-gray-500 ml-1">e.g. literature, music, art</span>
+              </label>
               <input
                 type="text"
                 value={formData.personality.interests.join(', ')}
-                onChange={(e) => setFormData({
-                  ...formData, 
-                  personality: {
-                    ...formData.personality, 
-                    interests: e.target.value.split(',').map(s => s.trim()).filter(s => s)
-                  }
-                })}
+                onChange={(e) => {
+                  const interests = e.target.value
+                    .split(',')
+                    .map(s => s.trim())
+                    .filter(s => s.length > 0);
+                  setFormData({
+                    ...formData, 
+                    personality: {
+                      ...formData.personality, 
+                      interests
+                    }
+                  });
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="literature, radio broadcasting, indie music"
+                placeholder="literature, radio broadcasting, indie music, creative writing"
               />
+              <div className="text-xs text-gray-500 mt-1">
+                Current interests: {formData.personality.interests.length > 0 ? formData.personality.interests.join(', ') : 'None'}
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Values (comma separated)
+                <span className="text-xs text-gray-500 ml-1">e.g. honesty, creativity, friendship</span>
+              </label>
+              <input
+                type="text"
+                value={formData.personality.values.join(', ')}
+                onChange={(e) => {
+                  const values = e.target.value
+                    .split(',')
+                    .map(s => s.trim())
+                    .filter(s => s.length > 0);
+                  setFormData({
+                    ...formData, 
+                    personality: {
+                      ...formData.personality, 
+                      values
+                    }
+                  });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="authenticity, creativity, intellectual growth, meaningful connections"
+              />
+              <div className="text-xs text-gray-500 mt-1">
+                Current values: {formData.personality.values.length > 0 ? formData.personality.values.join(', ') : 'None'}
+              </div>
             </div>
           </div>
         </div>
