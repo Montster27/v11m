@@ -54,6 +54,12 @@ export const NPCManagementPanel: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState<NPCFormData>(defaultFormData);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Raw input states for comma-separated fields
+  const [traitsInput, setTraitsInput] = useState('');
+  const [interestsInput, setInterestsInput] = useState('');
+  const [valuesInput, setValuesInput] = useState('');
+  const [activitiesInput, setActivitiesInput] = useState('');
 
   const {
     npcs,
@@ -101,6 +107,10 @@ export const NPCManagementPanel: React.FC = () => {
 
     addNPC(newNPC);
     setFormData(defaultFormData);
+    setTraitsInput('');
+    setInterestsInput('');
+    setValuesInput('');
+    setActivitiesInput('');
     setIsCreating(false);
     setActiveTab('manage');
   };
@@ -110,6 +120,10 @@ export const NPCManagementPanel: React.FC = () => {
 
     updateNPC(selectedNPCId, formData);
     setFormData(defaultFormData);
+    setTraitsInput('');
+    setInterestsInput('');
+    setValuesInput('');
+    setActivitiesInput('');
     setSelectedNPCId(null);
     setIsCreating(false);
   };
@@ -118,6 +132,13 @@ export const NPCManagementPanel: React.FC = () => {
     setFormData(npc);
     setSelectedNPCId(npc.id);
     setIsCreating(true);
+    
+    // Populate raw input states
+    setTraitsInput(npc.personality.traits.join(', '));
+    setInterestsInput(npc.personality.interests.join(', '));
+    setValuesInput(npc.personality.values.join(', '));
+    setActivitiesInput(npc.background.activities.join(', '));
+    
     setActiveTab('create');
   };
 
@@ -467,11 +488,15 @@ export const NPCManagementPanel: React.FC = () => {
                 Activities (comma separated)
                 <span className="text-xs text-gray-500 ml-1">e.g. Drama Club, Basketball</span>
               </label>
-              <input
-                type="text"
-                value={formData.background.activities.join(', ')}
+              <textarea
+                rows={1}
+                value={activitiesInput}
                 onChange={(e) => {
-                  const activities = e.target.value
+                  const rawValue = e.target.value;
+                  setActivitiesInput(rawValue);
+                  
+                  // Update formData with parsed activities
+                  const activities = rawValue
                     .split(',')
                     .map(s => s.trim())
                     .filter(s => s.length > 0);
@@ -483,7 +508,7 @@ export const NPCManagementPanel: React.FC = () => {
                     }
                   });
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 placeholder="Campus Radio, Literary Magazine, Study Groups"
               />
               <div className="text-xs text-gray-500 mt-1">
@@ -547,11 +572,15 @@ export const NPCManagementPanel: React.FC = () => {
                 Traits (comma separated)
                 <span className="text-xs text-gray-500 ml-1">e.g. thoughtful, artistic, warm</span>
               </label>
-              <input
-                type="text"
-                value={formData.personality.traits.join(', ')}
+              <textarea
+                rows={1}
+                value={traitsInput}
                 onChange={(e) => {
-                  const traits = e.target.value
+                  const rawValue = e.target.value;
+                  setTraitsInput(rawValue);
+                  
+                  // Update formData with parsed traits
+                  const traits = rawValue
                     .split(',')
                     .map(s => s.trim())
                     .filter(s => s.length > 0);
@@ -563,7 +592,7 @@ export const NPCManagementPanel: React.FC = () => {
                     }
                   });
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 placeholder="thoughtful, artistic, warm, intelligent"
               />
               <div className="text-xs text-gray-500 mt-1">
@@ -576,11 +605,15 @@ export const NPCManagementPanel: React.FC = () => {
                 Interests (comma separated)
                 <span className="text-xs text-gray-500 ml-1">e.g. literature, music, art</span>
               </label>
-              <input
-                type="text"
-                value={formData.personality.interests.join(', ')}
+              <textarea
+                rows={1}
+                value={interestsInput}
                 onChange={(e) => {
-                  const interests = e.target.value
+                  const rawValue = e.target.value;
+                  setInterestsInput(rawValue);
+                  
+                  // Update formData with parsed interests
+                  const interests = rawValue
                     .split(',')
                     .map(s => s.trim())
                     .filter(s => s.length > 0);
@@ -592,7 +625,7 @@ export const NPCManagementPanel: React.FC = () => {
                     }
                   });
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 placeholder="literature, radio broadcasting, indie music, creative writing"
               />
               <div className="text-xs text-gray-500 mt-1">
@@ -605,11 +638,15 @@ export const NPCManagementPanel: React.FC = () => {
                 Values (comma separated)
                 <span className="text-xs text-gray-500 ml-1">e.g. honesty, creativity, friendship</span>
               </label>
-              <input
-                type="text"
-                value={formData.personality.values.join(', ')}
+              <textarea
+                rows={1}
+                value={valuesInput}
                 onChange={(e) => {
-                  const values = e.target.value
+                  const rawValue = e.target.value;
+                  setValuesInput(rawValue);
+                  
+                  // Update formData with parsed values
+                  const values = rawValue
                     .split(',')
                     .map(s => s.trim())
                     .filter(s => s.length > 0);
@@ -621,7 +658,7 @@ export const NPCManagementPanel: React.FC = () => {
                     }
                   });
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 placeholder="authenticity, creativity, intellectual growth, meaningful connections"
               />
               <div className="text-xs text-gray-500 mt-1">
@@ -635,6 +672,10 @@ export const NPCManagementPanel: React.FC = () => {
           <Button 
             onClick={() => {
               setFormData(defaultFormData);
+              setTraitsInput('');
+              setInterestsInput('');
+              setValuesInput('');
+              setActivitiesInput('');
               setSelectedNPCId(null);
               setIsCreating(false);
             }}
@@ -774,6 +815,7 @@ export const NPCManagementPanel: React.FC = () => {
       <div className="mb-4">
         <h1 className="text-xl font-bold text-gray-900">NPC Management</h1>
         <p className="text-gray-600 text-sm mt-1">Manage non-player characters, relationships, and interactions</p>
+        
       </div>
 
       <div className="bg-white rounded-lg shadow">
