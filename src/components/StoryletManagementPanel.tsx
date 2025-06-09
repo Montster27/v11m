@@ -1,8 +1,11 @@
 // /Users/montysharma/V11M2/src/components/StoryletManagementPanel.tsx
 import React, { useState, useEffect } from 'react';
 import { useStoryletStore } from '../store/useStoryletStore';
+import { useNPCStore } from '../store/useNPCStore';
 import { Button, Card } from './ui';
 import { StoryletDeploymentStatus, Storylet, Choice, Effect } from '../types/storylet';
+import StoryArcVisualizer from './StoryArcVisualizer';
+import ArcProgressDisplay from './ArcProgressDisplay';
 
 type StoryletTabType = 'overview' | 'manage' | 'search' | 'arcs' | 'filter' | 'create';
 
@@ -25,6 +28,9 @@ const StoryletManagementPanel: React.FC = () => {
   const [showCreateArcModal, setShowCreateArcModal] = useState(false);
   const [newArcName, setNewArcName] = useState('');
   
+  // Bulk selection state
+  const [selectedStoryletIds, setSelectedStoryletIds] = useState<Set<string>>(new Set());
+  
   // Arc testing state
   const [testingArc, setTestingArc] = useState<string | null>(null);
   const [testingHistory, setTestingHistory] = useState<Array<{
@@ -33,6 +39,9 @@ const StoryletManagementPanel: React.FC = () => {
     flags: Record<string, boolean>;
   }>>([]);
   const [testingFlags, setTestingFlags] = useState<Record<string, boolean>>({});
+  
+  // Visualization state
+  const [visualizingArc, setVisualizingArc] = useState<string | null>(null);
   
   // Form data state for create/edit
   const [formData, setFormData] = useState<Partial<Storylet>>({
@@ -64,10 +73,18 @@ const StoryletManagementPanel: React.FC = () => {
     getStoryletsByArc
   } = useStoryletStore();
 
+  const { getAllNPCs } = useNPCStore();
+  const allNPCs = getAllNPCs();
+
   // Debug testingArc changes
   useEffect(() => {
     console.log('🧪 useEffect - testingArc changed to:', testingArc);
   }, [testingArc]);
+
+  // Clear selections when filtering changes or tab changes
+  useEffect(() => {
+    setSelectedStoryletIds(new Set());
+  }, [searchQuery, selectedStoryArc, activeTab, deploymentFilter]);
 
   // Search and filter logic
   const searchStorylets = (storylets: Storylet[], query: string) => {
@@ -210,6 +227,76 @@ const StoryletManagementPanel: React.FC = () => {
       if (selectedStoryArc === arcName) {
         setSelectedStoryArc('');
       }
+    }
+  };
+
+  // Bulk selection handlers
+  const handleSelectAllStorylets = () => {
+    const allIds = new Set(activityFilteredStorylets.map(s => s.id));
+    setSelectedStoryletIds(allIds);
+  };
+
+  const handleDeselectAllStorylets = () => {
+    setSelectedStoryletIds(new Set());
+  };
+
+  const handleToggleStoryletSelection = (storyletId: string) => {
+    const newSelected = new Set(selectedStoryletIds);
+    if (newSelected.has(storyletId)) {
+      newSelected.delete(storyletId);
+    } else {
+      newSelected.add(storyletId);
+    }
+    setSelectedStoryletIds(newSelected);
+  };
+
+  const handleBulkStatusUpdate = () => {
+    if (selectedStoryletIds.size === 0) {
+      alert('Please select storylets to update');
+      return;
+    }
+
+    const count = selectedStoryletIds.size;
+    if (confirm(`Are you sure you want to set ${count} storylet${count > 1 ? 's' : ''} to ${selectedStatus.toUpperCase()}?`)) {
+      selectedStoryletIds.forEach(storyletId => {
+        handleStatusUpdate(storyletId, selectedStatus);
+      });
+      setSelectedStoryletIds(new Set());
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedStoryletIds.size === 0) {
+      alert('Please select storylets to delete');
+      return;
+    }
+
+    const count = selectedStoryletIds.size;
+    if (confirm(`Are you sure you want to delete ${count} storylet${count > 1 ? 's' : ''}? This action cannot be undone.`)) {
+      selectedStoryletIds.forEach(storyletId => {
+        deleteStorylet(storyletId);
+      });
+      setSelectedStoryletIds(new Set());
+    }
+  };
+
+  // Story arc status management
+  const handleArcStatusUpdate = (arcName: string, newStatus: StoryletDeploymentStatus) => {
+    const arcStorylets = getStoryletsByArc(arcName);
+    
+    if (arcStorylets.length === 0) {
+      alert('No storylets found in this arc');
+      return;
+    }
+
+    const count = arcStorylets.length;
+    if (confirm(`Are you sure you want to set all ${count} storylet${count > 1 ? 's' : ''} in "${arcName}" to ${newStatus.toUpperCase()}?`)) {
+      arcStorylets.forEach(storylet => {
+        handleStatusUpdate(storylet.id, newStatus);
+      });
+      
+      // Show success message
+      alert(`Updated ${count} storylet${count > 1 ? 's' : ''} in "${arcName}" to ${newStatus.toUpperCase()}`);
     }
   };
 
@@ -406,6 +493,8 @@ const StoryletManagementPanel: React.FC = () => {
         </Card>
       </div>
 
+      <ArcProgressDisplay />
+
       <Card className="p-4">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Deployment Filter</h3>
         <div className="space-y-4">
@@ -512,6 +601,57 @@ const StoryletManagementPanel: React.FC = () => {
         </div>
       </div>
 
+      {/* Bulk selection controls */}
+      <Card className="p-4 bg-blue-50 border-blue-200">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center space-x-4">
+            <span className="text-sm font-medium text-blue-900">
+              {selectedStoryletIds.size} storylet{selectedStoryletIds.size !== 1 ? 's' : ''} selected
+            </span>
+            <div className="flex space-x-2">
+              <Button
+                onClick={handleSelectAllStorylets}
+                variant="outline"
+                size="sm"
+                className="text-xs text-blue-600 border-blue-300 hover:bg-blue-100"
+              >
+                Select All ({activityFilteredStorylets.length})
+              </Button>
+              <Button
+                onClick={handleDeselectAllStorylets}
+                variant="outline"
+                size="sm"
+                className="text-xs text-gray-600 border-gray-300 hover:bg-gray-100"
+                disabled={selectedStoryletIds.size === 0}
+              >
+                Deselect All
+              </Button>
+            </div>
+          </div>
+          
+          <div className="flex space-x-2">
+            <Button
+              onClick={handleBulkStatusUpdate}
+              variant="primary"
+              size="sm"
+              className="text-xs"
+              disabled={selectedStoryletIds.size === 0}
+            >
+              Update Status ({selectedStoryletIds.size})
+            </Button>
+            <Button
+              onClick={handleBulkDelete}
+              variant="outline"
+              size="sm"
+              className="text-xs text-red-600 border-red-300 hover:bg-red-50"
+              disabled={selectedStoryletIds.size === 0}
+            >
+              Delete Selected ({selectedStoryletIds.size})
+            </Button>
+          </div>
+        </div>
+      </Card>
+
       <div className="space-y-4">
         {activityFilteredStorylets.map((storylet) => {
           const currentStatus = storylet.deploymentStatus || 'live';
@@ -519,38 +659,48 @@ const StoryletManagementPanel: React.FC = () => {
           const isCompleted = completedStoryletIds.includes(storylet.id);
           
           return (
-            <Card key={storylet.id} className="p-4">
+            <Card key={storylet.id} className={`p-4 transition-colors ${
+              selectedStoryletIds.has(storylet.id) ? 'bg-blue-50 border-blue-300' : ''
+            }`}>
               <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    <h4 className="font-semibold text-gray-900">
-                      {highlightSearchTerm(storylet.name, searchQuery)}
-                    </h4>
-                    <span className={`px-2 py-1 text-xs rounded ${
-                      isActive ? 'bg-green-100 text-green-800' :
-                      isCompleted ? 'bg-gray-100 text-gray-600' :
-                      'bg-blue-100 text-blue-600'
-                    }`}>
-                      {isActive ? 'Active' : isCompleted ? 'Completed' : 'Available'}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {highlightSearchTerm(storylet.description, searchQuery)}
-                  </p>
-                  <div className="text-xs text-gray-500 mt-2">
-                    ID: {highlightSearchTerm(storylet.id, searchQuery)} | Trigger: {storylet.trigger.type}
-                    {storylet.storyArc && (
-                      <> | Arc: {highlightSearchTerm(storylet.storyArc, searchQuery)}</>
+                <div className="flex items-start space-x-3 flex-1">
+                  <input
+                    type="checkbox"
+                    checked={selectedStoryletIds.has(storylet.id)}
+                    onChange={() => handleToggleStoryletSelection(storylet.id)}
+                    className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      <h4 className="font-semibold text-gray-900">
+                        {highlightSearchTerm(storylet.name, searchQuery)}
+                      </h4>
+                      <span className={`px-2 py-1 text-xs rounded ${
+                        isActive ? 'bg-green-100 text-green-800' :
+                        isCompleted ? 'bg-gray-100 text-gray-600' :
+                        'bg-blue-100 text-blue-600'
+                      }`}>
+                        {isActive ? 'Active' : isCompleted ? 'Completed' : 'Available'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {highlightSearchTerm(storylet.description, searchQuery)}
+                    </p>
+                    <div className="text-xs text-gray-500 mt-2">
+                      ID: {highlightSearchTerm(storylet.id, searchQuery)} | Trigger: {storylet.trigger.type}
+                      {storylet.storyArc && (
+                        <> | Arc: {highlightSearchTerm(storylet.storyArc, searchQuery)}</>
+                      )}
+                    </div>
+                    {searchFilters.searchInChoices && storylet.choices.some(choice => 
+                      choice.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      choice.id.toLowerCase().includes(searchQuery.toLowerCase())
+                    ) && (
+                      <div className="text-xs text-blue-600 mt-1">
+                        ✓ Found in choices
+                      </div>
                     )}
                   </div>
-                  {searchFilters.searchInChoices && storylet.choices.some(choice => 
-                    choice.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    choice.id.toLowerCase().includes(searchQuery.toLowerCase())
-                  ) && (
-                    <div className="text-xs text-blue-600 mt-1">
-                      ✓ Found in choices
-                    </div>
-                  )}
                 </div>
                 
                 <div className="flex items-center space-x-2 ml-4">
@@ -819,6 +969,13 @@ const StoryletManagementPanel: React.FC = () => {
           const activeInArc = arcStorylets.filter(s => activeStoryletIds.includes(s.id)).length;
           const completedInArc = arcStorylets.filter(s => completedStoryletIds.includes(s.id)).length;
           
+          // Calculate status distribution
+          const statusDistribution = arcStorylets.reduce((acc, storylet) => {
+            const status = storylet.deploymentStatus || 'live';
+            acc[status] = (acc[status] || 0) + 1;
+            return acc;
+          }, {} as Record<StoryletDeploymentStatus, number>);
+          
           return (
             <Card key={arc} className="p-4">
               <div className="flex justify-between items-start mb-3">
@@ -845,9 +1002,67 @@ const StoryletManagementPanel: React.FC = () => {
                   <span className="text-gray-600">Completed:</span>
                   <span className="font-medium text-blue-600">{completedInArc}</span>
                 </div>
+                
+                {/* Status Distribution */}
+                <div className="pt-2 border-t border-gray-200">
+                  <div className="text-xs font-medium text-gray-700 mb-1">Deployment Status:</div>
+                  <div className="space-y-1">
+                    {statusDistribution.live && (
+                      <div className="flex justify-between">
+                        <span className="text-green-600">Live:</span>
+                        <span className="font-medium">{statusDistribution.live}</span>
+                      </div>
+                    )}
+                    {statusDistribution.stage && (
+                      <div className="flex justify-between">
+                        <span className="text-yellow-600">Stage:</span>
+                        <span className="font-medium">{statusDistribution.stage}</span>
+                      </div>
+                    )}
+                    {statusDistribution.dev && (
+                      <div className="flex justify-between">
+                        <span className="text-red-600">Dev:</span>
+                        <span className="font-medium">{statusDistribution.dev}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
               
               <div className="mt-3 pt-3 border-t space-y-2">
+                {/* Bulk Status Controls */}
+                {arcStorylets.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-xs font-medium text-gray-700">Set All to:</div>
+                    <div className="grid grid-cols-3 gap-1">
+                      <Button
+                        onClick={() => handleArcStatusUpdate(arc, 'dev')}
+                        variant="outline"
+                        className="text-xs py-1 text-red-600 border-red-200 hover:bg-red-50"
+                        disabled={arcStorylets.length === 0}
+                      >
+                        Dev ({statusDistribution.dev || 0})
+                      </Button>
+                      <Button
+                        onClick={() => handleArcStatusUpdate(arc, 'stage')}
+                        variant="outline"
+                        className="text-xs py-1 text-yellow-600 border-yellow-200 hover:bg-yellow-50"
+                        disabled={arcStorylets.length === 0}
+                      >
+                        Stage ({statusDistribution.stage || 0})
+                      </Button>
+                      <Button
+                        onClick={() => handleArcStatusUpdate(arc, 'live')}
+                        variant="outline"
+                        className="text-xs py-1 text-green-600 border-green-200 hover:bg-green-50"
+                        disabled={arcStorylets.length === 0}
+                      >
+                        Live ({statusDistribution.live || 0})
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
                 <Button
                   onClick={() => {
                     setSelectedStoryArc(arc);
@@ -868,6 +1083,14 @@ const StoryletManagementPanel: React.FC = () => {
                   className="w-full text-sm"
                 >
                   🧪 Test Arc
+                </Button>
+                
+                <Button
+                  onClick={() => setVisualizingArc(arc)}
+                  variant="outline"
+                  className="w-full text-sm text-purple-600 border-purple-200 hover:bg-purple-50"
+                >
+                  📊 Visualize Arc
                 </Button>
               </div>
               
@@ -1116,7 +1339,10 @@ const StoryletManagementPanel: React.FC = () => {
         deploymentStatus: formData.deploymentStatus || 'dev',
         trigger: formData.trigger || { type: 'time', conditions: {} },
         choices: formData.choices || [],
-        storyArc: formData.storyArc || undefined
+        storyArc: formData.storyArc || undefined,
+        involvedNPCs: formData.involvedNPCs,
+        primaryNPC: formData.primaryNPC,
+        locationId: formData.locationId
       };
 
       console.log('📝 Submitting storylet:', storylet);
@@ -1296,6 +1522,75 @@ const StoryletManagementPanel: React.FC = () => {
           </Card>
 
           <Card className="p-4">
+            <h4 className="font-semibold mb-4">NPC Integration</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Primary NPC
+                </label>
+                <select
+                  value={formData.primaryNPC || ''}
+                  onChange={(e) => setFormData({ ...formData, primaryNPC: e.target.value || undefined })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">No Primary NPC</option>
+                  {allNPCs.map(npc => (
+                    <option key={npc.id} value={npc.id}>{npc.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Location ID
+                </label>
+                <input
+                  type="text"
+                  value={formData.locationId || ''}
+                  onChange={(e) => setFormData({ ...formData, locationId: e.target.value || undefined })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="dining_hall, library, etc."
+                />
+              </div>
+            </div>
+            
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Involved NPCs
+              </label>
+              <div className="space-y-2 max-h-32 overflow-y-auto border border-gray-200 rounded p-2">
+                {allNPCs.map(npc => (
+                  <label key={npc.id} className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={(formData.involvedNPCs || []).includes(npc.id)}
+                      onChange={(e) => {
+                        const involvedNPCs = formData.involvedNPCs || [];
+                        if (e.target.checked) {
+                          setFormData({ 
+                            ...formData, 
+                            involvedNPCs: [...involvedNPCs, npc.id] 
+                          });
+                        } else {
+                          setFormData({ 
+                            ...formData, 
+                            involvedNPCs: involvedNPCs.filter(id => id !== npc.id) 
+                          });
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    <span className="text-sm">{npc.name}</span>
+                  </label>
+                ))}
+                {allNPCs.length === 0 && (
+                  <p className="text-sm text-gray-500">No NPCs available. Create NPCs first.</p>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-4">
             <h4 className="font-semibold mb-4">Trigger Conditions</h4>
             <div className="space-y-4">
               <div>
@@ -1313,6 +1608,8 @@ const StoryletManagementPanel: React.FC = () => {
                   <option value="time">Time-based</option>
                   <option value="flag">Flag-based</option>
                   <option value="resource">Resource-based</option>
+                  <option value="npc_relationship">NPC Relationship</option>
+                  <option value="npc_availability">NPC Availability</option>
                 </select>
               </div>
               
@@ -1443,6 +1740,14 @@ const StoryletManagementPanel: React.FC = () => {
                                   newEffect = { type: 'unlock', storyletId: '' };
                                 } else if (e.target.value === 'foundationXp') {
                                   newEffect = { type: 'foundationXp', key: '', amount: 0 };
+                                } else if (e.target.value === 'npcRelationship') {
+                                  newEffect = { type: 'npcRelationship', npcId: '', delta: 0, reason: '' };
+                                } else if (e.target.value === 'npcMemory') {
+                                  newEffect = { type: 'npcMemory', npcId: '', memory: { description: '', sentiment: 'neutral', importance: 5 } };
+                                } else if (e.target.value === 'npcFlag') {
+                                  newEffect = { type: 'npcFlag', npcId: '', flag: '', value: true };
+                                } else if (e.target.value === 'npcMood') {
+                                  newEffect = { type: 'npcMood', npcId: '', mood: 'neutral', duration: 0 };
                                 }
                                 updateEffect(choiceIndex, effectIndex, newEffect);
                               }}
@@ -1453,6 +1758,10 @@ const StoryletManagementPanel: React.FC = () => {
                               <option value="skillXp">Skill XP</option>
                               <option value="foundationXp">Foundation XP</option>
                               <option value="unlock">Unlock</option>
+                              <option value="npcRelationship">NPC Relationship</option>
+                              <option value="npcMemory">NPC Memory</option>
+                              <option value="npcFlag">NPC Flag</option>
+                              <option value="npcMood">NPC Mood</option>
                             </select>
                             
                             <Button
@@ -1557,6 +1866,186 @@ const StoryletManagementPanel: React.FC = () => {
                                   placeholder="storylet_id"
                                 />
                               </div>
+                            )}
+
+                            {effect.type === 'npcRelationship' && (
+                              <>
+                                <div>
+                                  <label className="block text-xs text-gray-600 mb-1">NPC</label>
+                                  <select
+                                    value={(effect as any).npcId || ''}
+                                    onChange={(e) => updateEffect(choiceIndex, effectIndex, { ...effect, npcId: e.target.value })}
+                                    className="w-full px-2 py-1 text-xs border rounded"
+                                  >
+                                    <option value="">Select NPC</option>
+                                    {allNPCs.map(npc => (
+                                      <option key={npc.id} value={npc.id}>{npc.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-600 mb-1">Relationship Change</label>
+                                  <input
+                                    type="number"
+                                    value={(effect as any).delta || 0}
+                                    onChange={(e) => updateEffect(choiceIndex, effectIndex, { ...effect, delta: parseInt(e.target.value) || 0 })}
+                                    className="w-full px-2 py-1 text-xs border rounded"
+                                    placeholder="±10"
+                                  />
+                                </div>
+                                <div className="md:col-span-2">
+                                  <label className="block text-xs text-gray-600 mb-1">Reason (optional)</label>
+                                  <input
+                                    type="text"
+                                    value={(effect as any).reason || ''}
+                                    onChange={(e) => updateEffect(choiceIndex, effectIndex, { ...effect, reason: e.target.value })}
+                                    className="w-full px-2 py-1 text-xs border rounded"
+                                    placeholder="Why the relationship changed"
+                                  />
+                                </div>
+                              </>
+                            )}
+
+                            {effect.type === 'npcMemory' && (
+                              <>
+                                <div>
+                                  <label className="block text-xs text-gray-600 mb-1">NPC</label>
+                                  <select
+                                    value={(effect as any).npcId || ''}
+                                    onChange={(e) => updateEffect(choiceIndex, effectIndex, { ...effect, npcId: e.target.value })}
+                                    className="w-full px-2 py-1 text-xs border rounded"
+                                  >
+                                    <option value="">Select NPC</option>
+                                    {allNPCs.map(npc => (
+                                      <option key={npc.id} value={npc.id}>{npc.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-600 mb-1">Sentiment</label>
+                                  <select
+                                    value={(effect as any).memory?.sentiment || 'neutral'}
+                                    onChange={(e) => updateEffect(choiceIndex, effectIndex, { 
+                                      ...effect, 
+                                      memory: { ...((effect as any).memory || {}), sentiment: e.target.value }
+                                    })}
+                                    className="w-full px-2 py-1 text-xs border rounded"
+                                  >
+                                    <option value="positive">Positive</option>
+                                    <option value="neutral">Neutral</option>
+                                    <option value="negative">Negative</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-600 mb-1">Importance (1-10)</label>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max="10"
+                                    value={(effect as any).memory?.importance || 5}
+                                    onChange={(e) => updateEffect(choiceIndex, effectIndex, { 
+                                      ...effect, 
+                                      memory: { ...((effect as any).memory || {}), importance: parseInt(e.target.value) || 5 }
+                                    })}
+                                    className="w-full px-2 py-1 text-xs border rounded"
+                                  />
+                                </div>
+                                <div className="md:col-span-3">
+                                  <label className="block text-xs text-gray-600 mb-1">Memory Description</label>
+                                  <textarea
+                                    value={(effect as any).memory?.description || ''}
+                                    onChange={(e) => updateEffect(choiceIndex, effectIndex, { 
+                                      ...effect, 
+                                      memory: { ...((effect as any).memory || {}), description: e.target.value }
+                                    })}
+                                    className="w-full px-2 py-1 text-xs border rounded"
+                                    rows={2}
+                                    placeholder="What the NPC will remember about this interaction"
+                                  />
+                                </div>
+                              </>
+                            )}
+
+                            {effect.type === 'npcFlag' && (
+                              <>
+                                <div>
+                                  <label className="block text-xs text-gray-600 mb-1">NPC</label>
+                                  <select
+                                    value={(effect as any).npcId || ''}
+                                    onChange={(e) => updateEffect(choiceIndex, effectIndex, { ...effect, npcId: e.target.value })}
+                                    className="w-full px-2 py-1 text-xs border rounded"
+                                  >
+                                    <option value="">Select NPC</option>
+                                    {allNPCs.map(npc => (
+                                      <option key={npc.id} value={npc.id}>{npc.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-600 mb-1">Flag Name</label>
+                                  <input
+                                    type="text"
+                                    value={(effect as any).flag || ''}
+                                    onChange={(e) => updateEffect(choiceIndex, effectIndex, { ...effect, flag: e.target.value })}
+                                    className="w-full px-2 py-1 text-xs border rounded"
+                                    placeholder="flag_name"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-600 mb-1">Value</label>
+                                  <select
+                                    value={(effect as any).value ? 'true' : 'false'}
+                                    onChange={(e) => updateEffect(choiceIndex, effectIndex, { ...effect, value: e.target.value === 'true' })}
+                                    className="w-full px-2 py-1 text-xs border rounded"
+                                  >
+                                    <option value="true">True</option>
+                                    <option value="false">False</option>
+                                  </select>
+                                </div>
+                              </>
+                            )}
+
+                            {effect.type === 'npcMood' && (
+                              <>
+                                <div>
+                                  <label className="block text-xs text-gray-600 mb-1">NPC</label>
+                                  <select
+                                    value={(effect as any).npcId || ''}
+                                    onChange={(e) => updateEffect(choiceIndex, effectIndex, { ...effect, npcId: e.target.value })}
+                                    className="w-full px-2 py-1 text-xs border rounded"
+                                  >
+                                    <option value="">Select NPC</option>
+                                    {allNPCs.map(npc => (
+                                      <option key={npc.id} value={npc.id}>{npc.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-600 mb-1">Mood</label>
+                                  <select
+                                    value={(effect as any).mood || 'neutral'}
+                                    onChange={(e) => updateEffect(choiceIndex, effectIndex, { ...effect, mood: e.target.value })}
+                                    className="w-full px-2 py-1 text-xs border rounded"
+                                  >
+                                    <option value="happy">Happy</option>
+                                    <option value="neutral">Neutral</option>
+                                    <option value="stressed">Stressed</option>
+                                    <option value="excited">Excited</option>
+                                    <option value="sad">Sad</option>
+                                    <option value="angry">Angry</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-600 mb-1">Duration (seconds, 0 = permanent)</label>
+                                  <input
+                                    type="number"
+                                    value={(effect as any).duration || 0}
+                                    onChange={(e) => updateEffect(choiceIndex, effectIndex, { ...effect, duration: parseInt(e.target.value) || 0 })}
+                                    className="w-full px-2 py-1 text-xs border rounded"
+                                    placeholder="0"
+                                  />
+                                </div>
+                              </>
                             )}
                           </div>
                         </div>
@@ -1824,6 +2313,14 @@ const StoryletManagementPanel: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Story Arc Visualization */}
+      {visualizingArc && (
+        <StoryArcVisualizer
+          arcName={visualizingArc}
+          onClose={() => setVisualizingArc(null)}
+        />
       )}
     </div>
   );

@@ -10,6 +10,28 @@ import { minigameStorylets } from '../data/minigameStorylets';
 import { integratedStorylets } from '../data/integratedStorylets';
 import { developmentTriggeredStorylets } from '../data/developmentTriggeredStorylets';
 import { startingStorylets } from '../data/startingStorylets';
+import { emmaRomanceStorylets, emmaInfluenceStorylets } from '../data/emmaRomanceArc';
+import { globalTimeoutManager } from '../utils/timeoutManager';
+import { getAppState, getNPCStore, isAppStoreAvailable, isNPCStoreAvailable, isIntegratedCharacterStoreAvailable, isSkillSystemV2StoreAvailable, isSaveStoreAvailable } from '../types/global';
+import { debounce, AsyncQueue } from '../utils/debounce';
+
+// Arc progression types
+interface ArcProgress {
+  total: number;
+  completed: number;
+  failed: boolean;
+  failureReason?: string;
+  current?: string;
+  percentage: number;
+}
+
+interface ArcStats {
+  name: string;
+  status: 'active' | 'complete' | 'failed' | 'not_started';
+  progress: string;
+  current?: string;
+  failureReason?: string;
+}
 
 interface StoryletState {
   // Core storylet data
@@ -43,11 +65,18 @@ interface StoryletState {
   addStoryArc: (arcName: string) => void;           // add a new story arc
   removeStoryArc: (arcName: string) => void;        // remove a story arc (and clear from storylets)
   getStoryletsByArc: (arcName: string) => Storylet[]; // get all storylets in a specific arc
+  
+  // Story arc progression helpers
+  getArcProgress: (arcName: string) => ArcProgress;
+  getActiveArcs: () => string[];
+  isArcComplete: (arcName: string) => boolean;
+  isArcFailed: (arcName: string) => boolean;
+  getArcStats: () => ArcStats[];
   setFlag: (key: string, value: boolean) => void;   // manually set a flag
   getFlag: (key: string) => boolean;                // get a flag value
   getCurrentStorylet: () => Storylet | null;        // get the first active storylet
   resetStorylets: () => void;                       // reset storylet system for testing
-  applyEffect: (effect: Effect) => void;            // apply a single effect
+  applyEffect: (effect: Effect, context?: { storyletId?: string; choiceId?: string }) => void; // apply a single effect
   launchMinigame: (gameId: MinigameType, effect: Effect, storyletId: string, choiceId: string) => void;
   completeMinigame: (success: boolean, stats?: any) => void;
   closeMinigame: () => void;
@@ -59,17 +88,10 @@ interface StoryletState {
 }
 
 // Helper functions to reduce cognitive complexity
-const getAppState = () => {
-  try {
-    if (typeof window !== 'undefined' && (window as any).useAppStore) {
-      return (window as any).useAppStore.getState();
-    }
-    return null;
-  } catch (error) {
-    console.warn('Could not access app store:', error);
-    return null;
-  }
-};
+// Note: getAppState is now imported from types/global.ts for type safety
+
+// Global evaluation queue to prevent race conditions
+const evaluationQueue = new AsyncQueue();
 
 const shouldSkipStorylet = (storylet: Storylet, state: any, appState: any) => {
   // Skip if already active
@@ -160,6 +182,59 @@ const evaluateResourceTrigger = (trigger: any, appState: any) => {
   });
 };
 
+const evaluateNPCRelationshipTrigger = (trigger: any) => {
+  try {
+    const npcStore = getNPCStore();
+    if (!npcStore) return false;
+    
+    const { npcId, minLevel, maxLevel, relationshipType } = trigger.conditions;
+    
+    if (npcId) {
+      const relationshipLevel = npcStore.getRelationshipLevel(npcId);
+      const currentType = npcStore.getRelationshipType(npcId);
+      
+      // Check level requirements
+      if (minLevel !== undefined && relationshipLevel < minLevel) return false;
+      if (maxLevel !== undefined && relationshipLevel > maxLevel) return false;
+      
+      // Check type requirements
+      if (relationshipType && currentType !== relationshipType) return false;
+      
+      return true;
+    }
+  } catch (error) {
+    console.warn('Could not evaluate NPC relationship trigger:', error);
+  }
+  return false;
+};
+
+const evaluateNPCAvailabilityTrigger = (trigger: any) => {
+  try {
+    const npcStore = getNPCStore();
+    if (!npcStore) return false;
+    
+    const { npcId, locationId, availability } = trigger.conditions;
+    
+    if (npcId) {
+      const npc = npcStore.getNPC(npcId);
+      if (!npc) return false;
+      
+      // Check availability status
+      if (availability && npc.currentStatus.availability !== availability) return false;
+      
+      // Check location availability
+      if (locationId) {
+        return npcStore.isNPCAvailableAt(npcId, locationId);
+      }
+      
+      return true;
+    }
+  } catch (error) {
+    console.warn('Could not evaluate NPC availability trigger:', error);
+  }
+  return false;
+};
+
 const evaluateStoryletTrigger = (trigger: any, activeFlags: any, appState: any) => {
   switch (trigger.type) {
     case 'time':
@@ -170,6 +245,12 @@ const evaluateStoryletTrigger = (trigger: any, activeFlags: any, appState: any) 
       
     case 'resource':
       return evaluateResourceTrigger(trigger, appState);
+      
+    case 'npc_relationship':
+      return evaluateNPCRelationshipTrigger(trigger);
+      
+    case 'npc_availability':
+      return evaluateNPCAvailabilityTrigger(trigger);
       
     default:
       return false;
@@ -185,7 +266,9 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     ...collegeStorylets, 
     ...minigameStorylets, 
     ...integratedStorylets,
-    ...developmentTriggeredStorylets 
+    ...developmentTriggeredStorylets,
+    ...emmaRomanceStorylets,
+    ...emmaInfluenceStorylets
   },
   activeFlags: {},
   activeStoryletIds: [],
@@ -204,6 +287,14 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   
   // Evaluate storylets - check triggers and unlock eligible storylets
   evaluateStorylets: () => {
+    // Use queue to prevent race conditions during evaluation
+    evaluationQueue.add(async () => {
+      return get()._evaluateStoryletsSync();
+    });
+  },
+
+  // Internal synchronous evaluation (for queue)
+  _evaluateStoryletsSync: () => {
     const state = get();
     const appState = getAppState();
     const newActiveIds: string[] = [];
@@ -292,6 +383,16 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
             current: appState?.resources,
             met: evaluateResourceTrigger(storylet.trigger, appState)
           };
+        } else if (storylet.trigger.type === 'npc_relationship') {
+          triggerDetails.npcRelationshipEvaluation = {
+            required: storylet.trigger.conditions,
+            met: evaluateNPCRelationshipTrigger(storylet.trigger)
+          };
+        } else if (storylet.trigger.type === 'npc_availability') {
+          triggerDetails.npcAvailabilityEvaluation = {
+            required: storylet.trigger.conditions,
+            met: evaluateNPCAvailabilityTrigger(storylet.trigger)
+          };
         }
         
         console.log(`📝 ${storylet.id} evaluation:`, triggerDetails);
@@ -324,6 +425,17 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   
   // Choose a storylet option and apply effects
   chooseStorylet: (storyletId: string, choiceId: string) => {
+    // Input validation
+    if (!storyletId || typeof storyletId !== 'string') {
+      console.error('Invalid storyletId provided:', storyletId);
+      return;
+    }
+    
+    if (!choiceId || typeof choiceId !== 'string') {
+      console.error('Invalid choiceId provided:', choiceId);
+      return;
+    }
+    
     const { allStorylets, activeStoryletIds, completedStoryletIds } = get();
     
     // Find the storylet and choice
@@ -333,9 +445,14 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       return;
     }
     
+    if (!Array.isArray(storylet.choices)) {
+      console.error('Storylet has invalid choices array:', storyletId);
+      return;
+    }
+    
     const choice = storylet.choices.find(c => c.id === choiceId);
     if (!choice) {
-      console.error('Choice not found:', choiceId);
+      console.error('Choice not found:', choiceId, 'Available choices:', storylet.choices.map(c => c.id));
       return;
     }
     
@@ -367,7 +484,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
         // Apply non-minigame effects immediately
         choice.effects.forEach((effect) => {
           if (effect.type !== 'minigame') {
-            get().applyEffect(effect);
+            get().applyEffect(effect, { storyletId, choiceId });
           }
         });
         
@@ -378,7 +495,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     
     // Apply all effects (no minigame)
     choice.effects.forEach((effect) => {
-      get().applyEffect(effect);
+      get().applyEffect(effect, { storyletId, choiceId });
     });
     
     // Convert storylet choice to quest achievement
@@ -421,14 +538,17 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       get().unlockStorylet(choice.nextStoryletId);
     }
     
-    // Re-evaluate storylets in case new conditions are met
-    setTimeout(() => {
-      get().evaluateStorylets();
+    // Re-evaluate storylets in case new conditions are met (using managed timeout)
+    globalTimeoutManager.setTimeout(() => {
+      const currentState = get();
+      if (currentState && typeof currentState.evaluateStorylets === 'function') {
+        currentState.evaluateStorylets();
+      }
     }, 100);
   },
   
   // Apply an individual effect
-  applyEffect: (effect: Effect) => {
+  applyEffect: (effect: Effect, context?: { storyletId?: string; choiceId?: string }) => {
     if (process.env.NODE_ENV === 'development') {
       console.log(`⚙️ Applying effect:`, effect);
     }
@@ -536,6 +656,78 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       case 'minigame':
         // Minigame effects are handled in chooseStorylet, not here
         console.warn('Minigame effect should be handled in chooseStorylet, not applyEffect');
+        break;
+        
+      case 'npcRelationship':
+        try {
+          if (typeof window !== 'undefined' && (window as any).useNPCStore) {
+            const npcStore = (window as any).useNPCStore.getState();
+            npcStore.adjustRelationship(effect.npcId, effect.delta, effect.reason || 'Storylet interaction');
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`💝 Adjusted ${effect.npcId} relationship by ${effect.delta}`);
+            }
+          }
+        } catch (error) {
+          console.warn('Could not adjust NPC relationship:', error);
+        }
+        break;
+        
+      case 'npcMemory':
+        try {
+          if (typeof window !== 'undefined' && (window as any).useNPCStore) {
+            const npcStore = (window as any).useNPCStore.getState();
+            const storyletId = context?.storyletId || 'unknown_storylet';
+            const choiceId = context?.choiceId || 'unknown_choice';
+            npcStore.addMemory(effect.npcId, effect.memory, storyletId, choiceId);
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`🧠 Added memory to ${effect.npcId}: ${effect.memory.description}`);
+            }
+          }
+        } catch (error) {
+          console.warn('Could not add NPC memory:', error);
+        }
+        break;
+        
+      case 'npcFlag':
+        try {
+          if (typeof window !== 'undefined' && (window as any).useNPCStore) {
+            const npcStore = (window as any).useNPCStore.getState();
+            npcStore.setNPCFlag(effect.npcId, effect.flag, effect.value);
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`🏷️ Set ${effect.npcId} flag ${effect.flag} to ${effect.value}`);
+            }
+          }
+        } catch (error) {
+          console.warn('Could not set NPC flag:', error);
+        }
+        break;
+        
+      case 'npcMood':
+        try {
+          if (typeof window !== 'undefined' && (window as any).useNPCStore) {
+            const npcStore = (window as any).useNPCStore.getState();
+            npcStore.updateNPCMood(effect.npcId, effect.mood, effect.duration);
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`😊 Set ${effect.npcId} mood to ${effect.mood}${effect.duration ? ` for ${effect.duration}s` : ''}`);
+            }
+          }
+        } catch (error) {
+          console.warn('Could not set NPC mood:', error);
+        }
+        break;
+        
+      case 'npcAvailability':
+        try {
+          if (typeof window !== 'undefined' && (window as any).useNPCStore) {
+            const npcStore = (window as any).useNPCStore.getState();
+            npcStore.updateNPCAvailability(effect.npcId, effect.availability, effect.duration);
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`📍 Set ${effect.npcId} availability to ${effect.availability}${effect.duration ? ` for ${effect.duration}s` : ''}`);
+            }
+          }
+        } catch (error) {
+          console.warn('Could not set NPC availability:', error);
+        }
         break;
     }
   },
@@ -660,6 +852,98 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     const { allStorylets } = get();
     return Object.values(allStorylets).filter(storylet => storylet.storyArc === arcName);
   },
+
+  // Helper function to normalize arc names for flag keys
+  _normalizeArcName: (arcName: string) => {
+    return arcName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+  },
+
+  // Story arc progression helpers
+  getArcProgress: (arcName: string) => {
+    const { activeFlags, allStorylets, completedStoryletIds } = get();
+    const arcKey = get()._normalizeArcName(arcName);
+    
+    const arcStorylets = Object.values(allStorylets)
+      .filter(s => s.storyArc === arcName)
+      .sort((a, b) => a.id.localeCompare(b.id));
+    
+    if (arcStorylets.length === 0) {
+      return {
+        total: 0,
+        completed: 0,
+        failed: false,
+        percentage: 0
+      };
+    }
+    
+    // Check for terminal failure
+    const failed = activeFlags[`${arcKey}:terminal_failure`] || false;
+    const failureReason = failed ? activeFlags[`${arcKey}:failure_reason`] as string : undefined;
+    
+    // Count completed storylets (either via arc flags or completion system)
+    const completed = arcStorylets.filter(s => 
+      activeFlags[`${arcKey}:${s.id}_complete`] || 
+      completedStoryletIds.includes(s.id)
+    ).length;
+    
+    // Find current active storylet
+    const currentStorylet = arcStorylets.find(s => 
+      get().activeStoryletIds.includes(s.id)
+    );
+    
+    return {
+      total: arcStorylets.length,
+      completed,
+      failed,
+      failureReason,
+      current: currentStorylet?.name,
+      percentage: Math.round((completed / arcStorylets.length) * 100)
+    };
+  },
+
+  getActiveArcs: () => {
+    const { storyArcs } = get();
+    return storyArcs.filter(arc => {
+      const progress = get().getArcProgress(arc);
+      return progress.total > 0 && !progress.failed && progress.completed < progress.total;
+    });
+  },
+
+  isArcComplete: (arcName: string) => {
+    const progress = get().getArcProgress(arcName);
+    return progress.completed === progress.total && progress.total > 0;
+  },
+
+  isArcFailed: (arcName: string) => {
+    const progress = get().getArcProgress(arcName);
+    return progress.failed;
+  },
+
+  getArcStats: () => {
+    const { storyArcs } = get();
+    return storyArcs.map(arc => {
+      const progress = get().getArcProgress(arc);
+      
+      let status: 'active' | 'complete' | 'failed' | 'not_started';
+      if (progress.total === 0) {
+        status = 'not_started';
+      } else if (progress.failed) {
+        status = 'failed';
+      } else if (progress.completed === progress.total) {
+        status = 'complete';
+      } else {
+        status = 'active';
+      }
+      
+      return {
+        name: arc,
+        status,
+        progress: `${progress.completed}/${progress.total}`,
+        current: progress.current,
+        failureReason: progress.failureReason
+      };
+    });
+  },
   
   // Flag management
   setFlag: (key: string, value: boolean) => {
@@ -696,7 +980,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     });
     
     // Re-evaluate after reset
-    setTimeout(() => {
+    globalTimeoutManager.setTimeout(() => {
       get().evaluateStorylets();
     }, 100);
     
@@ -763,9 +1047,9 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     
     // Apply success or failure effects
     if (success && effect.onSuccess) {
-      effect.onSuccess.forEach(successEffect => get().applyEffect(successEffect));
+      effect.onSuccess.forEach(successEffect => get().applyEffect(successEffect, { storyletId, choiceId }));
     } else if (!success && effect.onFailure) {
-      effect.onFailure.forEach(failureEffect => get().applyEffect(failureEffect));
+      effect.onFailure.forEach(failureEffect => get().applyEffect(failureEffect, { storyletId, choiceId }));
     }
     
     // Complete the storylet now that the minigame is done
@@ -808,7 +1092,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
         }));
         
         // Re-evaluate storylets in case new conditions are met
-        setTimeout(() => {
+        globalTimeoutManager.setTimeout(() => {
           get().evaluateStorylets();
         }, 100);
       }
@@ -851,7 +1135,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
         }));
         
         // Re-evaluate storylets
-        setTimeout(() => {
+        globalTimeoutManager.setTimeout(() => {
           get().evaluateStorylets();
         }, 100);
       }
@@ -878,7 +1162,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     set({ deploymentFilter: new Set(filter) });
     
     // Re-evaluate storylets with new filter
-    setTimeout(() => {
+    globalTimeoutManager.setTimeout(() => {
       get().evaluateStorylets();
     }, 100);
   },
@@ -902,7 +1186,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     set({ deploymentFilter: newFilter });
     
     // Re-evaluate storylets with new filter
-    setTimeout(() => {
+    globalTimeoutManager.setTimeout(() => {
       get().evaluateStorylets();
     }, 100);
   },
@@ -925,7 +1209,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       });
       
       // Re-evaluate storylets
-      setTimeout(() => {
+      globalTimeoutManager.setTimeout(() => {
         get().evaluateStorylets();
       }, 100);
     } else {

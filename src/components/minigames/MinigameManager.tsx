@@ -3,6 +3,8 @@ import MemoryCardGame from './MemoryCardGame';
 import WordScrambleGame from './WordScrambleGame';
 import ColorMatchGame from './ColorMatchGame';
 import StroopTestGame from './StroopTestGame';
+import ErrorBoundary from '../ErrorBoundary';
+import { Button, Card } from '../ui';
 import type { MinigameType } from '../../types/storylet';
 
 interface MinigameManagerProps {
@@ -10,6 +12,35 @@ interface MinigameManagerProps {
   onGameComplete: (success: boolean, stats?: any) => void;
   onClose: () => void;
 }
+
+// Error fallback for minigames
+const MinigameErrorFallback: React.FC<{ error?: Error; retry: () => void }> = ({ error, retry }) => (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <Card className="p-6 max-w-md m-4 border-red-200 bg-red-50">
+      <div className="text-center space-y-4">
+        <div className="text-red-600">
+          <h2 className="text-lg font-semibold">Minigame Error</h2>
+          <p className="text-sm mt-2">
+            The minigame encountered an error and cannot continue.
+          </p>
+        </div>
+        
+        <div className="flex justify-center space-x-3">
+          <Button onClick={retry} variant="primary">
+            Try Again
+          </Button>
+          <Button 
+            onClick={() => window.location.reload()} 
+            variant="outline"
+            className="text-red-600 border-red-200 hover:bg-red-50"
+          >
+            Reload Game
+          </Button>
+        </div>
+      </div>
+    </Card>
+  </div>
+);
 
 const MinigameManager: React.FC<MinigameManagerProps> = ({
   gameId,
@@ -214,7 +245,11 @@ const MinigameManager: React.FC<MinigameManagerProps> = ({
     }
   };
 
-  return renderGame();
+  return (
+    <ErrorBoundary fallback={MinigameErrorFallback}>
+      {renderGame()}
+    </ErrorBoundary>
+  );
 };
 
 export default MinigameManager;
