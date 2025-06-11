@@ -23,6 +23,7 @@ const ClueManagementPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ClueTabType>('all');
   const [editingClue, setEditingClue] = useState<Clue | null>(null);
   const [newClueForm, setNewClueForm] = useState<ClueFormData>({
+    id: '',
     title: '',
     description: '',
     content: '',
@@ -55,10 +56,11 @@ const ClueManagementPanel: React.FC = () => {
   const discoveredClues = getDiscoveredClues();
 
   const handleCreateClue = () => {
-    if (!newClueForm.title.trim()) return;
+    if (!newClueForm.id.trim() || !newClueForm.title.trim()) return;
     
     createClue(newClueForm);
     setNewClueForm({
+      id: '',
       title: '',
       description: '',
       content: '',
@@ -76,6 +78,7 @@ const ClueManagementPanel: React.FC = () => {
   const handleEditClue = (clue: Clue) => {
     setEditingClue(clue);
     setNewClueForm({
+      id: clue.id,
       title: clue.title,
       description: clue.description,
       content: clue.content,
@@ -92,11 +95,12 @@ const ClueManagementPanel: React.FC = () => {
   };
 
   const handleUpdateClue = () => {
-    if (!editingClue || !newClueForm.title.trim()) return;
+    if (!editingClue || !newClueForm.id.trim() || !newClueForm.title.trim()) return;
     
     updateClue(editingClue.id, newClueForm);
     setEditingClue(null);
     setNewClueForm({
+      id: '',
       title: '',
       description: '',
       content: '',
@@ -115,6 +119,7 @@ const ClueManagementPanel: React.FC = () => {
   const handleCancelEdit = () => {
     setEditingClue(null);
     setNewClueForm({
+      id: '',
       title: '',
       description: '',
       content: '',
@@ -195,7 +200,10 @@ const ClueManagementPanel: React.FC = () => {
           <Card key={clue.id} className="p-4">
             <div className="space-y-2">
               <div className="flex justify-between items-start">
-                <h4 className="font-semibold text-gray-900">{clue.title}</h4>
+                <div>
+                  <h4 className="font-semibold text-gray-900">{clue.title}</h4>
+                  <div className="text-xs text-gray-500 font-mono">ID: {clue.id}</div>
+                </div>
                 <div className="flex space-x-1">
                   <span className={`px-2 py-1 text-xs rounded ${
                     clue.isDiscovered ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
@@ -275,6 +283,21 @@ const ClueManagementPanel: React.FC = () => {
           {/* Basic Information */}
           <div className="space-y-4">
             <h4 className="font-semibold text-gray-900">Basic Information</h4>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Clue ID *</label>
+              <input
+                type="text"
+                value={newClueForm.id}
+                onChange={(e) => setNewClueForm(prev => ({ ...prev, id: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="unique_clue_id (used in storylet clueDiscovery effects)"
+                disabled={editingClue !== null} // Don't allow editing ID of existing clues
+              />
+              <div className="text-xs text-gray-500 mt-1">
+                This ID is used in storylet clueDiscovery effects. Use lowercase with underscores.
+              </div>
+            </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
