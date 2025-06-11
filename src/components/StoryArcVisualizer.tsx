@@ -1,6 +1,7 @@
 // /Users/montysharma/V11M2/src/components/StoryArcVisualizer.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { useStoryletStore } from '../store/useStoryletStore';
+import { useClueStore } from '../store/useClueStore';
 import { Button, Card } from './ui';
 import { Storylet, Choice, Effect, StoryletDeploymentStatus } from '../types/storylet';
 
@@ -26,6 +27,7 @@ interface StoryArcVisualizerProps {
 
 const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClose }) => {
   const { getStoryletsByArc, allStorylets, updateStorylet, storyArcs } = useStoryletStore();
+  const { clues } = useClueStore();
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [highlightedPath, setHighlightedPath] = useState<string[]>([]);
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -949,40 +951,26 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                 })()}
                                 
                                 {effect.type === 'clueDiscovery' && (() => {
-                                  const clueEffect = effect as { type: 'clueDiscovery'; clueId: string; minigameType?: string; onSuccess?: Effect[]; onFailure?: Effect[] };
+                                  const clueEffect = effect as { type: 'clueDiscovery'; clueId: string; onSuccess?: Effect[]; onFailure?: Effect[] };
                                   return (
-                                    <>
-                                      <input
-                                        type="text"
-                                        value={clueEffect.clueId || ''}
-                                        onChange={(e) => {
-                                          console.log('🔍 Clue ID changed to:', e.target.value);
-                                          updateEffect(choiceIndex, effectIndex, { 
-                                            ...clueEffect,
-                                            clueId: e.target.value
-                                          });
-                                        }}
-                                        placeholder="Clue ID"
-                                        className="text-xs border rounded px-1 py-0.5 flex-1"
-                                      />
-                                      <select
-                                        value={clueEffect.minigameType || ''}
-                                        onChange={(e) => {
-                                          console.log('🎮 Minigame type changed to:', e.target.value);
-                                          updateEffect(choiceIndex, effectIndex, { 
-                                            ...clueEffect,
-                                            minigameType: e.target.value || undefined
-                                          });
-                                        }}
-                                        className="text-xs border rounded px-1 py-0.5"
-                                      >
-                                        <option value="">No Minigame</option>
-                                        <option value="memory">Memory</option>
-                                        <option value="stroop">Stroop Test</option>
-                                        <option value="wordscramble">Word Scramble</option>
-                                        <option value="colormatch">Color Match</option>
-                                      </select>
-                                    </>
+                                    <select
+                                      value={clueEffect.clueId || ''}
+                                      onChange={(e) => {
+                                        console.log('🔍 Clue changed to:', e.target.value);
+                                        updateEffect(choiceIndex, effectIndex, { 
+                                          ...clueEffect,
+                                          clueId: e.target.value
+                                        });
+                                      }}
+                                      className="text-xs border rounded px-1 py-0.5 flex-1"
+                                    >
+                                      <option value="">Select a clue</option>
+                                      {clues.map((clue) => (
+                                        <option key={clue.id} value={clue.id}>
+                                          {clue.title} ({clue.id})
+                                        </option>
+                                      ))}
+                                    </select>
                                   );
                                 })()}
                                 

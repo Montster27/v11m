@@ -1,6 +1,7 @@
 // /Users/montysharma/V11M2/src/components/StoryletManagementPanel.tsx
 import React, { useState, useEffect } from 'react';
 import { useStoryletStore } from '../store/useStoryletStore';
+import { useClueStore } from '../store/useClueStore';
 import { useNPCStore } from '../store/useNPCStore';
 import { Button, Card } from './ui';
 import { StoryletDeploymentStatus, Storylet, Choice, Effect } from '../types/storylet';
@@ -76,6 +77,8 @@ const StoryletManagementPanel: React.FC = () => {
 
   const { getAllNPCs } = useNPCStore();
   const allNPCs = getAllNPCs();
+  
+  const { clues } = useClueStore();
 
   // Debug testingArc changes
   useEffect(() => {
@@ -2098,32 +2101,21 @@ const StoryletManagementPanel: React.FC = () => {
                             )}
 
                             {effect.type === 'clueDiscovery' && (
-                              <>
-                                <div>
-                                  <label className="block text-xs text-gray-600 mb-1">Clue ID</label>
-                                  <input
-                                    type="text"
-                                    value={(effect as any).clueId || ''}
-                                    onChange={(e) => updateEffect(choiceIndex, effectIndex, { ...effect, clueId: e.target.value })}
-                                    className="w-full px-2 py-1 text-xs border rounded"
-                                    placeholder="clue_id_here"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs text-gray-600 mb-1">Minigame (Optional)</label>
-                                  <select
-                                    value={(effect as any).minigameType || ''}
-                                    onChange={(e) => updateEffect(choiceIndex, effectIndex, { ...effect, minigameType: e.target.value || undefined })}
-                                    className="w-full px-2 py-1 text-xs border rounded"
-                                  >
-                                    <option value="">No Minigame (Direct Discovery)</option>
-                                    <option value="memory">Memory Card Game</option>
-                                    <option value="stroop">Stroop Test</option>
-                                    <option value="wordscramble">Word Scramble</option>
-                                    <option value="colormatch">Color Match</option>
-                                  </select>
-                                </div>
-                              </>
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">Clue</label>
+                                <select
+                                  value={(effect as any).clueId || ''}
+                                  onChange={(e) => updateEffect(choiceIndex, effectIndex, { ...effect, clueId: e.target.value })}
+                                  className="w-full px-2 py-1 text-xs border rounded"
+                                >
+                                  <option value="">Select a clue</option>
+                                  {clues.map((clue) => (
+                                    <option key={clue.id} value={clue.id}>
+                                      {clue.title} ({clue.id})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
                             )}
                           </div>
                         </div>
