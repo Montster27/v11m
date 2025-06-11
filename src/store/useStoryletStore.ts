@@ -1232,15 +1232,22 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
           const characterId = appState?.activeCharacter?.id || 'default';
           
           // Discover the clue directly
-          const discoveryResult = clueStore.discoverClue(effect.clueId, storyletId, characterId);
+          const discoveryResult = clueStore.discoverClue(effect.clueId, {
+            storyletId,
+            minigameType: 'none',
+            characterId,
+            dayNumber: appState?.day || 1,
+            gameState: appState
+          });
           
           if (discoveryResult) {
-            console.log(`🔍 Clue discovered directly: ${discoveryResult.title}`);
+            const discoveredClue = clueStore.getClueById(effect.clueId);
+            console.log(`🔍 Clue discovered directly: ${discoveredClue?.title || effect.clueId}`);
             
             // Show notification if available
             if (typeof window !== 'undefined' && (window as any).showClueNotification) {
               (window as any).showClueNotification({
-                clue: discoveryResult,
+                clue: discoveredClue,
                 minigameType: 'none',
                 storyletId,
                 characterId
@@ -1298,15 +1305,22 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
             const appState = getAppState();
             const characterId = appState?.activeCharacter?.id || 'default';
             
-            const discoveryResult = clueStore.discoverClue(clueId, storyletId, characterId);
+            const discoveryResult = clueStore.discoverClue(clueId, {
+              storyletId,
+              minigameType: effect.minigameType || 'unknown',
+              characterId,
+              dayNumber: appState?.day || 1,
+              gameState: appState
+            });
             
             if (discoveryResult) {
-              console.log(`🔍 Clue discovered via minigame: ${discoveryResult.title}`);
+              const discoveredClue = clueStore.getClueById(clueId);
+              console.log(`🔍 Clue discovered via minigame: ${discoveredClue?.title || clueId}`);
               
               // Show notification
               if (typeof window !== 'undefined' && (window as any).showClueNotification) {
                 (window as any).showClueNotification({
-                  clue: discoveryResult,
+                  clue: discoveredClue,
                   minigameType: effect.minigameType || 'unknown',
                   storyletId,
                   characterId
