@@ -236,8 +236,21 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     console.log('📖 Found storylet:', storylet);
     if (storylet) {
       setEditingStorylet(storylet);
-      setEditFormData(storylet);
-      setTriggerConditionsText(JSON.stringify(storylet.trigger?.conditions || {}, null, 2));
+      
+      // Ensure flag triggers have at least one empty flag for editing
+      let formData = { ...storylet };
+      if (storylet.trigger?.type === 'flag' && (!storylet.trigger.conditions?.flags || storylet.trigger.conditions.flags.length === 0)) {
+        formData = {
+          ...storylet,
+          trigger: {
+            ...storylet.trigger,
+            conditions: { flags: [''] }
+          }
+        };
+      }
+      
+      setEditFormData(formData);
+      setTriggerConditionsText(JSON.stringify(formData.trigger?.conditions || {}, null, 2));
       console.log('✏️ Started editing storylet:', storylet.name);
     }
   };
@@ -531,10 +544,13 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
 
         {/* Edit Panel */}
         {editingStorylet ? (
-          <div className="w-96 space-y-4 max-h-full overflow-y-auto">
+          <div className="w-[576px] space-y-4 max-h-full overflow-y-auto">
             <Card className="p-4">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-purple-900">Edit Storylet</h3>
+                <div>
+                  <h3 className="text-lg font-semibold text-purple-900">Edit Storylet</h3>
+                  <div className="text-sm text-gray-600 font-mono">ID: {editFormData.id}</div>
+                </div>
                 <div className="space-x-2">
                   <Button onClick={handleSaveEdit} variant="primary" className="text-sm">
                     Save
@@ -610,7 +626,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                       if (triggerType === 'time') {
                         defaultConditions = { day: 1 };
                       } else if (triggerType === 'flag') {
-                        defaultConditions = { flags: [] };
+                        defaultConditions = { flags: [''] };
                       } else if (triggerType === 'resource') {
                         defaultConditions = { energy: { min: 10 } };
                       }
@@ -637,10 +653,10 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Trigger Conditions (JSON)
+                    Trigger Conditions
                     {editFormData.trigger?.type === 'flag' && (
                       <span className="text-xs text-blue-600 ml-2">
-                        Example: {`{"flags": ["metMysteriousStudent", "questionedStranger"]}`}
+                        Storylet triggers when ANY of these flags are true
                       </span>
                     )}
                     {editFormData.trigger?.type === 'time' && (
@@ -654,43 +670,109 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                       </span>
                     )}
                   </label>
-                  <textarea
-                    value={triggerConditionsText}
-                    onChange={(e) => {
-                      const newText = e.target.value;
-                      console.log('🎯 Trigger conditions text changed to:', newText);
-                      setTriggerConditionsText(newText);
-                      
-                      // Try to parse JSON and update form data if valid
-                      try {
-                        const conditions = JSON.parse(newText);
-                        console.log('🎯 Parsed conditions:', conditions);
-                        setEditFormData({
-                          ...editFormData,
-                          trigger: { ...editFormData.trigger!, conditions }
-                        });
-                      } catch (error) {
-                        console.log('🎯 Invalid JSON in trigger conditions (will not update form):', error);
-                        // Invalid JSON, don't update form data but allow text editing
-                      }
-                    }}
-                    className={`w-full px-3 py-2 border rounded text-sm font-mono ${
-                      (() => {
+                  
+                  {/* Flag-specific editor */}
+                  {editFormData.trigger?.type === 'flag' ? (
+                    <div className="space-y-3">
+                      <div className="bg-blue-50 p-3 rounded border">
+                        <div className="text-sm font-medium text-blue-900 mb-2">🎯 Required Flags (OR logic)</div>
+                        <div className="space-y-2">
+                          {(editFormData.trigger?.conditions?.flags || []).map((flag: string, index: number) => (
+                            <div key={index} className="flex items-center space-x-2">
+                              <input
+                                type="text"
+                                value={flag}
+                                onChange={(e) => {
+                                  const newFlags = [...(editFormData.trigger?.conditions?.flags || [])];
+                                  newFlags[index] = e.target.value;
+                                  const newConditions = { flags: newFlags };
+                                  setEditFormData({
+                                    ...editFormData,
+                                    trigger: { ...editFormData.trigger!, conditions: newConditions }
+                                  });
+                                  setTriggerConditionsText(JSON.stringify(newConditions, null, 2));
+                                }}
+                                placeholder="Flag name (e.g., metMysteriousStudent)"
+                                className="flex-1 px-3 py-1 border border-gray-300 rounded text-sm"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newFlags = (editFormData.trigger?.conditions?.flags || []).filter((_, i) => i !== index);
+                                  const newConditions = { flags: newFlags };
+                                  setEditFormData({
+                                    ...editFormData,
+                                    trigger: { ...editFormData.trigger!, conditions: newConditions }
+                                  });
+                                  setTriggerConditionsText(JSON.stringify(newConditions, null, 2));
+                                }}
+                                className="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-sm"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newFlags = [...(editFormData.trigger?.conditions?.flags || []), ''];
+                              const newConditions = { flags: newFlags };
+                              setEditFormData({
+                                ...editFormData,
+                                trigger: { ...editFormData.trigger!, conditions: newConditions }
+                              });
+                              setTriggerConditionsText(JSON.stringify(newConditions, null, 2));
+                            }}
+                            className="w-full px-3 py-2 border-2 border-dashed border-blue-300 text-blue-600 hover:bg-blue-50 rounded text-sm"
+                          >
+                            + Add Flag
+                          </button>
+                        </div>
+                        <div className="text-xs text-blue-700 mt-2">
+                          Storylet triggers when ANY of these flags are true. Common flags include:
+                          college_started, analyticalApproach, socialApproach, emma_romance:coffee_success
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* JSON editor for non-flag triggers */
+                    <textarea
+                      value={triggerConditionsText}
+                      onChange={(e) => {
+                        const newText = e.target.value;
+                        console.log('🎯 Trigger conditions text changed to:', newText);
+                        setTriggerConditionsText(newText);
+                        
+                        // Try to parse JSON and update form data if valid
                         try {
-                          JSON.parse(triggerConditionsText);
-                          return 'border-gray-300';
-                        } catch {
-                          return 'border-red-300 bg-red-50';
+                          const conditions = JSON.parse(newText);
+                          console.log('🎯 Parsed conditions:', conditions);
+                          setEditFormData({
+                            ...editFormData,
+                            trigger: { ...editFormData.trigger!, conditions }
+                          });
+                        } catch (error) {
+                          console.log('🎯 Invalid JSON in trigger conditions (will not update form):', error);
+                          // Invalid JSON, don't update form data but allow text editing
                         }
-                      })()
-                    }`}
-                    rows={4}
-                    placeholder={
-                      editFormData.trigger?.type === 'flag' ? '{\n  "flags": ["flagName"]\n}' :
-                      editFormData.trigger?.type === 'time' ? '{\n  "day": 5\n}' :
-                      '{\n  "energy": {"min": 20}\n}'
-                    }
-                  />
+                      }}
+                      className={`w-full px-3 py-2 border rounded text-sm font-mono ${
+                        (() => {
+                          try {
+                            JSON.parse(triggerConditionsText);
+                            return 'border-gray-300';
+                          } catch {
+                            return 'border-red-300 bg-red-50';
+                          }
+                        })()
+                      }`}
+                      rows={4}
+                      placeholder={
+                        editFormData.trigger?.type === 'time' ? '{\n  "day": 5\n}' :
+                        '{\n  "energy": {"min": 20}\n}'
+                      }
+                    />
+                  )}
                   <div className="text-xs mt-1 flex justify-between">
                     <span className="text-gray-500">
                       Current trigger: {editFormData.trigger?.type || 'none'} - 
@@ -781,6 +863,8 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                       newEffect = { type: 'resource', key: 'energy', delta: 0 };
                                     } else if (e.target.value === 'flag') {
                                       newEffect = { type: 'flag', key: '', value: true };
+                                    } else if (e.target.value === 'clueDiscovery') {
+                                      newEffect = { type: 'clueDiscovery', clueId: '', onSuccess: [], onFailure: [] };
                                     }
                                     console.log('🔄 New effect created:', newEffect);
                                     updateEffect(choiceIndex, effectIndex, newEffect);
@@ -789,6 +873,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                 >
                                   <option value="resource">Resource</option>
                                   <option value="flag">Flag</option>
+                                  <option value="clueDiscovery">Clue Discovery</option>
                                 </select>
                                 
                                 {effect.type === 'resource' && (() => {
@@ -863,6 +948,44 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                   );
                                 })()}
                                 
+                                {effect.type === 'clueDiscovery' && (() => {
+                                  const clueEffect = effect as { type: 'clueDiscovery'; clueId: string; minigameType?: string; onSuccess?: Effect[]; onFailure?: Effect[] };
+                                  return (
+                                    <>
+                                      <input
+                                        type="text"
+                                        value={clueEffect.clueId || ''}
+                                        onChange={(e) => {
+                                          console.log('🔍 Clue ID changed to:', e.target.value);
+                                          updateEffect(choiceIndex, effectIndex, { 
+                                            ...clueEffect,
+                                            clueId: e.target.value
+                                          });
+                                        }}
+                                        placeholder="Clue ID"
+                                        className="text-xs border rounded px-1 py-0.5 flex-1"
+                                      />
+                                      <select
+                                        value={clueEffect.minigameType || ''}
+                                        onChange={(e) => {
+                                          console.log('🎮 Minigame type changed to:', e.target.value);
+                                          updateEffect(choiceIndex, effectIndex, { 
+                                            ...clueEffect,
+                                            minigameType: e.target.value || undefined
+                                          });
+                                        }}
+                                        className="text-xs border rounded px-1 py-0.5"
+                                      >
+                                        <option value="">No Minigame</option>
+                                        <option value="memory">Memory</option>
+                                        <option value="stroop">Stroop Test</option>
+                                        <option value="wordscramble">Word Scramble</option>
+                                        <option value="colormatch">Color Match</option>
+                                      </select>
+                                    </>
+                                  );
+                                })()}
+                                
                                 <Button
                                   onClick={() => removeEffect(choiceIndex, effectIndex)}
                                   variant="outline"
@@ -888,7 +1011,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
           if (!node) return null;
 
           return (
-            <div className="w-80 space-y-4">
+            <div className="w-[480px] space-y-4">
               <Card className="p-4">
                 <h3 className="font-semibold text-lg mb-2">{node.storylet.name}</h3>
                 <p className="text-sm text-gray-600 mb-4">{node.storylet.description}</p>

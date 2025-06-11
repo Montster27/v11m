@@ -6,6 +6,7 @@ import { Button, Card } from './ui';
 import { StoryletDeploymentStatus, Storylet, Choice, Effect } from '../types/storylet';
 import StoryArcVisualizer from './StoryArcVisualizer';
 import ArcProgressDisplay from './ArcProgressDisplay';
+import FlagEditor from './FlagEditor';
 
 type StoryletTabType = 'overview' | 'manage' | 'search' | 'arcs' | 'filter' | 'create';
 
@@ -1599,10 +1600,24 @@ const StoryletManagementPanel: React.FC = () => {
                 </label>
                 <select
                   value={formData.trigger?.type || 'time'}
-                  onChange={(e) => setFormData({
-                    ...formData,
-                    trigger: { type: e.target.value as any, conditions: {} }
-                  })}
+                  onChange={(e) => {
+                    const triggerType = e.target.value as 'time' | 'flag' | 'resource' | 'npc_relationship' | 'npc_availability';
+                    let defaultConditions = {};
+                    
+                    // Provide appropriate default conditions for each trigger type
+                    if (triggerType === 'time') {
+                      defaultConditions = { day: 1 };
+                    } else if (triggerType === 'flag') {
+                      defaultConditions = { flags: [''] };
+                    } else if (triggerType === 'resource') {
+                      defaultConditions = { energy: { min: 10 } };
+                    }
+                    
+                    setFormData({
+                      ...formData,
+                      trigger: { type: triggerType, conditions: defaultConditions }
+                    });
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="time">Time-based</option>
@@ -1615,25 +1630,56 @@ const StoryletManagementPanel: React.FC = () => {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Conditions (JSON)
+                  Trigger Conditions
+                  {formData.trigger?.type === 'flag' && (
+                    <span className="text-xs text-blue-600 ml-2">
+                      Storylet triggers when ANY of these flags are true
+                    </span>
+                  )}
+                  {formData.trigger?.type === 'time' && (
+                    <span className="text-xs text-blue-600 ml-2">
+                      Example: {`{"day": 5}`}
+                    </span>
+                  )}
+                  {formData.trigger?.type === 'resource' && (
+                    <span className="text-xs text-blue-600 ml-2">
+                      Example: {`{"energy": {"min": 20}}`}
+                    </span>
+                  )}
                 </label>
-                <textarea
-                  value={JSON.stringify(formData.trigger?.conditions || {}, null, 2)}
-                  onChange={(e) => {
-                    try {
-                      const conditions = JSON.parse(e.target.value);
-                      setFormData({
-                        ...formData,
-                        trigger: { ...formData.trigger!, conditions }
-                      });
-                    } catch {
-                      // Invalid JSON, ignore
-                    }
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-sm"
-                  rows={3}
-                  placeholder='{"day": 5} or {"flags": ["metTutor"]} or {"energy": {"min": 20}}'
-                />
+                
+                {/* Flag-specific editor */}
+                {formData.trigger?.type === 'flag' ? (
+                  <FlagEditor
+                    flags={formData.trigger?.conditions?.flags || ['']}
+                    onChange={(flags) => setFormData({
+                      ...formData,
+                      trigger: { 
+                        ...formData.trigger!, 
+                        conditions: { flags } 
+                      }
+                    })}
+                  />
+                ) : (
+                  /* JSON editor for non-flag triggers */
+                  <textarea
+                    value={JSON.stringify(formData.trigger?.conditions || {}, null, 2)}
+                    onChange={(e) => {
+                      try {
+                        const conditions = JSON.parse(e.target.value);
+                        setFormData({
+                          ...formData,
+                          trigger: { ...formData.trigger!, conditions }
+                        });
+                      } catch {
+                        // Invalid JSON, ignore
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-sm"
+                    rows={3}
+                    placeholder='{"day": 5} or {"energy": {"min": 20}}'
+                  />
+                )}
               </div>
             </div>
           </Card>
@@ -1748,6 +1794,8 @@ const StoryletManagementPanel: React.FC = () => {
                                   newEffect = { type: 'npcFlag', npcId: '', flag: '', value: true };
                                 } else if (e.target.value === 'npcMood') {
                                   newEffect = { type: 'npcMood', npcId: '', mood: 'neutral', duration: 0 };
+                                } else if (e.target.value === 'clueDiscovery') {
+                                  newEffect = { type: 'clueDiscovery', clueId: '', onSuccess: [], onFailure: [] };
                                 }
                                 updateEffect(choiceIndex, effectIndex, newEffect);
                               }}
@@ -1762,6 +1810,7 @@ const StoryletManagementPanel: React.FC = () => {
                               <option value="npcMemory">NPC Memory</option>
                               <option value="npcFlag">NPC Flag</option>
                               <option value="npcMood">NPC Mood</option>
+                              <option value="clueDiscovery">Clue Discovery</option>
                             </select>
                             
                             <Button
@@ -2044,6 +2093,35 @@ const StoryletManagementPanel: React.FC = () => {
                                     className="w-full px-2 py-1 text-xs border rounded"
                                     placeholder="0"
                                   />
+                                </div>
+                              </>
+                            )}
+
+                            {effect.type === 'clueDiscovery' && (
+                              <>
+                                <div>
+                                  <label className="block text-xs text-gray-600 mb-1">Clue ID</label>
+                                  <input
+                                    type="text"
+                                    value={(effect as any).clueId || ''}
+                                    onChange={(e) => updateEffect(choiceIndex, effectIndex, { ...effect, clueId: e.target.value })}
+                                    className="w-full px-2 py-1 text-xs border rounded"
+                                    placeholder="clue_id_here"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-600 mb-1">Minigame (Optional)</label>
+                                  <select
+                                    value={(effect as any).minigameType || ''}
+                                    onChange={(e) => updateEffect(choiceIndex, effectIndex, { ...effect, minigameType: e.target.value || undefined })}
+                                    className="w-full px-2 py-1 text-xs border rounded"
+                                  >
+                                    <option value="">No Minigame (Direct Discovery)</option>
+                                    <option value="memory">Memory Card Game</option>
+                                    <option value="stroop">Stroop Test</option>
+                                    <option value="wordscramble">Word Scramble</option>
+                                    <option value="colormatch">Color Match</option>
+                                  </select>
                                 </div>
                               </>
                             )}
