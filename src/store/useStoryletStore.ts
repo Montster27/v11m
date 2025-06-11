@@ -80,6 +80,8 @@ interface StoryletState {
   launchMinigame: (gameId: MinigameType, effect: Effect, storyletId: string, choiceId: string) => void;
   completeMinigame: (success: boolean, stats?: any) => void;
   closeMinigame: () => void;
+  launchClueDiscovery: (effect: Effect, storyletId: string, choiceId: string) => void;
+  completeClueDiscovery: (success: boolean, clueId: string) => void;
   
   // Development actions
   setDeploymentFilter: (filter: Set<'live' | 'stage' | 'dev'>) => void; // set which deployment statuses to show
@@ -492,6 +494,28 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
         return;
       }
     }
+
+    // Check if there's a clue discovery effect that needs to be handled
+    const hasClueDiscoveryEffect = choice.effects.some(effect => effect.type === 'clueDiscovery');
+    
+    if (hasClueDiscoveryEffect) {
+      // Find and launch the clue discovery, potentially with minigame
+      const clueEffect = choice.effects.find(effect => effect.type === 'clueDiscovery');
+      if (clueEffect) {
+        console.log(`🔍 Triggering clue discovery: ${clueEffect.clueId} from storylet ${storyletId}`);
+        get().launchClueDiscovery(clueEffect, storyletId, choiceId);
+        
+        // Apply non-clue-discovery effects immediately
+        choice.effects.forEach((effect) => {
+          if (effect.type !== 'clueDiscovery') {
+            get().applyEffect(effect, { storyletId, choiceId });
+          }
+        });
+        
+        // Don't complete the storylet yet - it will be completed when the clue discovery finishes
+        return;
+      }
+    }
     
     // Apply all effects (no minigame)
     choice.effects.forEach((effect) => {
@@ -656,6 +680,11 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       case 'minigame':
         // Minigame effects are handled in chooseStorylet, not here
         console.warn('Minigame effect should be handled in chooseStorylet, not applyEffect');
+        break;
+
+      case 'clueDiscovery':
+        // Clue discovery effects are handled in chooseStorylet, not here
+        console.warn('Clue discovery effect should be handled in chooseStorylet, not applyEffect');
         break;
         
       case 'npcRelationship':
@@ -1023,7 +1052,14 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     
     const { effect, storyletId, choiceId } = minigameContext;
     
-    // Trigger clue discovery if minigame was successful
+    // Handle clue discovery minigames differently from regular minigames
+    if (effect.type === 'clueDiscovery') {
+      // Let completeClueDiscovery handle this
+      get().completeClueDiscovery(success, effect.clueId);
+      return;
+    }
+    
+    // Handle legacy minigame effects with gameId
     if (success && effect.gameId) {
       try {
         if (typeof window !== 'undefined' && (window as any).triggerClueDiscovery) {
@@ -1034,7 +1070,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
           if (clueResult) {
             console.log(`🔍 Clue discovered: ${clueResult.clue.title}`);
             
-            // Show notification (we'll implement this next)
+            // Show notification
             if (typeof window !== 'undefined' && (window as any).showClueNotification) {
               (window as any).showClueNotification(clueResult);
             }
@@ -1154,6 +1190,207 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       activeMinigame: null,
       minigameContext: null
     });
+  },
+  
+  // Launch clue discovery (potentially with minigame)
+  launchClueDiscovery: (effect: Effect, storyletId: string, choiceId: string) => {
+    if (effect.type !== 'clueDiscovery') {
+      console.error('Invalid effect type for clue discovery:', effect);
+      return;
+    }
+
+    console.log(`🔍 Launching clue discovery: ${effect.clueId}`);
+    
+    // Check if clue discovery includes a minigame
+    if (effect.minigameType) {
+      console.log(`🎮 Clue discovery includes minigame: ${effect.minigameType}`);
+      
+      // Pause time when launching minigame
+      try {
+        if (typeof window !== 'undefined' && (window as any).useAppStore) {
+          (window as any).useAppStore.getState().pauseTime();
+        }
+      } catch (error) {
+        console.warn('Could not pause time:', error);
+      }
+      
+      // Launch the minigame but with clue discovery context
+      set({
+        activeMinigame: effect.minigameType as MinigameType,
+        minigameContext: {
+          effect,
+          storyletId,
+          choiceId
+        }
+      });
+    } else {
+      // Direct clue discovery without minigame
+      try {
+        if (typeof window !== 'undefined' && (window as any).useClueStore) {
+          const clueStore = (window as any).useClueStore.getState();
+          const appState = getAppState();
+          const characterId = appState?.activeCharacter?.id || 'default';
+          
+          // Discover the clue directly
+          const discoveryResult = clueStore.discoverClue(effect.clueId, storyletId, characterId);
+          
+          if (discoveryResult) {
+            console.log(`🔍 Clue discovered directly: ${discoveryResult.title}`);
+            
+            // Show notification if available
+            if (typeof window !== 'undefined' && (window as any).showClueNotification) {
+              (window as any).showClueNotification({
+                clue: discoveryResult,
+                minigameType: 'none',
+                storyletId,
+                characterId
+              });
+            }
+            
+            // Apply success effects if any
+            if (effect.onSuccess) {
+              effect.onSuccess.forEach(successEffect => 
+                get().applyEffect(successEffect, { storyletId, choiceId })
+              );
+            }
+          } else {
+            console.warn(`Failed to discover clue: ${effect.clueId}`);
+            
+            // Apply failure effects if any
+            if (effect.onFailure) {
+              effect.onFailure.forEach(failureEffect => 
+                get().applyEffect(failureEffect, { storyletId, choiceId })
+              );
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Could not trigger direct clue discovery:', error);
+        
+        // Apply failure effects on error
+        if (effect.onFailure) {
+          effect.onFailure.forEach(failureEffect => 
+            get().applyEffect(failureEffect, { storyletId, choiceId })
+          );
+        }
+      }
+      
+      // Complete the clue discovery process
+      get().completeClueDiscovery(true, effect.clueId);
+    }
+  },
+  
+  // Complete clue discovery (called after minigame or direct discovery)
+  completeClueDiscovery: (success: boolean, clueId: string) => {
+    const { minigameContext, activeStoryletIds, completedStoryletIds, allStorylets } = get();
+    
+    console.log(`🔍 Clue discovery completed: ${success ? 'SUCCESS' : 'FAILURE'} for clue ${clueId}`);
+    
+    // If this was triggered by a minigame, handle the minigame completion
+    if (minigameContext && minigameContext.effect.type === 'clueDiscovery') {
+      const { effect, storyletId, choiceId } = minigameContext;
+      
+      if (success && effect.clueId === clueId) {
+        // Trigger actual clue discovery
+        try {
+          if (typeof window !== 'undefined' && (window as any).useClueStore) {
+            const clueStore = (window as any).useClueStore.getState();
+            const appState = getAppState();
+            const characterId = appState?.activeCharacter?.id || 'default';
+            
+            const discoveryResult = clueStore.discoverClue(clueId, storyletId, characterId);
+            
+            if (discoveryResult) {
+              console.log(`🔍 Clue discovered via minigame: ${discoveryResult.title}`);
+              
+              // Show notification
+              if (typeof window !== 'undefined' && (window as any).showClueNotification) {
+                (window as any).showClueNotification({
+                  clue: discoveryResult,
+                  minigameType: effect.minigameType || 'unknown',
+                  storyletId,
+                  characterId
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('Could not trigger clue discovery after minigame:', error);
+        }
+      }
+      
+      // Apply success or failure effects
+      if (success && effect.onSuccess) {
+        effect.onSuccess.forEach(successEffect => 
+          get().applyEffect(successEffect, { storyletId, choiceId })
+        );
+      } else if (!success && effect.onFailure) {
+        effect.onFailure.forEach(failureEffect => 
+          get().applyEffect(failureEffect, { storyletId, choiceId })
+        );
+      }
+      
+      // Complete the storylet now that clue discovery is done
+      if (storyletId && choiceId) {
+        const storylet = allStorylets[storyletId];
+        if (storylet) {
+          // Convert storylet choice to quest achievement
+          try {
+            if (typeof window !== 'undefined' && (window as any).useAppStore) {
+              (window as any).useAppStore.getState().convertStoryletToQuest(storyletId, choiceId);
+            }
+          } catch (error) {
+            console.warn('Could not convert storylet to quest:', error);
+          }
+          
+          // Mark storylet as completed
+          const newActiveIds = activeStoryletIds.filter(id => id !== storyletId);
+          const newCompletedIds = [...completedStoryletIds, storyletId];
+          
+          // Set cooldown for resource-based storylets (3 days)
+          const cooldownDay = storylet.trigger.type === 'resource' ? 
+            ((() => {
+              try {
+                if (typeof window !== 'undefined' && (window as any).useAppStore) {
+                  return (window as any).useAppStore.getState().day + 3;
+                }
+                return 999; // fallback
+              } catch {
+                return 999; // fallback
+              }
+            })()) : undefined;
+          
+          set((state) => ({
+            activeStoryletIds: newActiveIds,
+            completedStoryletIds: newCompletedIds,
+            storyletCooldowns: cooldownDay ? {
+              ...state.storyletCooldowns,
+              [storyletId]: cooldownDay
+            } : state.storyletCooldowns
+          }));
+          
+          // Re-evaluate storylets in case new conditions are met
+          globalTimeoutManager.setTimeout(() => {
+            get().evaluateStorylets();
+          }, 100);
+        }
+      }
+      
+      // Resume time when clue discovery completes (if there was a minigame)
+      try {
+        if (typeof window !== 'undefined' && (window as any).useAppStore) {
+          (window as any).useAppStore.getState().resumeTime();
+        }
+      } catch (error) {
+        console.warn('Could not resume time:', error);
+      }
+      
+      // Clear minigame state
+      set({
+        activeMinigame: null,
+        minigameContext: null
+      });
+    }
   },
   
   // Development actions

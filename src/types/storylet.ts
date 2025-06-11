@@ -37,6 +37,7 @@ export type Effect =
   | { type: "domainXp"; domain: "intellectualCompetence" | "physicalCompetence" | "emotionalIntelligence" | "socialCompetence" | "personalAutonomy" | "identityClarity" | "lifePurpose"; amount: number } // award XP to a domain (V2 characters)
   | { type: "unlock"; storyletId: string }           // unlock a new storylet immediately
   | { type: "minigame"; gameId: string; onSuccess?: Effect[]; onFailure?: Effect[] } // launch a minigame
+  | { type: "clueDiscovery"; clueId: string; minigameType?: string; onSuccess?: Effect[]; onFailure?: Effect[] } // trigger clue discovery with optional minigame
   // NPC-related effects
   | { type: "npcRelationship"; npcId: string; delta: number; reason?: string }
   | { type: "npcMemory"; npcId: string; memory: NPCMemoryInput }
