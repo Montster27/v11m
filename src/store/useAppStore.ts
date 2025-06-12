@@ -284,9 +284,9 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     set((state) => {
       const newResources = {
         ...state.resources,
-        [resource]: resource === 'money' || resource === 'knowledge' || resource === 'social' 
-          ? Math.max(0, Math.min(1000, value))  // Knowledge, money, social capped at 1000
-          : Math.max(0, Math.min(100, value))   // Energy and stress capped at 100
+        [resource]: resource === 'energy' || resource === 'stress'
+          ? Math.max(0, Math.min(100, value))   // Energy and stress capped at 100
+          : Math.max(0, value)                  // Knowledge, social, money can grow unlimited
       };
       
       // Trigger storylet evaluation after resource update
