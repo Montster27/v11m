@@ -37,7 +37,7 @@ export type Effect =
   | { type: "domainXp"; domain: "intellectualCompetence" | "physicalCompetence" | "emotionalIntelligence" | "socialCompetence" | "personalAutonomy" | "identityClarity" | "lifePurpose"; amount: number } // award XP to a domain (V2 characters)
   | { type: "unlock"; storyletId: string }           // unlock a new storylet immediately
   | { type: "minigame"; gameId: string; onSuccess?: Effect[]; onFailure?: Effect[] } // launch a minigame
-  | { type: "clueDiscovery"; clueId: string; minigameType?: string; onSuccess?: Effect[]; onFailure?: Effect[] } // trigger clue discovery with optional minigame
+  | { type: "clueDiscovery"; clueId: string; minigameType?: MinigameType; onSuccess?: Effect[]; onFailure?: Effect[] } // trigger clue discovery (minigame determined by clue or specified)
   // NPC-related effects
   | { type: "npcRelationship"; npcId: string; delta: number; reason?: string }
   | { type: "npcMemory"; npcId: string; memory: NPCMemoryInput }
@@ -45,14 +45,10 @@ export type Effect =
   | { type: "npcMood"; npcId: string; mood: NPCStatus["mood"]; duration?: number }
   | { type: "npcAvailability"; npcId: string; availability: NPCStatus["availability"]; duration?: number };
 
-// Available minigames
+// Available minigames (only implemented ones)
 export type MinigameType = 
   | "memory-cards"
-  | "pattern-sequence" 
-  | "math-quiz"
-  | "reaction-time"
   | "word-scramble"
-  | "logic-puzzle"
-  | "typing-test"
   | "color-match"
-  | "stroop-test";
+  | "stroop-test"
+  | "path-planner";

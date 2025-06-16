@@ -5,6 +5,7 @@ import Navigation from './components/Navigation';
 import DebugPanel from './components/DebugPanel';
 import MinigameManager from './components/minigames/MinigameManager';
 import ClueNotification from './components/ClueNotification';
+import ClueDiscoveryManager from './components/ClueDiscoveryManager';
 import { CharacterCreation, Planner, Quests, Skills, StoryletDeveloper, SplashScreen } from './pages';
 import { useSaveStore } from './store/useSaveStore';
 import { useAppStore } from './store/useAppStore';
@@ -16,11 +17,16 @@ if (process.env.NODE_ENV === 'development') {
   import('./utils/clueSystemTest'); // Import clue system test functions
   import('./utils/balanceSimulator'); // Import balance testing utilities
   import('./utils/quickBalanceTools'); // Import quick balance analysis tools
+  import('./utils/clearAllData'); // Import data clearing utilities
+  import('./utils/testClueDiscovery'); // Import clue discovery test utilities
+  import('./utils/testConcernFlags'); // Import character concerns test utilities
+  import('./utils/testPathPlanner'); // Import path planner test utilities
 }
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [clueNotification, setClueNotification] = useState<{clue: Clue; isVisible: boolean} | null>(null);
+  const [clueDiscovery, setClueDiscovery] = useState<{clueId: string; minigameType: string; isActive: boolean} | null>(null);
   // Save store available for splash screen
   const { activeCharacter } = useAppStore();
   const { activeMinigame, completeMinigame, closeMinigame } = useStoryletStore();
@@ -32,7 +38,7 @@ function App() {
     }
   }, []);
 
-  // Set up global clue notification function
+  // Set up global clue notification and discovery functions
   useEffect(() => {
     if (typeof window !== 'undefined') {
       (window as any).showClueNotification = (clueResult: {clue: Clue}) => {
@@ -41,11 +47,21 @@ function App() {
           isVisible: true
         });
       };
+
+      (window as any).startClueDiscovery = (clueId: string, minigameType: string) => {
+        console.log(`🔍 Starting clue discovery: ${clueId} with ${minigameType}`);
+        setClueDiscovery({
+          clueId,
+          minigameType,
+          isActive: true
+        });
+      };
     }
 
     return () => {
       if (typeof window !== 'undefined') {
         delete (window as any).showClueNotification;
+        delete (window as any).startClueDiscovery;
       }
     };
   }, []);
@@ -90,6 +106,36 @@ function App() {
           isVisible={clueNotification?.isVisible || false}
           onClose={() => setClueNotification(null)}
         />
+        
+        {/* Clue Discovery Manager - handles full clue discovery flow */}
+        {clueDiscovery?.isActive && (
+          <ClueDiscoveryManager
+            clueId={clueDiscovery.clueId}
+            minigameType={clueDiscovery.minigameType as any}
+            onComplete={(success, clue) => {
+              console.log(`🔍 Clue discovery completed: ${success ? 'SUCCESS' : 'FAILURE'}`, { clue });
+              
+              // Trigger the storylet store's completion handler
+              const { completeClueDiscovery } = useStoryletStore.getState();
+              completeClueDiscovery(success, clueDiscovery.clueId);
+              
+              // Close the discovery manager
+              setClueDiscovery(null);
+              
+              // Show notification if successful
+              if (success && clue) {
+                setClueNotification({
+                  clue,
+                  isVisible: true
+                });
+              }
+            }}
+            onClose={() => {
+              console.log('🔍 Clue discovery cancelled by user');
+              setClueDiscovery(null);
+            }}
+          />
+        )}
       </div>
     </Router>
   );

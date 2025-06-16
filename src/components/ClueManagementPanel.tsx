@@ -8,10 +8,11 @@ import { Clue, ClueFormData, StoryArc } from '../types/clue';
 type ClueTabType = 'all' | 'create' | 'storyArcs' | 'discovered' | 'stats';
 
 const AVAILABLE_MINIGAMES = [
-  { id: 'memory', name: 'Memory Card Game' },
-  { id: 'stroop', name: 'Stroop Test' },
-  { id: 'wordscramble', name: 'Word Scramble' },
-  { id: 'colormatch', name: 'Color Match' }
+  { id: 'memory-cards', name: 'Memory Card Game' },
+  { id: 'stroop-test', name: 'Stroop Test' },
+  { id: 'word-scramble', name: 'Word Scramble' },
+  { id: 'color-match', name: 'Color Match' },
+  { id: 'path-planner', name: 'Path Planner' }
 ];
 
 const getMinigameName = (id: string): string => {

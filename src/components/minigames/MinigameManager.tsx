@@ -3,6 +3,7 @@ import MemoryCardGame from './MemoryCardGame';
 import WordScrambleGame from './WordScrambleGame';
 import ColorMatchGame from './ColorMatchGame';
 import StroopTestGame from './StroopTestGame';
+import PathPlannerGame from './PathPlannerGame';
 import ErrorBoundary from '../ErrorBoundary';
 import { Button, Card } from '../ui';
 import type { MinigameType } from '../../types/storylet';
@@ -221,6 +222,15 @@ const MinigameManager: React.FC<MinigameManagerProps> = ({
       case 'stroop-test':
         return (
           <StroopTestGame
+            onGameComplete={onGameComplete}
+            onClose={onClose}
+            difficulty="medium"
+          />
+        );
+      
+      case 'path-planner':
+        return (
+          <PathPlannerGame
             onGameComplete={onGameComplete}
             onClose={onClose}
             difficulty="medium"
