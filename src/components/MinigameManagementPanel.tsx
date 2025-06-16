@@ -8,6 +8,8 @@ import ColorMatchGame from './minigames/ColorMatchGame';
 import PathPlannerGame from './minigames/PathPlannerGame';
 
 type MinigameType = 'memory' | 'stroop' | 'wordscramble' | 'colormatch' | 'pathplanner';
+type DifficultyLevel = 'easy' | 'medium' | 'hard';
+type PathPlannerVariant = 'classic' | 'keyLock' | 'dynamic' | 'costOptim';
 
 interface MinigameInfo {
   id: MinigameType;
@@ -15,6 +17,8 @@ interface MinigameInfo {
   description: string;
   component: React.ComponentType<any>;
   defaultProps?: any;
+  variants?: Array<{ id: string; name: string; description: string }>;
+  supportsDifficulty?: boolean;
 }
 
 const AVAILABLE_MINIGAMES: MinigameInfo[] = [
@@ -23,35 +27,46 @@ const AVAILABLE_MINIGAMES: MinigameInfo[] = [
     name: 'Memory Card Game',
     description: 'Match pairs of cards by remembering their positions. Tests working memory and concentration.',
     component: MemoryCardGame,
-    defaultProps: { difficulty: 'medium' }
+    defaultProps: { difficulty: 'medium' },
+    supportsDifficulty: true
   },
   {
     id: 'stroop',
     name: 'Stroop Test',
     description: 'Name the color of words while ignoring the text. Tests cognitive flexibility and attention.',
     component: StroopTestGame,
-    defaultProps: { difficulty: 'medium' }
+    defaultProps: { difficulty: 'medium' },
+    supportsDifficulty: true
   },
   {
     id: 'wordscramble',
     name: 'Word Scramble',
     description: 'Unscramble letters to form words. Tests vocabulary and pattern recognition.',
     component: WordScrambleGame,
-    defaultProps: { difficulty: 'medium' }
+    defaultProps: { difficulty: 'medium' },
+    supportsDifficulty: true
   },
   {
     id: 'colormatch',
     name: 'Color Match',
     description: 'Match colors quickly and accurately. Tests reaction time and visual processing.',
     component: ColorMatchGame,
-    defaultProps: { difficulty: 'medium' }
+    defaultProps: { difficulty: 'medium' },
+    supportsDifficulty: true
   },
   {
     id: 'pathplanner',
     name: 'Path Planner',
     description: 'Navigate through obstacles and solve routing puzzles. Tests spatial reasoning and planning skills.',
     component: PathPlannerGame,
-    defaultProps: { difficulty: 'medium', variant: 'classic' }
+    defaultProps: { difficulty: 'medium', variant: 'classic' },
+    supportsDifficulty: true,
+    variants: [
+      { id: 'classic', name: 'Classic Maze', description: 'Navigate through walls to reach the goal' },
+      { id: 'keyLock', name: 'Key & Lock', description: 'Collect keys to unlock doors blocking your path' },
+      { id: 'dynamic', name: 'Dynamic Obstacles', description: 'Avoid moving obstacles that patrol the maze' },
+      { id: 'costOptim', name: 'Cost Optimization', description: 'Find the most efficient path within budget constraints' }
+    ]
   }
 ];
 
@@ -61,6 +76,8 @@ const MinigameManagementPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [selectedMinigame, setSelectedMinigame] = useState<MinigameType>('memory');
   const [testingMinigame, setTestingMinigame] = useState<MinigameType | null>(null);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>('medium');
+  const [selectedVariant, setSelectedVariant] = useState<PathPlannerVariant>('classic');
 
   const tabs = [
     { id: 'overview' as TabType, label: 'Overview', icon: '🎮' },
@@ -128,54 +145,124 @@ const MinigameManagementPanel: React.FC = () => {
     </div>
   );
 
-  const renderTestGames = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Test Minigames</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select Minigame to Test
-            </label>
-            <select
-              value={selectedMinigame}
-              onChange={(e) => setSelectedMinigame(e.target.value as MinigameType)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              {AVAILABLE_MINIGAMES.map((game) => (
-                <option key={game.id} value={game.id}>
-                  {game.name}
-                </option>
-              ))}
-            </select>
-          </div>
+  const renderTestGames = () => {
+    const selectedGameInfo = AVAILABLE_MINIGAMES.find(g => g.id === selectedMinigame);
+    
+    return (
+      <div className="space-y-6">
+        <Card className="p-6">
+          <h3 className="text-xl font-bold text-gray-900 mb-4">Test Minigames</h3>
           
-          <div className="flex items-end">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Minigame to Test
+              </label>
+              <select
+                value={selectedMinigame}
+                onChange={(e) => {
+                  setSelectedMinigame(e.target.value as MinigameType);
+                  // Reset variant when changing games
+                  if (e.target.value === 'pathplanner') {
+                    setSelectedVariant('classic');
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                {AVAILABLE_MINIGAMES.map((game) => (
+                  <option key={game.id} value={game.id}>
+                    {game.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedGameInfo?.supportsDifficulty && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Difficulty Level
+                </label>
+                <select
+                  value={selectedDifficulty}
+                  onChange={(e) => setSelectedDifficulty(e.target.value as DifficultyLevel)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </div>
+            )}
+
+            {selectedMinigame === 'pathplanner' && selectedGameInfo?.variants && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Path Planner Variant
+                </label>
+                <select
+                  value={selectedVariant}
+                  onChange={(e) => setSelectedVariant(e.target.value as PathPlannerVariant)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  {selectedGameInfo.variants.map((variant) => (
+                    <option key={variant.id} value={variant.id}>
+                      {variant.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div className="mb-6">
             <Button
               onClick={() => setTestingMinigame(selectedMinigame)}
-              className="w-full"
+              className="w-full md:w-auto"
             >
               Launch Test Game
             </Button>
           </div>
-        </div>
 
         {selectedMinigame && (
           <div className="bg-blue-50 p-4 rounded-lg mb-4">
             <div className="font-medium text-blue-900">
-              {AVAILABLE_MINIGAMES.find(g => g.id === selectedMinigame)?.name}
+              {selectedGameInfo?.name}
+              {selectedGameInfo?.supportsDifficulty && (
+                <span className="ml-2 text-sm bg-blue-200 text-blue-800 px-2 py-1 rounded capitalize">
+                  {selectedDifficulty}
+                </span>
+              )}
             </div>
             <div className="text-sm text-blue-800 mt-1">
-              {AVAILABLE_MINIGAMES.find(g => g.id === selectedMinigame)?.description}
+              {selectedGameInfo?.description}
             </div>
+            {selectedMinigame === 'pathplanner' && selectedGameInfo?.variants && (
+              <div className="mt-2 p-3 bg-blue-100 rounded">
+                <div className="font-medium text-blue-900 text-sm">
+                  Selected Variant: {selectedGameInfo.variants.find(v => v.id === selectedVariant)?.name}
+                </div>
+                <div className="text-xs text-blue-700 mt-1">
+                  {selectedGameInfo.variants.find(v => v.id === selectedVariant)?.description}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {testingMinigame && (
           <Card className="p-4 bg-gray-50">
             <div className="flex justify-between items-center mb-4">
-              <h4 className="font-semibold text-gray-900">Testing: {AVAILABLE_MINIGAMES.find(g => g.id === testingMinigame)?.name}</h4>
+              <div>
+                <h4 className="font-semibold text-gray-900">Testing: {AVAILABLE_MINIGAMES.find(g => g.id === testingMinigame)?.name}</h4>
+                <div className="text-sm text-gray-600 mt-1">
+                  {AVAILABLE_MINIGAMES.find(g => g.id === testingMinigame)?.supportsDifficulty && (
+                    <span className="mr-3">Difficulty: <strong>{selectedDifficulty}</strong></span>
+                  )}
+                  {testingMinigame === 'pathplanner' && (
+                    <span>Variant: <strong>{selectedVariant}</strong></span>
+                  )}
+                </div>
+              </div>
               <Button 
                 onClick={() => setTestingMinigame(null)}
                 variant="outline"
@@ -201,22 +288,42 @@ const MinigameManagementPanel: React.FC = () => {
                 
                 const GameComponent = game.component;
                 try {
-                  return (
-                    <GameComponent
-                      onGameComplete={(success: boolean, stats?: any) => {
-                        console.log('🎮 Minigame completed:', { success, stats, gameId: testingMinigame });
-                        const statsDisplay = stats ? JSON.stringify(stats, null, 2) : 'No stats';
-                        alert(`🎮 Game: ${game.name}\n✅ Success: ${success}\n📊 Stats: ${statsDisplay}`);
-                        setTestingMinigame(null);
-                      }}
-                      onClose={() => {
-                        console.log('🎮 Minigame closed by user');
-                        setTestingMinigame(null);
-                      }}
-                      difficulty="medium"
-                      {...(game.defaultProps || {})}
-                    />
-                  );
+                  // Build props based on game type and selected options
+                  const gameProps: any = {
+                    onGameComplete: (success: boolean, stats?: any) => {
+                      console.log('🎮 Minigame completed:', { success, stats, gameId: testingMinigame });
+                      const statsDisplay = stats ? JSON.stringify(stats, null, 2) : 'No stats';
+                      alert(`🎮 Game: ${game.name}\n✅ Success: ${success}\n📊 Stats: ${statsDisplay}`);
+                      setTestingMinigame(null);
+                    },
+                    onClose: () => {
+                      console.log('🎮 Minigame closed by user');
+                      setTestingMinigame(null);
+                    }
+                  };
+
+                  // Add difficulty if supported
+                  if (game.supportsDifficulty) {
+                    gameProps.difficulty = selectedDifficulty;
+                  }
+
+                  // Add variant for path planner
+                  if (testingMinigame === 'pathplanner') {
+                    gameProps.variant = selectedVariant;
+                  }
+
+                  // Merge with default props, but let selected options override defaults
+                  const finalProps = { ...(game.defaultProps || {}), ...gameProps };
+
+                  // Debug logging to verify props
+                  console.log('🎮 Loading minigame with props:', {
+                    gameId: testingMinigame,
+                    selectedDifficulty,
+                    selectedVariant: testingMinigame === 'pathplanner' ? selectedVariant : 'N/A',
+                    finalProps
+                  });
+
+                  return <GameComponent key={`${testingMinigame}-${selectedDifficulty}-${selectedVariant}`} {...finalProps} />;
                 } catch (error) {
                   console.error('Error loading minigame:', error);
                   return (
@@ -241,7 +348,8 @@ const MinigameManagementPanel: React.FC = () => {
         )}
       </Card>
     </div>
-  );
+    );
+  };
 
   const renderIntegration = () => (
     <div className="space-y-6">
@@ -299,8 +407,31 @@ const MinigameManagementPanel: React.FC = () => {
                 <div key={game.id} className="bg-blue-50 p-3 rounded text-center">
                   <div className="font-mono text-sm text-blue-800">{game.id}</div>
                   <div className="text-xs text-blue-600 mt-1">{game.name}</div>
+                  {game.variants && (
+                    <div className="text-xs text-gray-600 mt-2">
+                      Variants: {game.variants.map(v => v.id).join(', ')}
+                    </div>
+                  )}
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold text-gray-800 mb-3">Path Planner Variants</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {AVAILABLE_MINIGAMES.find(g => g.id === 'pathplanner')?.variants?.map((variant) => (
+                <div key={variant.id} className="bg-purple-50 p-3 rounded">
+                  <div className="font-mono text-sm text-purple-800">{variant.id}</div>
+                  <div className="font-medium text-purple-900 text-sm mt-1">{variant.name}</div>
+                  <div className="text-xs text-purple-700 mt-1">{variant.description}</div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 p-3 bg-gray-50 rounded text-sm">
+              <p className="text-gray-700">
+                <strong>Usage:</strong> Add <code className="bg-gray-200 px-1 rounded">variant: "classic"</code> to minigame effect properties
+              </p>
             </div>
           </div>
 

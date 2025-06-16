@@ -12,7 +12,12 @@ interface PuzzleBoardProps {
   gameStatus: 'playing' | 'success' | 'failure';
 }
 
-type CellType = 'empty' | 'wall' | 'start' | 'goal' | 'player' | 'key' | 'lock' | 'obstacle';
+interface ValidMove {
+  position: Coordinate;
+  direction: string;
+}
+
+type CellType = 'empty' | 'wall' | 'start' | 'goal' | 'player' | 'key' | 'lock' | 'obstacle' | 'validMove';
 
 interface CellInfo {
   type: CellType;
@@ -34,6 +39,39 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
   onCellClick,
   gameStatus
 }) => {
+  // Calculate valid moves from current position
+  const validMoves = useMemo(() => {
+    const moves: ValidMove[] = [];
+    const directions = [
+      { x: 0, y: -1, name: 'up' },
+      { x: 0, y: 1, name: 'down' },
+      { x: -1, y: 0, name: 'left' },
+      { x: 1, y: 0, name: 'right' }
+    ];
+    
+    directions.forEach(dir => {
+      const newPos = {
+        x: playerPosition.x + dir.x,
+        y: playerPosition.y + dir.y
+      };
+      
+      // Check if position is valid (basic bounds and wall check)
+      if (newPos.x >= 0 && newPos.x < level.size.x && 
+          newPos.y >= 0 && newPos.y < level.size.y) {
+        // Check if it's not a wall
+        const isWall = level.walls.some(wall => wall.x === newPos.x && wall.y === newPos.y);
+        if (!isWall) {
+          moves.push({
+            position: newPos,
+            direction: dir.name
+          });
+        }
+      }
+    });
+    
+    return moves;
+  }, [playerPosition, level]);
+  
   // Create grid data with all cell information
   const gridData = useMemo(() => {
     const grid: CellInfo[][] = [];
@@ -117,6 +155,18 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
       }
     }
 
+    // Mark valid moves (before marking player position)
+    if (gameStatus === 'playing') {
+      validMoves.forEach(move => {
+        const { x, y } = move.position;
+        if (y >= 0 && y < level.size.y && x >= 0 && x < level.size.x) {
+          if (grid[y][x].type === 'empty') {
+            grid[y][x].type = 'validMove';
+          }
+        }
+      });
+    }
+    
     // Mark player position (overrides other types except obstacles)
     const { x: playerX, y: playerY } = playerPosition;
     if (playerY >= 0 && playerY < level.size.y && playerX >= 0 && playerX < level.size.x) {
@@ -130,14 +180,17 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
 
   // Get cell styling
   const getCellClasses = (cell: CellInfo): string => {
-    const baseClasses = "w-8 h-8 border border-gray-300 flex items-center justify-center text-xs font-bold transition-all duration-200 cursor-pointer relative";
+    const baseClasses = "border-2 border-gray-400 flex items-center justify-center font-bold transition-all duration-200 cursor-pointer relative select-none";
     
     switch (cell.type) {
       case 'wall':
         return `${baseClasses} bg-gray-800 border-gray-700 cursor-not-allowed`;
       
       case 'player':
-        return `${baseClasses} bg-blue-500 border-blue-600 text-white shadow-lg ring-2 ring-blue-300 animate-pulse`;
+        return `${baseClasses} bg-blue-500 border-blue-600 text-white shadow-lg ring-4 ring-blue-300 z-10`;
+      
+      case 'validMove':
+        return `${baseClasses} bg-green-100 border-green-300 text-green-600 hover:bg-green-200 ring-2 ring-green-200`;
       
       case 'start':
         return `${baseClasses} bg-green-200 border-green-400 text-green-800`;
@@ -186,6 +239,8 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
         return '█';
       case 'player':
         return '👤';
+      case 'validMove':
+        return '•';
       case 'start':
         return '🏁';
       case 'goal':
@@ -201,10 +256,10 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
     }
   };
 
-  // Calculate grid size for responsive design
+  // Calculate proper grid sizing for visibility
   const maxSize = Math.max(level.size.x, level.size.y);
-  const cellSize = maxSize <= 8 ? 'w-10 h-10' : maxSize <= 12 ? 'w-8 h-8' : 'w-6 h-6';
-  const fontSize = maxSize <= 8 ? 'text-sm' : maxSize <= 12 ? 'text-xs' : 'text-xs';
+  const cellSize = maxSize <= 6 ? 48 : maxSize <= 8 ? 40 : maxSize <= 10 ? 32 : 28; // pixels
+  const fontSize = maxSize <= 6 ? 16 : maxSize <= 8 ? 14 : 12;
 
   return (
     <div className="flex flex-col items-center space-y-4">
@@ -220,23 +275,26 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
 
       {/* Game Board */}
       <div 
-        className="inline-block border-2 border-gray-400 bg-gray-50 p-2 rounded-lg shadow-lg"
+        className="inline-block border-2 border-gray-800 bg-gray-100 p-3 rounded-lg shadow-lg"
         role="application"
         aria-label="Path planner puzzle grid"
         tabIndex={0}
+        style={{ maxWidth: '90vw', overflow: 'auto' }}
       >
         <div 
-          className="grid gap-0"
+          className="grid gap-1 bg-gray-200 p-2 rounded"
           style={{ 
-            gridTemplateColumns: `repeat(${level.size.x}, ${cellSize.split(' ')[0].substring(2)})`,
-            gridTemplateRows: `repeat(${level.size.y}, ${cellSize.split(' ')[1].substring(2)})`
+            gridTemplateColumns: `repeat(${level.size.x}, ${cellSize}px)`,
+            gridTemplateRows: `repeat(${level.size.y}, ${cellSize}px)`,
+            width: 'fit-content',
+            margin: '0 auto'
           }}
         >
           {gridData.map((row, y) =>
             row.map((cell, x) => (
               <div
                 key={`${x}-${y}`}
-                className={getCellClasses(cell).replace('w-8 h-8', cellSize).replace('text-xs', fontSize)}
+                className={getCellClasses(cell)}
                 onClick={() => onCellClick(cell.position)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
@@ -246,6 +304,13 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
                 }}
                 tabIndex={cell.type === 'wall' ? -1 : 0}
                 role="button"
+                style={{
+                  width: `${cellSize}px`,
+                  height: `${cellSize}px`,
+                  fontSize: `${fontSize}px`,
+                  minWidth: `${cellSize}px`,
+                  minHeight: `${cellSize}px`
+                }}
                 aria-label={`Cell at row ${y + 1}, column ${x + 1}. ${
                   cell.type === 'wall' ? 'Wall' :
                   cell.type === 'player' ? 'Player position' :
@@ -259,9 +324,9 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
               >
                 {getCellContent(cell)}
                 
-                {/* Cost overlay for cost optimization mode */}
+                {/* Cost display for cost optimization mode */}
                 {level.variant === 'costOptim' && cell.cost && cell.type === 'empty' && (
-                  <span className="absolute bottom-0 right-0 text-xs text-gray-500 bg-white rounded-tl px-1">
+                  <span className="absolute top-0 left-0 text-xs text-gray-700 bg-yellow-200 rounded-br px-1 font-bold leading-none">
                     {cell.cost}
                   </span>
                 )}
@@ -311,6 +376,12 @@ const PuzzleBoard: React.FC<PuzzleBoardProps> = ({
           <div className="flex items-center space-x-1">
             <span className="w-3 h-3 bg-gradient-to-r from-green-200 to-red-200 border rounded"></span>
             <span>Cost</span>
+          </div>
+        )}
+        {gameStatus === 'playing' && (
+          <div className="flex items-center space-x-1">
+            <span className="text-green-600">•</span>
+            <span>Valid Move</span>
           </div>
         )}
       </div>

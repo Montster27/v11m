@@ -59,9 +59,9 @@ export function generatePuzzle(
   
   // Base difficulty settings
   const difficultySettings = {
-    easy: { size: 6, complexity: 0.2, entities: 1 },
-    medium: { size: 8, complexity: 0.3, entities: 2 },
-    hard: { size: 10, complexity: 0.4, entities: 3 }
+    easy: { size: 5, complexity: 0.15, entities: 1 },
+    medium: { size: 6, complexity: 0.25, entities: 2 },
+    hard: { size: 8, complexity: 0.35, entities: 2 }
   };
   
   const settings = difficultySettings[difficulty];
@@ -87,26 +87,27 @@ function generateClassicMaze(size: Coordinate, complexity: number, rng: SeededRa
   const totalCells = size.x * size.y;
   const wallCount = Math.floor(totalCells * complexity);
   
-  // Create maze using randomized algorithm
+  // Create maze with better distribution
   for (let i = 0; i < wallCount; i++) {
     let wall: Coordinate;
     let attempts = 0;
     
     do {
       wall = {
-        x: rng.nextInt(0, size.x - 1),
-        y: rng.nextInt(0, size.y - 1)
+        x: rng.nextInt(1, size.x - 2), // Avoid edges
+        y: rng.nextInt(1, size.y - 2)
       };
       attempts++;
     } while (
-      attempts < 50 && (
+      attempts < 100 && (
         isWall(wall, walls) ||
         isAdjacent(wall, { x: 0, y: 0 }) ||
-        isAdjacent(wall, { x: size.x - 1, y: size.y - 1 })
+        isAdjacent(wall, { x: size.x - 1, y: size.y - 1 }) ||
+        countAdjacentWalls(wall, walls) >= 2 // Prevent wall clusters
       )
     );
     
-    if (attempts < 50) {
+    if (attempts < 100) {
       walls.push(wall);
     }
   }
@@ -415,6 +416,14 @@ function isAdjacent(pos1: Coordinate, pos2: Coordinate): boolean {
   const dx = Math.abs(pos1.x - pos2.x);
   const dy = Math.abs(pos1.y - pos2.y);
   return dx <= 1 && dy <= 1 && (dx + dy) > 0;
+}
+
+function countAdjacentWalls(pos: Coordinate, walls: Coordinate[]): number {
+  const directions = [{ x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 }];
+  return directions.reduce((count, dir) => {
+    const checkPos = { x: pos.x + dir.x, y: pos.y + dir.y };
+    return count + (isWall(checkPos, walls) ? 1 : 0);
+  }, 0);
 }
 
 function findEmptyPosition(

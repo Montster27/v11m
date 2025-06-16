@@ -104,13 +104,24 @@ const PathPlannerGame: React.FC<PathPlannerGameProps> = ({
   // Initialize puzzle
   useEffect(() => {
     const initPuzzle = () => {
+      console.log('🧩 PathPlannerGame initializing with:', { variant, difficulty });
+      
       let puzzle: PuzzleLevel;
       
       if (levelData) {
         puzzle = levelData;
+        console.log('📋 Using provided levelData');
       } else {
         // Generate puzzle based on variant and difficulty
         puzzle = generatePuzzle(variant, difficulty);
+        console.log('🎲 Generated puzzle:', { 
+          variant: puzzle.variant, 
+          size: puzzle.size, 
+          wallCount: puzzle.walls.length,
+          hasKeys: !!puzzle.keys?.length,
+          hasObstacles: !!puzzle.obstacles?.length,
+          hasCosts: !!puzzle.costs?.length
+        });
       }
       
       setCurrentLevel(puzzle);
@@ -193,12 +204,15 @@ const PathPlannerGame: React.FC<PathPlannerGameProps> = ({
     );
 
     if (moveResult.type === 'invalid') {
-      // Provide feedback for invalid move
+      // Provide visual feedback for invalid move
+      console.log('❌ Invalid move:', moveResult.message || 'Cannot move there');
+      // Could add screen flash or sound here
       return;
     }
 
     if (moveResult.type === 'fail') {
       // Game over - collision with obstacle
+      console.log('💥 Game Over:', moveResult.message || 'Collision with obstacle!');
       setGameStatus('failure');
       return;
     }
@@ -242,20 +256,32 @@ const PathPlannerGame: React.FC<PathPlannerGameProps> = ({
     }
   }, [playerPosition, currentLevel, gameStatus, collectedKeys, unlockedLocks, totalCost, turnCount]);
 
-  // Handle cell click (alternative to keyboard)
+  // Handle cell click - move toward clicked cell
   const handleCellClick = useCallback((position: Coordinate) => {
     if (!currentLevel || gameStatus !== 'playing') return;
 
-    // Calculate direction from current position
-    const direction = {
-      x: position.x - playerPosition.x,
-      y: position.y - playerPosition.y
-    };
+    // Don't move if clicking current position
+    if (position.x === playerPosition.x && position.y === playerPosition.y) return;
 
-    // Only allow adjacent moves (manhattan distance = 1)
-    if (Math.abs(direction.x) + Math.abs(direction.y) === 1) {
-      handleMove(direction);
+    // Calculate direction toward clicked cell (one step at a time)
+    const deltaX = position.x - playerPosition.x;
+    const deltaY = position.y - playerPosition.y;
+    
+    let direction: Coordinate;
+    
+    // Move one step in the most direct path
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      // Move horizontally first
+      direction = { x: deltaX > 0 ? 1 : -1, y: 0 };
+    } else if (Math.abs(deltaY) > 0) {
+      // Move vertically
+      direction = { x: 0, y: deltaY > 0 ? 1 : -1 };
+    } else {
+      // Move horizontally if equal
+      direction = { x: deltaX > 0 ? 1 : -1, y: 0 };
     }
+    
+    handleMove(direction);
   }, [playerPosition, handleMove, currentLevel, gameStatus]);
 
   // Reset puzzle
@@ -326,8 +352,8 @@ const PathPlannerGame: React.FC<PathPlannerGameProps> = ({
   const elapsedTime = Math.round((currentTime - startTime) / 1000);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <Card className="w-full max-w-4xl mx-4 my-4 max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2">
+      <Card className="w-full max-w-6xl h-full max-h-[95vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b">
           <div>
@@ -388,23 +414,38 @@ const PathPlannerGame: React.FC<PathPlannerGameProps> = ({
         )}
 
         {/* Game Content */}
-        <div className="p-4 overflow-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <div className="flex-1 p-4 overflow-auto">
+          <div className="h-full flex flex-col lg:flex-row gap-4">
             {/* Main Game Board */}
-            <div className="lg:col-span-3">
-              <PuzzleBoard
-                level={currentLevel}
-                playerPosition={playerPosition}
-                collectedKeys={collectedKeys}
-                unlockedLocks={unlockedLocks}
-                obstaclePositions={currentObstaclePositions}
-                onCellClick={handleCellClick}
-                gameStatus={gameStatus}
-              />
+            <div className="flex-1 flex items-center justify-center min-h-0">
+              <div className="w-full h-full flex items-center justify-center">
+                <PuzzleBoard
+                  level={currentLevel}
+                  playerPosition={playerPosition}
+                  collectedKeys={collectedKeys}
+                  unlockedLocks={unlockedLocks}
+                  obstaclePositions={currentObstaclePositions}
+                  onCellClick={handleCellClick}
+                  gameStatus={gameStatus}
+                />
+              </div>
             </div>
 
             {/* Side Panel with Variant-Specific UI */}
-            <div className="space-y-4">
+            <div className="w-full lg:w-80 flex-shrink-0 space-y-4 overflow-y-auto">
+              {/* Instructions */}
+              <Card className="p-3">
+                <h4 className="font-semibold text-gray-900 mb-2">How to Play</h4>
+                <div className="text-sm text-gray-600 space-y-1">
+                  <p>• <span className="text-green-600">•</span> = Valid moves</p>
+                  <p>• Click a green dot or use arrow keys</p>
+                  <p>• Reach 🎯 to win!</p>
+                  {currentLevel.variant === 'keyLock' && <p>• Collect 🔑 to unlock 🔒</p>}
+                  {currentLevel.variant === 'dynamic' && <p>• Avoid 💀 obstacles</p>}
+                  {currentLevel.variant === 'costOptim' && <p>• Stay within budget</p>}
+                </div>
+              </Card>
+              
               {currentLevel.variant === 'keyLock' && (
                 <KeyLockHUD
                   keys={currentLevel.keys || []}
@@ -435,15 +476,15 @@ const PathPlannerGame: React.FC<PathPlannerGameProps> = ({
                 <Card className="p-4 text-center">
                   {gameStatus === 'success' ? (
                     <div className="text-green-600">
-                      <div className="text-2xl mb-2">🎉</div>
-                      <p className="font-bold">Success!</p>
-                      <p className="text-sm">Puzzle completed in {moveCount} moves</p>
+                      <div className="text-3xl mb-2">🎉</div>
+                      <p className="font-bold text-lg">Success!</p>
+                      <p className="text-sm">Completed in {moveCount} moves</p>
                     </div>
                   ) : (
                     <div className="text-red-600">
-                      <div className="text-2xl mb-2">💥</div>
-                      <p className="font-bold">Game Over</p>
-                      <p className="text-sm">Try again with a different path</p>
+                      <div className="text-3xl mb-2">💥</div>
+                      <p className="font-bold text-lg">Game Over</p>
+                      <p className="text-sm">Try a different path</p>
                     </div>
                   )}
                 </Card>
