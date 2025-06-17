@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Storage and Test Clue Discovery</title>
+</head>
+<body>
+    <h1>Clear Storage and Test Clue Discovery</h1>
+    
+    <h2>Instructions:</h2>
+    <ol>
+        <li>Open your browser's developer console (F12)</li>
+        <li>Navigate to the React app at <a href="http://localhost:5174" target="_blank">http://localhost:5174</a></li>
+        <li>In the console, run this script to clear old localStorage data:</li>
+    </ol>
+    
+    <pre><code>
+// Clear old localStorage data that might have incorrect minigame types
+localStorage.removeItem('clue-store');
+localStorage.removeItem('storylet-store');
+console.log('✅ Cleared clue and storylet stores');
+
+// Create test clue with correct minigame types
+setTimeout(() => {
+    if (typeof createTestClueAndStorylet === 'function') {
+        createTestClueAndStorylet();
+    } else {
+        console.log('❌ createTestClueAndStorylet function not available yet');
+    }
+}, 1000);
+    </code></pre>
+    
+    <h2>Fixed Issues:</h2>
+    <ul>
+        <li>✅ ClueManagementPanel now uses correct minigame IDs:
+            <ul>
+                <li><code>memory-cards</code> (was <code>memory</code>)</li>
+                <li><code>stroop-test</code> (was <code>stroop</code>)</li>
+                <li><code>word-scramble</code> (was <code>wordscramble</code>)</li>
+                <li><code>color-match</code> (was <code>colormatch</code>)</li>
+            </ul>
+        </li>
+        <li>✅ TypeScript MinigameType updated to only include implemented types</li>
+        <li>✅ ClueDiscoveryManager shows available minigame types in error message</li>
+    </ul>
+    
+    <h2>Testing Steps:</h2>
+    <ol>
+        <li>Clear localStorage using the script above</li>
+        <li>Refresh the page</li>
+        <li>Run <code>createTestClueAndStorylet()</code> in console</li>
+        <li>Go to Planner → Look for "Library Investigation"</li>
+        <li>Choose "Carefully examine the mysterious object"</li>
+        <li>Should now show memory-cards minigame instead of error</li>
+    </ol>
+</body>
+</html>

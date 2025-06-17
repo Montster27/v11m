@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        .icon {
+            width: 512px;
+            height: 512px;
+            background: #3B82F6;
+            position: relative;
+            border-radius: 50px;
+        }
+        .segment {
+            position: absolute;
+            width: 360px;
+            height: 360px;
+            top: 76px;
+            left: 76px;
+            border-radius: 50%;
+            background: conic-gradient(
+                #1E40AF 0deg 72deg,
+                #2563EB 72deg 144deg,
+                #3B82F6 144deg 216deg,
+                #60A5FA 216deg 288deg,
+                #93C5FD 288deg 360deg
+            );
+        }
+        .center {
+            position: absolute;
+            width: 160px;
+            height: 160px;
+            background: white;
+            border-radius: 50%;
+            top: 176px;
+            left: 176px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+            color: #EF4444;
+        }
+        .text {
+            position: absolute;
+            bottom: 60px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-size: 60px;
+            font-weight: bold;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div class="icon">
+        <div class="segment"></div>
+        <div class="center">♥</div>
+        <div class="text">MMV</div>
+    </div>
+</body>
+</html>

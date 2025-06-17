@@ -7,10 +7,10 @@ import MinigameManager from './components/minigames/MinigameManager';
 import ClueNotification from './components/ClueNotification';
 import ClueDiscoveryManager from './components/ClueDiscoveryManager';
 import { CharacterCreation, Planner, Quests, Skills, StoryletDeveloper, SplashScreen } from './pages';
-import { useSaveStore } from './store/useSaveStore';
 import { useAppStore } from './store/useAppStore';
 import { useStoryletStore } from './store/useStoryletStore';
-import { useSkillSystemV2Store } from './store/useSkillSystemV2Store';
+import { useGameOrchestrator, useStoryletNotifications } from './hooks/useGameOrchestrator';
+import { useAutoSave } from './hooks/useAutoSave';
 import { Clue } from './types/clue';
 // Development-only imports for testing utilities
 if (process.env.NODE_ENV === 'development') {
@@ -26,45 +26,34 @@ if (process.env.NODE_ENV === 'development') {
 function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [clueNotification, setClueNotification] = useState<{clue: Clue; isVisible: boolean} | null>(null);
-  const [clueDiscovery, setClueDiscovery] = useState<{clueId: string; minigameType: string; isActive: boolean} | null>(null);
-  // Save store available for splash screen
+  
+  // Core store hooks
   const { activeCharacter } = useAppStore();
   const { activeMinigame, completeMinigame, closeMinigame } = useStoryletStore();
+  
+  // Set up reactive orchestration (replaces setTimeout patterns)
+  useGameOrchestrator();
+  
+  // Set up reactive auto-save (replaces setTimeout-based auto-save)
+  useAutoSave();
+  
+  // Set up reactive notifications (replaces window-based system)
+  const { 
+    newlyDiscoveredClue, 
+    clueDiscoveryRequest, 
+    clearDiscoveredClue, 
+    clearClueDiscoveryRequest 
+  } = useStoryletNotifications();
 
-  // Make V2 skill system globally accessible
+  // React to newly discovered clues
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      (window as any).useSkillSystemV2Store = useSkillSystemV2Store;
+    if (newlyDiscoveredClue) {
+      setClueNotification({
+        clue: newlyDiscoveredClue,
+        isVisible: true
+      });
     }
-  }, []);
-
-  // Set up global clue notification and discovery functions
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      (window as any).showClueNotification = (clueResult: {clue: Clue}) => {
-        setClueNotification({
-          clue: clueResult.clue,
-          isVisible: true
-        });
-      };
-
-      (window as any).startClueDiscovery = (clueId: string, minigameType: string) => {
-        console.log(`🔍 Starting clue discovery: ${clueId} with ${minigameType}`);
-        setClueDiscovery({
-          clueId,
-          minigameType,
-          isActive: true
-        });
-      };
-    }
-
-    return () => {
-      if (typeof window !== 'undefined') {
-        delete (window as any).showClueNotification;
-        delete (window as any).startClueDiscovery;
-      }
-    };
-  }, []);
+  }, [newlyDiscoveredClue]);
 
   if (showSplash) {
     return (
@@ -104,25 +93,28 @@ function App() {
         <ClueNotification
           clue={clueNotification?.clue || null}
           isVisible={clueNotification?.isVisible || false}
-          onClose={() => setClueNotification(null)}
+          onClose={() => {
+            setClueNotification(null);
+            clearDiscoveredClue();
+          }}
         />
         
         {/* Clue Discovery Manager - handles full clue discovery flow */}
-        {clueDiscovery?.isActive && (
+        {clueDiscoveryRequest && (
           <ClueDiscoveryManager
-            clueId={clueDiscovery.clueId}
-            minigameType={clueDiscovery.minigameType as any}
+            clueId={clueDiscoveryRequest.clueId}
+            minigameType={clueDiscoveryRequest.minigameType as any}
             onComplete={(success, clue) => {
               console.log(`🔍 Clue discovery completed: ${success ? 'SUCCESS' : 'FAILURE'}`, { clue });
               
               // Trigger the storylet store's completion handler
               const { completeClueDiscovery } = useStoryletStore.getState();
-              completeClueDiscovery(success, clueDiscovery.clueId);
+              completeClueDiscovery(success, clueDiscoveryRequest.clueId);
               
-              // Close the discovery manager
-              setClueDiscovery(null);
+              // Clear the discovery request reactively
+              clearClueDiscoveryRequest();
               
-              // Show notification if successful
+              // Show notification if successful via reactive system
               if (success && clue) {
                 setClueNotification({
                   clue,
@@ -132,7 +124,7 @@ function App() {
             }}
             onClose={() => {
               console.log('🔍 Clue discovery cancelled by user');
-              setClueDiscovery(null);
+              clearClueDiscoveryRequest();
             }}
           />
         )}

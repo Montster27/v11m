@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  mmv-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_APP_ENV=development
+    command: npm run dev -- --host 0.0.0.0
+
+  mmv-build:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4173:5173"
+    environment:
+      - NODE_ENV=production

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clue Discovery Test</title>
+</head>
+<body>
+    <h1>Clue Discovery System Test</h1>
+    <p>This test verifies that the clue discovery system works with the implemented minigame types.</p>
+    
+    <h2>Implemented Minigame Types:</h2>
+    <ul>
+        <li>memory-cards</li>
+        <li>word-scramble</li>
+        <li>color-match</li>
+        <li>stroop-test</li>
+    </ul>
+    
+    <h2>Fix Applied:</h2>
+    <p>✅ Updated MinigameType to only include implemented minigames</p>
+    <p>✅ Enhanced ClueDiscoveryManager error messaging</p>
+    <p>✅ Updated test utility to use supported minigame types</p>
+    
+    <h2>To Test:</h2>
+    <ol>
+        <li>Run <code>npm run dev</code></li>
+        <li>Open browser console and run <code>createTestClueAndStorylet()</code></li>
+        <li>Go to Planner page and look for "Library Investigation" storylet</li>
+        <li>Choose "Carefully examine the mysterious object"</li>
+        <li>Verify clue discovery launches with memory-cards minigame</li>
+    </ol>
+</body>
+</html>

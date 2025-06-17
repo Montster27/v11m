@@ -289,16 +289,8 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
           : Math.max(0, value)                  // Knowledge, social, money can grow unlimited
       };
       
-      // Trigger storylet evaluation after resource update
-      setTimeout(() => {
-        try {
-          if (typeof window !== 'undefined' && (window as any).useStoryletStore) {
-            (window as any).useStoryletStore.getState().evaluateStorylets();
-          }
-        } catch (error) {
-          console.warn('Could not trigger storylet evaluation:', error);
-        }
-      }, 100);
+      // Note: Storylet evaluation is now handled reactively by useGameOrchestrator hook
+      // This eliminates the race condition from setTimeout patterns
       
       return { resources: newResources };
     });
@@ -500,30 +492,9 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     
     set({ day: day + 1 });
     
-    // Trigger storylet evaluation after day change
-    setTimeout(() => {
-      try {
-        if (typeof window !== 'undefined' && (window as any).useStoryletStore) {
-          (window as any).useStoryletStore.getState().evaluateStorylets();
-        }
-      } catch (error) {
-        console.warn('Could not trigger storylet evaluation:', error);
-      }
-    }, 100);
-    
-    // Auto-save current game if there's an active save
-    setTimeout(() => {
-      try {
-        if (typeof window !== 'undefined' && (window as any).useSaveStore) {
-          const saveStore = (window as any).useSaveStore.getState();
-          if (saveStore.currentSaveId) {
-            saveStore.updateCurrentSave();
-          }
-        }
-      } catch (error) {
-        console.warn('Could not auto-save:', error);
-      }
-    }, 200);
+    // Note: Storylet evaluation is now handled reactively by useGameOrchestrator hook
+    // Auto-save functionality should be handled through proper store subscriptions
+    // This eliminates race conditions from setTimeout patterns
   },
   
   incrementDay: () => {

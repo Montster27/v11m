@@ -55,6 +55,13 @@ interface StoryletState {
     choiceId: string;                              // the choice this came from
   } | null;
   
+  // Reactive notification state (replaces window-based notifications)
+  newlyDiscoveredClue: any | null;                  // clue discovered that needs notification
+  clueDiscoveryRequest: {                           // clue discovery request
+    clueId: string;
+    minigameType: string;
+  } | null;
+  
   // Actions
   evaluateStorylets: () => void;                    // scan and unlock storylets based on triggers
   chooseStorylet: (storyletId: string, choiceId: string) => void;  // make a choice in a storylet
@@ -82,6 +89,12 @@ interface StoryletState {
   closeMinigame: () => void;
   launchClueDiscovery: (effect: Effect, storyletId: string, choiceId: string) => void;
   completeClueDiscovery: (success: boolean, clueId: string) => void;
+  
+  // Reactive notification actions (replaces window-based system)
+  setDiscoveredClue: (clue: any) => void;           // set a newly discovered clue for notification
+  clearDiscoveredClue: () => void;                  // clear discovered clue notification
+  setClueDiscoveryRequest: (clueId: string, minigameType: string) => void; // request clue discovery
+  clearClueDiscoveryRequest: () => void;            // clear clue discovery request
   
   // Development actions
   setDeploymentFilter: (filter: Set<'live' | 'stage' | 'dev'>) => void; // set which deployment statuses to show
@@ -286,6 +299,10 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   // Minigame state
   activeMinigame: null,
   minigameContext: null,
+  
+  // Reactive notification state
+  newlyDiscoveredClue: null,
+  clueDiscoveryRequest: null,
   
   // Evaluate storylets - check triggers and unlock eligible storylets
   evaluateStorylets: () => {
@@ -562,13 +579,8 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       get().unlockStorylet(choice.nextStoryletId);
     }
     
-    // Re-evaluate storylets in case new conditions are met (using managed timeout)
-    globalTimeoutManager.setTimeout(() => {
-      const currentState = get();
-      if (currentState && typeof currentState.evaluateStorylets === 'function') {
-        currentState.evaluateStorylets();
-      }
-    }, 100);
+    // Note: Re-evaluation is now handled reactively by useGameOrchestrator hook
+    // This eliminates the race condition from setTimeout patterns
   },
   
   // Apply an individual effect
@@ -1008,10 +1020,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       minigameContext: null
     });
     
-    // Re-evaluate after reset
-    globalTimeoutManager.setTimeout(() => {
-      get().evaluateStorylets();
-    }, 100);
+    // Note: Re-evaluation after reset is handled reactively by useGameOrchestrator hook
     
     console.log('✅ Storylet store reset complete');
   },
@@ -1127,10 +1136,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
           } : state.storyletCooldowns
         }));
         
-        // Re-evaluate storylets in case new conditions are met
-        globalTimeoutManager.setTimeout(() => {
-          get().evaluateStorylets();
-        }, 100);
+        // Note: Re-evaluation is handled reactively by useGameOrchestrator hook
       }
     }
     
@@ -1170,10 +1176,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
           completedStoryletIds: newCompletedIds
         }));
         
-        // Re-evaluate storylets
-        globalTimeoutManager.setTimeout(() => {
-          get().evaluateStorylets();
-        }, 100);
+        // Note: Re-evaluation is handled reactively by useGameOrchestrator hook
       }
     }
     
@@ -1383,10 +1386,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
             } : state.storyletCooldowns
           }));
           
-          // Re-evaluate storylets in case new conditions are met
-          globalTimeoutManager.setTimeout(() => {
-            get().evaluateStorylets();
-          }, 100);
+          // Note: Re-evaluation is handled reactively by useGameOrchestrator hook
         }
       }
       
@@ -1412,10 +1412,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     console.log(`🔧 Setting deployment filter to: ${Array.from(filter).join(', ')}`);
     set({ deploymentFilter: new Set(filter) });
     
-    // Re-evaluate storylets with new filter
-    globalTimeoutManager.setTimeout(() => {
-      get().evaluateStorylets();
-    }, 100);
+    // Note: Re-evaluation with new filter is handled reactively by useGameOrchestrator hook
   },
 
   toggleDeploymentStatus: (status: 'live' | 'stage' | 'dev') => {
@@ -1436,10 +1433,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     console.log(`🔧 Toggled ${status}, new filter: ${Array.from(newFilter).join(', ')}`);
     set({ deploymentFilter: newFilter });
     
-    // Re-evaluate storylets with new filter
-    globalTimeoutManager.setTimeout(() => {
-      get().evaluateStorylets();
-    }, 100);
+    // Note: Re-evaluation with new filter is handled reactively by useGameOrchestrator hook
   },
   
   updateStoryletDeploymentStatus: (storyletId: string, status: 'dev' | 'stage' | 'live') => {
@@ -1459,13 +1453,29 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
         }
       });
       
-      // Re-evaluate storylets
-      globalTimeoutManager.setTimeout(() => {
-        get().evaluateStorylets();
-      }, 100);
+      // Note: Re-evaluation is handled reactively by useGameOrchestrator hook
     } else {
       console.warn(`Storylet ${storyletId} not found`);
     }
+  },
+
+  // Reactive notification actions (replaces window-based system)
+  setDiscoveredClue: (clue: any) => {
+    set({ newlyDiscoveredClue: clue });
+  },
+
+  clearDiscoveredClue: () => {
+    set({ newlyDiscoveredClue: null });
+  },
+
+  setClueDiscoveryRequest: (clueId: string, minigameType: string) => {
+    set({ 
+      clueDiscoveryRequest: { clueId, minigameType }
+    });
+  },
+
+  clearClueDiscoveryRequest: () => {
+    set({ clueDiscoveryRequest: null });
   }
 }), {
   name: 'storylet-store',
