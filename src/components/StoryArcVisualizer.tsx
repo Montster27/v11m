@@ -1229,9 +1229,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                       className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
                     >
                       <option value="">No Arc</option>
-                      {storyArcs.map(arc => (
-                        <option key={arc} value={arc}>{arc}</option>
-                      ))}
+                      <option value={arcName}>{arcName}</option>
                     </select>
                   </div>
                 </div>
