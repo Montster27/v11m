@@ -221,12 +221,9 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
       console.log('💾 Final storylet being saved:', updatedStorylet);
       updateStorylet(updatedStorylet);
       
-      // Clear editing state using our store
-      setEditingStorylet(null);
-      setEditFormData({});
-      setTriggerConditionsText('{}');
-      
-      console.log('✅ Storylet saved and edit mode closed');
+      // Don't close edit panel - keep it open for continued editing
+      // Users can manually close it when they're done
+      console.log('✅ Storylet saved, keeping edit mode open for continued editing');
     } else {
       console.log('❌ Save failed - missing required fields:', {
         editingStorylet: !!editingStorylet,
@@ -386,24 +383,25 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
 
   const connectionIssues = validateConnections();
   
-  // Auto-save functionality
+  // Auto-save functionality (disabled for now to prevent edit panel from disappearing)
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
-  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(true);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(false); // Disabled to fix edit panel disappearing
   
-  useEffect(() => {
-    if (!autoSaveEnabled || !editingStorylet || !hasUnsavedChanges) return;
-    
-    const autoSaveTimer = setTimeout(() => {
-      if (editFormData.id && editFormData.name && editFormData.description) {
-        handleSaveEdit();
-        setLastSaveTime(new Date());
-        setHasUnsavedChanges(false);
-      }
-    }, 2000); // Auto-save after 2 seconds of inactivity
-    
-    return () => clearTimeout(autoSaveTimer);
-  }, [editFormData, hasUnsavedChanges, autoSaveEnabled, editingStorylet, handleSaveEdit]);
+  // Commented out auto-save to prevent edit panel from closing automatically
+  // useEffect(() => {
+  //   if (!autoSaveEnabled || !editingStorylet || !hasUnsavedChanges) return;
+  //   
+  //   const autoSaveTimer = setTimeout(() => {
+  //     if (editFormData.id && editFormData.name && editFormData.description) {
+  //       handleSaveEdit();
+  //       setLastSaveTime(new Date());
+  //       setHasUnsavedChanges(false);
+  //     }
+  //   }, 2000); // Auto-save after 2 seconds of inactivity
+  //   
+  //   return () => clearTimeout(autoSaveTimer);
+  // }, [editFormData, hasUnsavedChanges, autoSaveEnabled, editingStorylet, handleSaveEdit]);
   
   // Track changes to form data
   useEffect(() => {
