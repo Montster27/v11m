@@ -30,7 +30,7 @@ export const StoryletProgress: React.FC<StoryletProgressProps> = ({ isOpen, onCl
       case 'day':
         return b.day - a.day;
       case 'storylet':
-        return a.storyletId.localeCompare(b.storyletId);
+        return (a.storyletId || '').localeCompare(b.storyletId || '');
       default:
         return b.timestamp - a.timestamp;
     }

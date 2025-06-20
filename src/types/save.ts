@@ -1,4 +1,42 @@
 // /Users/montysharma/V11M2/src/types/save.ts
+import type { Effect, Choice } from './storylet';
+import type { IntegratedCharacter } from './integratedCharacter';
+
+// Quest system types
+export interface Quest {
+  id: string;
+  title: string;
+  description: string;
+  status: 'active' | 'completed' | 'failed';
+  progress: number;
+  maxProgress: number;
+  rewards: Effect[];
+  storyletId?: string;
+  choiceId?: string;
+}
+
+// Task system types
+export interface Task {
+  id: string;
+  title: string;
+  description: string;
+  completed: boolean;
+  priority: 'low' | 'medium' | 'high';
+  dueDay?: number;
+  category: string;
+}
+
+// Goal system types
+export interface Goal {
+  id: string;
+  title: string;
+  description: string;
+  targetValue: number;
+  currentValue: number;
+  metric: string;
+  timeframe: 'daily' | 'weekly' | 'monthly' | 'permanent';
+  completed: boolean;
+}
 
 export interface StoryletCompletion {
   storyletId: string;
@@ -8,7 +46,7 @@ export interface StoryletCompletion {
   choice: {
     id: string;
     text: string;
-    effects: any[];
+    effects: Effect[];
   };
 }
 
@@ -21,7 +59,7 @@ export interface SaveData {
   gameDay: number;
   
   // Character data
-  activeCharacter: any | null;
+  activeCharacter: IntegratedCharacter | null;
   
   // Core game state
   userLevel: number;
@@ -73,12 +111,12 @@ export interface SaveData {
   };
   
   // Quest system
-  activeQuests: any[];
-  completedQuests: any[];
+  activeQuests: Quest[];
+  completedQuests: Quest[];
   
   // Planner data
-  goals: any[];
-  tasks: any[];
+  goals: Goal[];
+  tasks: Task[];
   
   // Game statistics
   stats: {

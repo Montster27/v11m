@@ -33,7 +33,7 @@ export const createTestCharacter = () => {
     },
     initialResources: {
       grades: 75,
-      money: 150,
+      money: 20,
       social: 60,
       energy: 80,
       stress: 25

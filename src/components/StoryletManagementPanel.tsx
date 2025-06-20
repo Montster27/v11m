@@ -8,6 +8,7 @@ import { StoryletDeploymentStatus, Storylet, Choice, Effect } from '../types/sto
 import StoryArcVisualizer from './StoryArcVisualizer';
 import ArcProgressDisplay from './ArcProgressDisplay';
 import FlagEditor from './FlagEditor';
+import { safeParseJSON, validateTriggerConditions } from '../utils/validation';
 
 type StoryletTabType = 'overview' | 'manage' | 'search' | 'arcs' | 'filter' | 'create';
 
@@ -1668,13 +1669,14 @@ const StoryletManagementPanel: React.FC = () => {
                   <textarea
                     value={JSON.stringify(formData.trigger?.conditions || {}, null, 2)}
                     onChange={(e) => {
-                      try {
-                        const conditions = JSON.parse(e.target.value);
+                      const conditions = safeParseJSON(e.target.value, null);
+                      if (conditions !== null) {
+                        const validatedConditions = validateTriggerConditions(conditions);
                         setFormData({
                           ...formData,
-                          trigger: { ...formData.trigger!, conditions }
+                          trigger: { ...formData.trigger!, conditions: validatedConditions }
                         });
-                      } catch {
+                      } else {
                         // Invalid JSON, ignore
                       }
                     }}

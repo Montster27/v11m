@@ -1,4 +1,7 @@
-// Error Boundary Component for Reliability
+/**
+ * @fileoverview Error Boundary Component for Reliability
+ * Provides comprehensive error handling and recovery for React components
+ */
 import React from 'react';
 import { Card, Button } from './ui';
 

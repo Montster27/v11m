@@ -51,7 +51,11 @@ export interface ClueDiscoveryEvent {
   timestamp: Date;
   context: {
     dayNumber: number;
-    gameState: any;
+    gameState: {
+      resources: Record<string, number>;
+      day: number;
+      activeFlags: Record<string, boolean>;
+    };
   };
 }
 

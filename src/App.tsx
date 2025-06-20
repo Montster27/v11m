@@ -2,11 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navigation from './components/Navigation';
-import DebugPanel from './components/DebugPanel';
 import MinigameManager from './components/minigames/MinigameManager';
 import ClueNotification from './components/ClueNotification';
 import ClueDiscoveryManager from './components/ClueDiscoveryManager';
-import { CharacterCreation, Planner, Quests, Skills, StoryletDeveloper, SplashScreen } from './pages';
+import { CharacterCreation, Planner, Quests, Skills, StoryletDeveloper, ContentCreator, SplashScreen } from './pages';
 import { useAppStore } from './store/useAppStore';
 import { useStoryletStore } from './store/useStoryletStore';
 import { useGameOrchestrator, useStoryletNotifications } from './hooks/useGameOrchestrator';
@@ -76,11 +75,9 @@ function App() {
           <Route path="/skills" element={<Skills />} />
           <Route path="/character-creation" element={<CharacterCreation />} />
           <Route path="/storylet-developer" element={<StoryletDeveloper />} />
+          <Route path="/content-creator" element={<ContentCreator />} />
           <Route path="/splash" element={<SplashScreen />} />
         </Routes>
-        
-        {/* Debug Panel - only in development */}
-        <DebugPanel />
         
         {/* Minigame Manager - renders when a minigame is active */}
         <MinigameManager

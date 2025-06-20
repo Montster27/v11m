@@ -529,7 +529,7 @@ ${bottlenecks.priority ? `🎯 Priority Issue: ${bottlenecks.priority}` : ''}
               const comparison = QuickBalanceAnalyzer.compareToOptimalStrategies();
               if (comparison) {
                 const topMatch = comparison.comparisons[0];
-                let output = `🎯 STRATEGY COMPARISON
+                const output = `🎯 STRATEGY COMPARISON
 
 📊 CURRENT STRATEGY ANALYSIS:
 Your Allocation: ${Object.entries(comparison.currentStrategy.allocations).map(([k, v]) => `${k}: ${v}%`).join(', ')}

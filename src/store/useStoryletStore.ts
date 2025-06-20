@@ -906,7 +906,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     
     const arcStorylets = Object.values(allStorylets)
       .filter(s => s.storyArc === arcName)
-      .sort((a, b) => a.id.localeCompare(b.id));
+      .sort((a, b) => (a.id || '').localeCompare(b.id || ''));
     
     if (arcStorylets.length === 0) {
       return {

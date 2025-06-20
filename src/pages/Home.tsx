@@ -8,7 +8,6 @@ import { Button, Card } from '../components/ui';
 import StoryletPanel from '../components/StoryletPanel';
 import ResourcePanel from '../components/ResourcePanel';
 import TimeAllocationPanel from '../components/TimeAllocationPanel';
-import DebugPanel from '../components/DebugPanel';
 
 const Home: React.FC = () => {
   const { activeCharacter, setActiveCharacter, addExperience, isTimePaused } = useAppStore();
@@ -160,9 +159,6 @@ const Home: React.FC = () => {
           </div>
         </div>
       </div>
-      
-      {/* Debug Panel */}
-      <DebugPanel />
     </div>
   );
 };

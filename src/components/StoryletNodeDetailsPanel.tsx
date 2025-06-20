@@ -3,6 +3,38 @@ import React from 'react';
 import { Card } from './ui';
 import { Node, Edge } from '../utils/storyArcGraphBuilder';
 
+// Helper function to safely render condition values
+const formatConditionValue = (value: any): string => {
+  if (typeof value === 'object' && value !== null) {
+    if (Array.isArray(value)) {
+      return value.join(', ');
+    }
+    // Handle operator objects like {greater_equal: 5}
+    const entries = Object.entries(value);
+    if (entries.length === 1) {
+      const [operator, operatorValue] = entries[0];
+      switch (operator) {
+        case 'greater_equal':
+          return `≥${operatorValue}`;
+        case 'greater_than':
+          return `>${operatorValue}`;
+        case 'less_equal':
+          return `≤${operatorValue}`;
+        case 'less_than':
+          return `<${operatorValue}`;
+        case 'equals':
+          return `=${operatorValue}`;
+        case 'not_equals':
+          return `≠${operatorValue}`;
+        default:
+          return JSON.stringify(value);
+      }
+    }
+    return JSON.stringify(value);
+  }
+  return String(value);
+};
+
 interface StoryletNodeDetailsPanelProps {
   selectedNode: string | null;
   nodes: Node[];
@@ -32,7 +64,7 @@ export const StoryletNodeDetailsPanel: React.FC<StoryletNodeDetailsPanelProps> =
               {node.storylet.trigger.type}
               {node.storylet.trigger.type === 'flag' && (
                 <div className="ml-2 text-xs">
-                  Requires: {node.storylet.trigger.conditions.flags?.join(', ') || 'none'}
+                  Requires: {formatConditionValue(node.storylet.trigger.conditions.flags) || 'none'}
                 </div>
               )}
             </div>

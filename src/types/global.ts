@@ -1,5 +1,35 @@
 // Global Type Definitions for Window Extensions
 import { StoryletState } from '../store/useStoryletStore';
+import type { Storylet, Choice } from './storylet';
+import type { IntegratedCharacter } from './integratedCharacter';
+import type { Clue } from './clue';
+
+// NPC-related types
+export interface NPCMemory {
+  id: string;
+  content: string;
+  timestamp: number;
+  storyletId: string;
+  choiceId: string;
+  importance: 'low' | 'medium' | 'high';
+  category: 'interaction' | 'observation' | 'relationship' | 'event';
+}
+
+export interface NPC {
+  id: string;
+  name: string;
+  relationship: number;
+  mood: string;
+  availability: string;
+  location?: string;
+  flags: Record<string, boolean>;
+  memories: NPCMemory[];
+}
+
+export interface NPCStoreInternalState {
+  npcs: Record<string, NPC>;
+  globalNPCFlags: Record<string, boolean>;
+}
 
 // Store interfaces
 interface AppStoreState {
@@ -23,15 +53,15 @@ interface AppStoreState {
 }
 
 interface NPCStoreState {
-  getState: () => any;
+  getState: () => NPCStoreInternalState;
   adjustRelationship: (npcId: string, delta: number, reason?: string) => void;
   getRelationshipLevel: (npcId: string) => number;
   getRelationshipType: (npcId: string) => string;
-  addMemory: (npcId: string, memory: any, storyletId: string, choiceId: string) => void;
+  addMemory: (npcId: string, memory: Omit<NPCMemory, 'id' | 'timestamp'>, storyletId: string, choiceId: string) => void;
   setNPCFlag: (npcId: string, flag: string, value: boolean) => void;
   updateNPCMood: (npcId: string, mood: string, duration?: number) => void;
   updateNPCAvailability: (npcId: string, availability: string, duration?: number) => void;
-  getNPC: (npcId: string) => any;
+  getNPC: (npcId: string) => NPC | undefined;
   isNPCAvailableAt: (npcId: string, locationId: string) => boolean;
 }
 
@@ -48,7 +78,7 @@ interface SkillSystemV2StoreState {
 }
 
 interface SaveStoreState {
-  recordStoryletCompletion: (storyletId: string, choiceId: string, choice: any) => void;
+  recordStoryletCompletion: (storyletId: string, choiceId: string, choice: Choice) => void;
 }
 
 interface ClueStoreState {
@@ -81,10 +111,10 @@ declare global {
 
     // Global functions
     addDevelopmentXP?: (domain: string, amount: number, source: string) => void;
-    triggerClueDiscovery?: (gameId: string, storyletId: string, characterId: string) => any;
-    showClueNotification?: (clueResult: any) => void;
-    testStorylets?: () => any;
-    resetStorylets?: () => any;
+    triggerClueDiscovery?: (gameId: string, storyletId: string, characterId: string) => Promise<Clue | null>;
+    showClueNotification?: (clueResult: Clue) => void;
+    testStorylets?: () => void;
+    resetStorylets?: () => void;
 
     // Internal arrays (for cleanup)
     __storyletTimeouts?: NodeJS.Timeout[];

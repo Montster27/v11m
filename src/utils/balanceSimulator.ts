@@ -6,17 +6,27 @@ import { IntegratedCharacter, DomainKey } from '../types/integratedCharacter';
 import type { Character } from '../store/characterStore';
 
 // Player archetype definitions for simulation
+export interface ResourceState {
+  energy: number;
+  stress: number;
+  knowledge: number;
+  social: number;
+  money: number;
+}
+
+export interface TimeAllocation {
+  study: number;
+  work: number;
+  social: number;
+  rest: number;
+  exercise: number;
+}
+
 export interface PlayerArchetype {
   id: string;
   name: string;
   description: string;
-  timeAllocationStrategy: (day: number, resources: any) => {
-    study: number;
-    work: number;
-    social: number;
-    rest: number;
-    exercise: number;
-  };
+  timeAllocationStrategy: (day: number, resources: ResourceState) => TimeAllocation;
   decisionBias: {
     riskTolerance: number; // 0-1, affects choice selection
     socialPreference: number; // 0-1, prefers social activities
@@ -30,18 +40,12 @@ export interface SimulationResult {
   playerId: string;
   archetype: string;
   finalDay: number;
-  finalResources: {
-    energy: number;
-    stress: number;
-    knowledge: number;
-    social: number;
-    money: number;
-  };
+  finalResources: ResourceState;
   finalDomains?: Record<DomainKey, number>;
   progressionCurve: {
     day: number;
-    resources: any;
-    domains?: any;
+    resources: ResourceState;
+    domains?: Record<DomainKey, number>;
   }[];
   questsCompleted: number;
   storyletsCompleted: number;
@@ -55,7 +59,12 @@ export interface SimulationResult {
 export interface SimulationAnalysis {
   totalRuns: number;
   averageResults: {
-    finalResources: any;
+    finalResources: Record<string, {
+      min: number;
+      max: number;
+      average: number;
+      std: number;
+    }>;
     questsCompleted: number;
     storyletsCompleted: number;
   };
@@ -292,7 +301,7 @@ export class BalanceSimulator {
         stress: 25,
         knowledge: 50,
         social: 50,
-        money: 150
+        money: 20
       },
       finalDomains: {
         intellectualCompetence: character.intellectualCompetence.level,
@@ -313,8 +322,8 @@ export class BalanceSimulator {
     };
 
     // Initial resources
-    let resources = { ...result.finalResources };
-    let domains = { ...result.finalDomains };
+    const resources = { ...result.finalResources };
+    const domains = { ...result.finalDomains };
 
     // Simulate each day
     for (let day = 1; day <= dayLength; day++) {
@@ -528,7 +537,11 @@ export class BalanceSimulator {
 
   private identifyBalanceIssues(
     results: SimulationResult[],
-    archetypeComparison: any
+    archetypeComparison: Record<string, {
+      performance: number;
+      strengths: string[];
+      weaknesses: string[];
+    }>
   ): SimulationAnalysis['balanceIssues'] {
     const issues = {
       overpoweredStrategies: [] as string[],
@@ -538,7 +551,7 @@ export class BalanceSimulator {
     };
 
     // Find overpowered/underpowered strategies
-    const performances = Object.entries(archetypeComparison).map(([name, data]: [string, any]) => ({
+    const performances = Object.entries(archetypeComparison).map(([name, data]) => ({
       name,
       performance: data.performance
     }));
@@ -571,7 +584,11 @@ export class BalanceSimulator {
   }
 
   // Stress testing methods
-  public async runStressTests(): Promise<any> {
+  public async runStressTests(): Promise<Array<{
+    testName: string;
+    result: SimulationResult;
+    broken: boolean;
+  }>> {
     const stressResults = [];
 
     // Test extreme allocations
@@ -613,6 +630,12 @@ export class BalanceSimulator {
 
 // Export simulation utilities for global access
 if (typeof window !== 'undefined') {
-  (window as any).BalanceSimulator = BalanceSimulator;
-  (window as any).DEFAULT_ARCHETYPES = DEFAULT_ARCHETYPES;
+  (window as typeof window & {
+    BalanceSimulator: typeof BalanceSimulator;
+    DEFAULT_ARCHETYPES: typeof DEFAULT_ARCHETYPES;
+  }).BalanceSimulator = BalanceSimulator;
+  (window as typeof window & {
+    BalanceSimulator: typeof BalanceSimulator;
+    DEFAULT_ARCHETYPES: typeof DEFAULT_ARCHETYPES;
+  }).DEFAULT_ARCHETYPES = DEFAULT_ARCHETYPES;
 }

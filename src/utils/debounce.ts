@@ -29,7 +29,7 @@ export function throttle<T extends (...args: any[]) => any>(
 
 // Async queue to prevent concurrent operations
 export class AsyncQueue {
-  private queue: (() => Promise<any>)[] = [];
+  private queue: (() => Promise<unknown>)[] = [];
   private running = false;
 
   async add<T>(operation: () => Promise<T>): Promise<T> {

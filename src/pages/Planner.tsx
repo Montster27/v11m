@@ -1,6 +1,6 @@
 // /Users/montysharma/V11M2/src/pages/Planner.tsx
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { useCharacterStore } from '../store/characterStore';
 import { useStoryletStore } from '../store/useStoryletStore';
@@ -8,7 +8,7 @@ import TimeAllocationPanel from '../components/TimeAllocationPanel';
 import StoryletPanel from '../components/StoryletPanel';
 import ResourcePanel from '../components/ResourcePanel';
 import SkillsPanel from '../components/SkillsPanel';
-import DebugPanel from '../components/DebugPanel';
+import ContentStudio from '../components/ContentStudio';
 import { Button } from '../components/ui';
 import { calculateResourceDeltas, type ResourceDeltas } from '../utils/resourceCalculations';
 import { validateSliderSum, checkCrashConditions } from '../utils/validation';
@@ -21,14 +21,37 @@ interface CrashModalProps {
 
 const CrashModal: React.FC<CrashModalProps> = ({ isOpen, onComplete, type }) => {
   const [countdown, setCountdown] = useState(3);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
+    // Reset countdown when modal opens
+    if (isOpen) {
+      setCountdown(3);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      // Clean up timer when modal closes
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      return;
+    }
     
-    const timer = setInterval(() => {
+    // Clear any existing timer before creating new one
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    
+    timerRef.current = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          clearInterval(timer);
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
           onComplete();
           return 0;
         }
@@ -36,7 +59,12 @@ const CrashModal: React.FC<CrashModalProps> = ({ isOpen, onComplete, type }) => 
       });
     }, 3000); // 3 seconds per day
 
-    return () => clearInterval(timer);
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
   }, [isOpen, onComplete]);
 
   if (!isOpen) return null;
@@ -88,6 +116,7 @@ const Planner: React.FC = () => {
   const [localDay, setLocalDay] = useState(day);
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRefs = useRef<Set<NodeJS.Timeout>>(new Set());
   
   const totalAllocated = getTotalTimeAllocated();
   const validation = validateSliderSum(totalAllocated);
@@ -95,27 +124,39 @@ const Planner: React.FC = () => {
   
   // Determine if Play button should be disabled
   const canPlay = validation.isValid && !isCrashRecovery && crashCheck.isValid && !isTimePaused;
+
+  // Utility function to create timeout with cleanup tracking
+  const createTimeout = useCallback((callback: () => void, delay: number) => {
+    const timeoutId = setTimeout(() => {
+      timeoutRefs.current.delete(timeoutId);
+      callback();
+    }, delay);
+    timeoutRefs.current.add(timeoutId);
+    return timeoutId;
+  }, []);
+
+  // Utility function to clear all timeouts
+  const clearAllTimeouts = useCallback(() => {
+    timeoutRefs.current.forEach(timeoutId => clearTimeout(timeoutId));
+    timeoutRefs.current.clear();
+  }, []);
   
-  // Update local day when store day changes
+  // Consolidated effect for day changes and storylet evaluation
   useEffect(() => {
     console.log('🔄 Day changed in store:', day);
     setLocalDay(day);
-    // Re-evaluate storylets when day changes
-    setTimeout(() => {
+    
+    // Use tracked timeout for storylet evaluation
+    createTimeout(() => {
       console.log('🎭 Re-evaluating storylets due to day change:', day);
       evaluateStorylets();
     }, 100);
-  }, [day, evaluateStorylets]);
+  }, [day, evaluateStorylets, createTimeout]);
   
-  // Initialize storylet system and re-evaluate when day changes
+  // Initialize storylets on mount only
   useEffect(() => {
     evaluateStorylets();
-  }, [day, evaluateStorylets]);
-  
-  // Initialize storylets on mount
-  useEffect(() => {
-    evaluateStorylets();
-  }, []);
+  }, []); // Only run once on mount
   
   // Calculate the current game date
   const getFormattedDate = (currentDay: number) => {
@@ -138,7 +179,7 @@ const Planner: React.FC = () => {
   const currentLevelProgress = experience % 100;
   
   // Real-time simulation tick (3 seconds = 1 in-game day)
-  const simulateTick = () => {
+  const simulateTick = useCallback(() => {
     console.log('=== SIMULATION TICK CALLED ===');
     
     // Get fresh state from the store each tick
@@ -206,7 +247,7 @@ const Planner: React.FC = () => {
     setLocalDay(newDay);
     
     // Trigger storylet evaluation after both resource AND day changes
-    setTimeout(() => {
+    createTimeout(() => {
       console.log('🎭 Triggering storylet evaluation after day', newDay);
       evaluateStorylets();
     }, 300);
@@ -219,10 +260,10 @@ const Planner: React.FC = () => {
       console.log('CRASH: Stress maxed out!');
       handleCrash('burnout');
     }
-  };
+  }, [createTimeout, evaluateStorylets, activeCharacter, currentCharacter, handleCrash]); // Add dependencies for useCallback
   
   // Handle crash scenarios
-  const handleCrash = (type: 'exhaustion' | 'burnout') => {
+  const handleCrash = useCallback((type: 'exhaustion' | 'burnout') => {
     setIsPlaying(false);
     setCrashType(type);
     setShowCrashModal(true);
@@ -239,7 +280,7 @@ const Planner: React.FC = () => {
     updateTimeAllocation('social', 0);
     updateTimeAllocation('rest', 100);
     updateTimeAllocation('exercise', 0);
-  };
+  }, [updateTimeAllocation]);
   
   // Handle crash recovery completion
   const handleCrashRecovery = () => {
@@ -278,14 +319,18 @@ const Planner: React.FC = () => {
     }
   };
   
-  // Cleanup interval on unmount
+  // Cleanup all timers on unmount
   useEffect(() => {
     return () => {
+      // Clear main simulation interval
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
+      // Clear all tracked timeouts
+      clearAllTimeouts();
     };
-  }, []);
+  }, [clearAllTimeouts]);
   
   // Auto-pause if crash conditions are met
   useEffect(() => {
@@ -455,7 +500,7 @@ const Planner: React.FC = () => {
                   const newDay = currentState.day + 1;
                   useAppStore.setState({ day: newDay });
                   console.log('📅 MANUAL: Advanced day to:', newDay);
-                  setTimeout(() => {
+                  createTimeout(() => {
                     const storyletStore = useStoryletStore.getState();
                     storyletStore.evaluateStorylets();
                     console.log('🎭 MANUAL: Re-evaluated storylets after day advance');
@@ -471,7 +516,7 @@ const Planner: React.FC = () => {
                   const newDay = currentState.day + 7;
                   useAppStore.setState({ day: newDay });
                   console.log('📅 MANUAL: Advanced week to day:', newDay);
-                  setTimeout(() => {
+                  createTimeout(() => {
                     const storyletStore = useStoryletStore.getState();
                     storyletStore.evaluateStorylets();
                     console.log('🎭 MANUAL: Re-evaluated storylets after week advance');
@@ -501,8 +546,8 @@ const Planner: React.FC = () => {
         type={crashType}
       />
       
-      {/* Debug Panel */}
-      <DebugPanel />
+      {/* Content Studio */}
+      <ContentStudio />
     </div>
   );
 };

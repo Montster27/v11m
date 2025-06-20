@@ -78,9 +78,14 @@ const Navigation: React.FC = () => {
               
               {/* Developer Tools - only in development */}
               {process.env.NODE_ENV === 'development' && (
-                <Link to="/storylet-developer" className={navLinkClass('/storylet-developer')}>
-                  📖 Dev
-                </Link>
+                <>
+                  <Link to="/storylet-developer" className={navLinkClass('/storylet-developer')}>
+                    📖 Dev
+                  </Link>
+                  <Link to="/content-creator" className={navLinkClass('/content-creator')}>
+                    🎨 Creator
+                  </Link>
+                </>
               )}
             </div>
             

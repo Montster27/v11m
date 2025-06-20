@@ -197,7 +197,7 @@ const AVAILABLE_EVENTS: QuestEvent[] = [
 ];
 
 // Previously triggered events to avoid repetition
-let triggeredEvents: Set<string> = new Set();
+const triggeredEvents: Set<string> = new Set();
 
 // Quest Engine class
 export class QuestEngine {
