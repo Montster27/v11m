@@ -172,6 +172,7 @@ export const useArcVisualizerStore = create<ArcVisualizerState>((set, get) => ({
   updateCache: () => {
     const state = get();
     const newStorylets = Object.values(state.storylets).filter(storylet => storylet.storyArc === state.currentArcName);
+    console.log(`🔄 Arc Visualizer Store: Updating cache for "${state.currentArcName}" - ${newStorylets.length} storylets`);
     set({
       cachedArcStorylets: newStorylets,
       lastCacheUpdate: Date.now()

@@ -12,6 +12,7 @@ import { integratedStorylets } from '../data/integratedStorylets';
 import { developmentTriggeredStorylets } from '../data/developmentTriggeredStorylets';
 import { startingStorylets } from '../data/startingStorylets';
 import { emmaRomanceStorylets, emmaInfluenceStorylets } from '../data/emmaRomanceArc';
+import { emmaRomanceAct1 } from '../data/arcs/emma-romance/act1-meeting';
 
 export interface StoryletCatalogState {
   // Core storylet data
@@ -70,13 +71,14 @@ const loadDefaultStorylets = (): Record<string, Storylet> => {
     frequentStorylets,
     minigameStorylets,
     integratedStorylets,
-    developmentTriggeredStorylets,
-    startingStorylets
+    developmentTriggeredStorylets
   ];
 
   const storyletObjects = [
+    startingStorylets,
     emmaRomanceStorylets,
-    emmaInfluenceStorylets
+    emmaInfluenceStorylets,
+    emmaRomanceAct1
   ];
 
   const storyletMap: Record<string, Storylet> = {};
@@ -112,14 +114,23 @@ const loadDefaultStorylets = (): Record<string, Storylet> => {
   });
 
   console.log(`Loaded ${Object.keys(storyletMap).length} storylets from data files`);
+  
+  // Debug: Show Starting arc storylets specifically
+  const startingArcStorylets = Object.values(storyletMap).filter(s => s.storyArc === 'Starting');
+  console.log(`📚 Starting arc has ${startingArcStorylets.length} storylets:`, startingArcStorylets.map(s => s.id));
+  
   return storyletMap;
 };
 
 export const useStoryletCatalogStore = create<StoryletCatalogState>()(
   persist(
     (set, get) => ({
-      // State
-      allStorylets: loadDefaultStorylets(),
+      // State - merge default storylets with persisted user storylets
+      allStorylets: (() => {
+        const defaultStorylets = loadDefaultStorylets();
+        // Note: userStorylets will be merged by Zustand persist middleware during hydration
+        return defaultStorylets;
+      })(),
       activeStoryletIds: [],
       completedStoryletIds: [],
       storyletCooldowns: {},
@@ -320,12 +331,34 @@ export const useStoryletCatalogStore = create<StoryletCatalogState>()(
     {
       name: 'storylet-catalog-store',
       version: 1,
-      // Don't persist the catalog itself, only the state data
-      partialize: (state) => ({
-        activeStoryletIds: state.activeStoryletIds,
-        completedStoryletIds: state.completedStoryletIds,
-        storyletCooldowns: state.storyletCooldowns
-      })
+      // Persist state data and user-created storylets
+      partialize: (state) => {
+        // Only persist storylets that are not from default data files
+        const defaultStoryletIds = new Set(Object.keys(loadDefaultStorylets()));
+        const userStorylets = Object.fromEntries(
+          Object.entries(state.allStorylets).filter(([id]) => !defaultStoryletIds.has(id))
+        );
+        
+        return {
+          activeStoryletIds: state.activeStoryletIds,
+          completedStoryletIds: state.completedStoryletIds,
+          storyletCooldowns: state.storyletCooldowns,
+          userStorylets: userStorylets
+        };
+      },
+      // Merge persisted user storylets with defaults on hydration
+      onRehydrateStorage: () => (state) => {
+        if (state && (state as any).userStorylets) {
+          const defaultStorylets = loadDefaultStorylets();
+          const userStorylets = (state as any).userStorylets;
+          console.log(`💾 Restoring ${Object.keys(userStorylets).length} user-created storylets from storage`);
+          
+          state.allStorylets = {
+            ...defaultStorylets,
+            ...userStorylets
+          };
+        }
+      }
     }
   )
 );

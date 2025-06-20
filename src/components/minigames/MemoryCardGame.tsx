@@ -234,16 +234,16 @@ const MemoryCardGame: React.FC<MemoryCardGameProps> = ({
               >
                 <img
                   src={`/images/memory-game/${card.imageId}`}
-                  alt="Memory card"
+                  alt={card.imageId.replace('.png', '').replace(/_/g, ' ')}
                   className="w-full h-full object-contain"
+                  onLoad={() => {
+                    console.log(`✅ Image loaded: ${card.imageId}`);
+                  }}
                   onError={(e) => {
-                    // Fallback for broken images
+                    console.error(`❌ Image failed to load: ${card.imageId}`);
+                    console.error('Full path:', `/images/memory-game/${card.imageId}`);
+                    // Simple fallback - just hide the broken image
                     e.currentTarget.style.display = 'none';
-                    e.currentTarget.parentElement!.innerHTML = `
-                      <div class="w-full h-full bg-gray-200 flex items-center justify-center text-xs text-gray-600 text-center">
-                        ${card.imageId.replace('.png', '').replace(/_/g, ' ')}
-                      </div>
-                    `;
                   }}
                 />
               </div>

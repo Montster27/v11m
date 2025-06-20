@@ -2,9 +2,11 @@
 
 import React, { useState, useMemo } from 'react';
 import { useStoryletStore } from '../../store/useStoryletStore';
+import { useStoryletCatalogStore } from '../../store/useStoryletCatalogStore';
 import type { Storylet } from '../../types/storylet';
 import HelpTooltip from '../ui/HelpTooltip';
 import StoryArcVisualizer from '../StoryArcVisualizer';
+import ArcTestingInterface from '../dev/ArcTestingInterface';
 
 interface UndoRedoSystem {
   executeAction: (action: any) => void;
@@ -21,15 +23,22 @@ interface ArcManagerProps {
 type ArcManagerTab = 'overview' | 'visualizer' | 'builder' | 'testing';
 
 const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
+  // Use catalog store for storylet data and management store for arcs
+  const allStorylets = useStoryletCatalogStore(state => state.allStorylets);
+  const getStoryletsForArc = useStoryletCatalogStore(state => state.getStoryletsForArc);
+  
   const {
     storyArcs,
-    allStorylets,
-    getStoryletsByArc,
     getArcStats,
     addStoryArc,
     removeStoryArc,
     updateStorylet
   } = useStoryletStore();
+  
+  // Create a local getStoryletsByArc function that uses the catalog store
+  const getStoryletsByArc = (arcName: string): Storylet[] => {
+    return getStoryletsForArc(arcName);
+  };
 
   const [activeTab, setActiveTab] = useState<ArcManagerTab>('overview');
   const [selectedArc, setSelectedArc] = useState<string>('');
@@ -38,6 +47,7 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
   const [newArcName, setNewArcName] = useState('');
   const [testingArc, setTestingArc] = useState<string | null>(null);
   const [testingFlags, setTestingFlags] = useState<Record<string, boolean>>({});
+  const [showArcTesting, setShowArcTesting] = useState(false);
 
   // Get arc statistics
   const arcStats = useMemo(() => {
@@ -65,7 +75,7 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
         isValid: storylets.length > 0
       };
     });
-  }, [storyArcs, getStoryletsByArc]);
+  }, [storyArcs, allStorylets]);
 
   // Get unassigned storylets
   const unassignedStorylets = useMemo(() => {
@@ -182,6 +192,15 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
                             className="text-blue-600 hover:text-blue-800 text-sm"
                           >
                             Visualize
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowArcTesting(true);
+                            }}
+                            className="text-green-600 hover:text-green-800 text-sm"
+                          >
+                            Test
                           </button>
                           <button
                             onClick={(e) => {
@@ -312,7 +331,7 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
                   {storyArcs.length > 0 && (
                     <select
                       onChange={(e) => e.target.value && setVisualizingArc(e.target.value)}
-                      value=""
+                      value={visualizingArc || ""}
                       className="mt-4 px-3 py-2 border border-gray-300 rounded"
                     >
                       <option value="">Select an arc...</option>
@@ -410,13 +429,10 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
                     </div>
                     
                     <button
-                      onClick={() => {
-                        // Implement arc testing logic
-                        alert('Arc testing functionality would be implemented here');
-                      }}
+                      onClick={() => setShowArcTesting(true)}
                       className="w-full px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
                     >
-                      Start Arc Test
+                      🎮 Start Interactive Arc Test
                     </button>
                   </div>
                 )}
@@ -459,6 +475,11 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Arc Testing Modal */}
+      {showArcTesting && (
+        <ArcTestingInterface onClose={() => setShowArcTesting(false)} />
       )}
     </div>
   );

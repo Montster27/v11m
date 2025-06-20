@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useStoryletStore } from '../../store/useStoryletStore';
+import { useStoryletCatalogStore } from '../../store/useStoryletCatalogStore';
 import type { Storylet } from '../../types/storylet';
 import HelpTooltip from '../ui/HelpTooltip';
 
@@ -26,8 +27,9 @@ interface SearchFilters {
 }
 
 const StoryletBrowser: React.FC<StoryletBrowserProps> = ({ onEditStorylet, onEditVisually, undoRedoSystem }) => {
+  // Use reactive subscriptions to both stores
+  const allStorylets = useStoryletCatalogStore(state => state.allStorylets);
   const {
-    allStorylets,
     activeStoryletIds,
     completedStoryletIds,
     storyArcs,
@@ -35,6 +37,9 @@ const StoryletBrowser: React.FC<StoryletBrowserProps> = ({ onEditStorylet, onEdi
     deleteStorylet,
     updateStoryletDeploymentStatus
   } = useStoryletStore();
+  
+  // Debug logging
+  console.log(`📚 StoryletBrowser: ${Object.keys(allStorylets).length} storylets in catalog`);
 
   // Helper function to safely format condition values
   const formatConditionValue = (value: any): string => {

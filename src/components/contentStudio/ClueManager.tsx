@@ -5,6 +5,7 @@ import { useClueStore } from '../../store/useClueStore';
 import { useStoryletStore } from '../../store/useStoryletStore';
 import type { Clue } from '../../types/clue';
 import HelpTooltip from '../ui/HelpTooltip';
+import MinigameManagementPanel from '../MinigameManagementPanel';
 
 interface UndoRedoSystem {
   executeAction: (action: any) => void;
@@ -399,35 +400,8 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
         )}
 
         {activeTab === 'minigames' && (
-          <div className="h-full overflow-y-auto p-6">
-            <div className="max-w-4xl mx-auto">
-              <h4 className="text-lg font-medium text-gray-800 mb-6">Minigame Testing Center</h4>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {minigameTypes.map((minigame) => (
-                  <div key={minigame.value} className="p-4 border border-gray-200 rounded-lg">
-                    <h5 className="font-medium text-gray-800 mb-2">{minigame.label}</h5>
-                    <p className="text-sm text-gray-600 mb-4">{minigame.description}</p>
-                    
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => {
-                          // Launch minigame test
-                          alert(`Testing ${minigame.label} minigame`);
-                        }}
-                        className="w-full px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-                      >
-                        Test Minigame
-                      </button>
-                      
-                      <div className="text-xs text-gray-500">
-                        {clues.filter(clue => clue.minigameTypes.includes(minigame.value)).length} clues use this minigame
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+          <div className="h-full overflow-y-auto">
+            <MinigameManagementPanel />
           </div>
         )}
 

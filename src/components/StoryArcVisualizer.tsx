@@ -52,26 +52,45 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState<boolean>(false);
 
-  // Initialize the arc visualizer when component mounts or arcName changes
+  // Reactive subscription to catalog store
+  const catalogStorylets = useStoryletCatalogStore(state => state.allStorylets);
+  
+  // Initialize and reactively update when catalog changes or arc changes
   useEffect(() => {
     console.log(`🏛️ Loading Arc Visualizer for "${arcName}"`);
+    console.log(`📦 Catalog has ${Object.keys(catalogStorylets).length} total storylets`);
     
-    // Load storylets from the main catalog store
-    const existingStorylets = useStoryletCatalogStore.getState().getStoryletsForArc(arcName);
-    console.log(`📚 Found ${existingStorylets.length} existing storylets for arc "${arcName}"`);
+    // Filter storylets for this arc from the catalog
+    const arcStorylets = Object.values(catalogStorylets).filter(
+      storylet => storylet.storyArc === arcName
+    );
+    console.log(`📚 Found ${arcStorylets.length} storylets for arc "${arcName}":`, arcStorylets.map(s => s.id));
     
     // Import them into our dedicated store
-    importFromMainStore(existingStorylets, arcName);
+    importFromMainStore(arcStorylets, arcName);
     loadArc(arcName);
-  }, [arcName, importFromMainStore, loadArc]);
+  }, [arcName, catalogStorylets, importFromMainStore, loadArc]);
 
   // Handle closing the visualizer and sync back to main store
   const handleClose = useCallback(() => {
     console.log('🚪 Closing Arc Visualizer, syncing data back to main store...');
     
-    // Export storylets back to main store (this could be implemented later)
+    // Export storylets back to main catalog store
     const exportedStorylets = exportToMainStore();
     console.log(`📤 Exported ${exportedStorylets.length} storylets back to main store`);
+    
+    // Actually save them to the catalog store
+    const catalogStore = useStoryletCatalogStore.getState();
+    exportedStorylets.forEach(storylet => {
+      console.log(`💾 Saving storylet to catalog: ${storylet.id} - ${storylet.name}`);
+      if (catalogStore.hasStorylet(storylet.id)) {
+        console.log(`📝 Updating existing storylet: ${storylet.id}`);
+        catalogStore.updateStorylet(storylet);
+      } else {
+        console.log(`🆕 Adding new storylet: ${storylet.id}`);
+        catalogStore.addStorylet(storylet);
+      }
+    });
     
     // Reset the dedicated store
     useArcVisualizerStore.getState().reset();
@@ -94,7 +113,11 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
 
   // Calculate graph layout using extracted utility
   const { nodes, edges } = useMemo(() => {
-    return calculateGraphLayout(filteredStorylets);
+    console.log(`🎨 Arc Visualizer: Calculating layout for ${filteredStorylets.length} storylets`);
+    console.log(`🎨 Filtered storylets:`, filteredStorylets.map(s => ({ id: s.id, name: s.name, arc: s.storyArc })));
+    const layout = calculateGraphLayout(filteredStorylets);
+    console.log(`🎨 Generated ${layout.nodes.length} nodes and ${layout.edges.length} edges`);
+    return layout;
   }, [filteredStorylets]);
   const [isDragSelecting, setIsDragSelecting] = useState<boolean>(false);
   const [dragSelection, setDragSelection] = useState<{x1: number, y1: number, x2: number, y2: number} | null>(null);
@@ -220,6 +243,10 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
       
       console.log('💾 Final storylet being saved:', updatedStorylet);
       updateStorylet(updatedStorylet);
+      
+      // Clear unsaved changes and update save time
+      setHasUnsavedChanges(false);
+      setLastSaveTime(new Date());
       
       // Don't close edit panel - keep it open for continued editing
       // Users can manually close it when they're done
@@ -386,22 +413,21 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   // Auto-save functionality (disabled for now to prevent edit panel from disappearing)
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
-  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(false); // Disabled to fix edit panel disappearing
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(true); // Enabled by default
   
-  // Commented out auto-save to prevent edit panel from closing automatically
-  // useEffect(() => {
-  //   if (!autoSaveEnabled || !editingStorylet || !hasUnsavedChanges) return;
-  //   
-  //   const autoSaveTimer = setTimeout(() => {
-  //     if (editFormData.id && editFormData.name && editFormData.description) {
-  //       handleSaveEdit();
-  //       setLastSaveTime(new Date());
-  //       setHasUnsavedChanges(false);
-  //     }
-  //   }, 2000); // Auto-save after 2 seconds of inactivity
-  //   
-  //   return () => clearTimeout(autoSaveTimer);
-  // }, [editFormData, hasUnsavedChanges, autoSaveEnabled, editingStorylet, handleSaveEdit]);
+  // Auto-save functionality
+  useEffect(() => {
+    if (!autoSaveEnabled || !editingStorylet || !hasUnsavedChanges) return;
+    
+    const autoSaveTimer = setTimeout(() => {
+      if (editFormData.id && editFormData.name && editFormData.description) {
+        console.log('🔄 Auto-saving storylet...');
+        handleSaveEdit();
+      }
+    }, 2000); // Auto-save after 2 seconds of inactivity
+    
+    return () => clearTimeout(autoSaveTimer);
+  }, [editFormData, hasUnsavedChanges, autoSaveEnabled, editingStorylet, handleSaveEdit]);
   
   // Track changes to form data
   useEffect(() => {
