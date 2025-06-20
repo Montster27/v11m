@@ -3,12 +3,17 @@
 // Avoids conflicts with existing fragmented store architecture
 
 import { create } from 'zustand';
+import { useCallback } from 'react';
 import type { Storylet, StoryletDeploymentStatus, Choice, Effect } from '../types/storylet';
 
 export interface ArcVisualizerState {
   // Core data
   storylets: Record<string, Storylet>;
   currentArcName: string;
+  
+  // Cached data to prevent infinite loops
+  cachedArcStorylets: Storylet[];
+  lastCacheUpdate: number;
   
   // UI state
   selectedStoryletId: string | null;
@@ -25,6 +30,7 @@ export interface ArcVisualizerState {
   // Query functions
   getStoryletsForCurrentArc: () => Storylet[];
   getStorylet: (storyletId: string) => Storylet | undefined;
+  updateCache: () => void;
   
   // Sync functions
   importFromMainStore: (storylets: Storylet[], arcName: string) => void;
@@ -80,6 +86,8 @@ export const useArcVisualizerStore = create<ArcVisualizerState>((set, get) => ({
   // Initial state
   storylets: {},
   currentArcName: '',
+  cachedArcStorylets: [],
+  lastCacheUpdate: 0,
   selectedStoryletId: null,
   editingStoryletId: null,
   
@@ -91,6 +99,8 @@ export const useArcVisualizerStore = create<ArcVisualizerState>((set, get) => ({
       selectedStoryletId: null,
       editingStoryletId: null
     });
+    // Update cache after setting arc name
+    get().updateCache();
   },
   
   // Create a new storylet with the specified template
@@ -113,6 +123,9 @@ export const useArcVisualizerStore = create<ArcVisualizerState>((set, get) => ({
       }
     }));
     
+    // Update cache after adding storylet
+    get().updateCache();
+    
     return newId;
   },
   
@@ -125,6 +138,8 @@ export const useArcVisualizerStore = create<ArcVisualizerState>((set, get) => ({
         [storylet.id]: storylet
       }
     }));
+    // Update cache after updating storylet
+    get().updateCache();
   },
   
   // Delete a storylet
@@ -138,6 +153,8 @@ export const useArcVisualizerStore = create<ArcVisualizerState>((set, get) => ({
         editingStoryletId: state.editingStoryletId === storyletId ? null : state.editingStoryletId
       };
     });
+    // Update cache after deleting storylet
+    get().updateCache();
   },
   
   // Set selected storylet
@@ -151,10 +168,21 @@ export const useArcVisualizerStore = create<ArcVisualizerState>((set, get) => ({
     set({ editingStoryletId: storyletId });
   },
   
-  // Get all storylets for the current arc
+  // Update cache when storylets change
+  updateCache: () => {
+    const state = get();
+    const newStorylets = Object.values(state.storylets).filter(storylet => storylet.storyArc === state.currentArcName);
+    set({
+      cachedArcStorylets: newStorylets,
+      lastCacheUpdate: Date.now()
+    });
+  },
+
+  // Get all storylets for the current arc (cached to prevent infinite loops)
   getStoryletsForCurrentArc: (): Storylet[] => {
-    const { storylets, currentArcName } = get();
-    return Object.values(storylets).filter(storylet => storylet.storyArc === currentArcName);
+    const state = get();
+    // Return cached version to prevent creating new arrays
+    return state.cachedArcStorylets;
   },
   
   // Get a specific storylet
@@ -176,6 +204,8 @@ export const useArcVisualizerStore = create<ArcVisualizerState>((set, get) => ({
       selectedStoryletId: null,
       editingStoryletId: null
     });
+    // Update cache after importing storylets
+    get().updateCache();
   },
   
   // Export storylets to sync back to main store
@@ -196,27 +226,39 @@ export const useArcVisualizerStore = create<ArcVisualizerState>((set, get) => ({
     set({
       storylets: {},
       currentArcName: '',
+      cachedArcStorylets: [],
+      lastCacheUpdate: 0,
       selectedStoryletId: null,
       editingStoryletId: null
     });
   }
 }));
 
+// Stable selectors to prevent infinite loops
+const selectArcStorylets = (state: ArcVisualizerState) => {
+  // Return cached storylets to prevent creating new arrays
+  return state.cachedArcStorylets;
+};
+
+const selectSelectedStorylet = (state: ArcVisualizerState) => {
+  const { selectedStoryletId, storylets } = state;
+  return selectedStoryletId ? storylets[selectedStoryletId] : null;
+};
+
+const selectEditingStorylet = (state: ArcVisualizerState) => {
+  const { editingStoryletId, storylets } = state;
+  return editingStoryletId ? storylets[editingStoryletId] : null;
+};
+
 // Utility hooks for common operations
 export const useArcStorylets = () => {
-  return useArcVisualizerStore(state => state.getStoryletsForCurrentArc());
+  return useArcVisualizerStore(selectArcStorylets);
 };
 
 export const useSelectedStorylet = () => {
-  return useArcVisualizerStore(state => {
-    const { selectedStoryletId, storylets } = state;
-    return selectedStoryletId ? storylets[selectedStoryletId] : null;
-  });
+  return useArcVisualizerStore(selectSelectedStorylet);
 };
 
 export const useEditingStorylet = () => {
-  return useArcVisualizerStore(state => {
-    const { editingStoryletId, storylets } = state;
-    return editingStoryletId ? storylets[editingStoryletId] : null;
-  });
+  return useArcVisualizerStore(selectEditingStorylet);
 };
