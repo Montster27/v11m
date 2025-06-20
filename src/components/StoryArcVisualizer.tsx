@@ -1,7 +1,7 @@
 // /Users/montysharma/V11M2/src/components/StoryArcVisualizer.tsx
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useArcVisualizerStore, useArcStorylets, useSelectedStorylet, useEditingStorylet } from '../store/useArcVisualizerStore';
 import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
-import { useStoryArcStore } from '../store/useStoryArcStore';
 import { useClueStore } from '../store/useClueStore';
 import { Button, Card } from './ui';
 import { Storylet, Choice, Effect, StoryletDeploymentStatus } from '../types/storylet';
@@ -17,14 +17,29 @@ interface StoryArcVisualizerProps {
 }
 
 const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClose }) => {
-  const { updateStorylet, addStorylet, allStorylets, getStoryletsForArc } = useStoryletCatalogStore();
-  const { normalizeArcName } = useStoryArcStore();
+  // Use our dedicated Arc Visualizer store
+  const {
+    loadArc,
+    createStorylet,
+    updateStorylet,
+    deleteStorylet,
+    setSelectedStorylet,
+    setEditingStorylet,
+    importFromMainStore,
+    exportToMainStore
+  } = useArcVisualizerStore();
+  
+  // Get reactive data from the store
+  const arcStorylets = useArcStorylets();
+  const selectedStorylet = useSelectedStorylet();
+  const editingStorylet = useEditingStorylet();
+  
+  // Get main store for import/export
+  const { getStoryletsForArc: getStoryletsFromCatalog } = useStoryletCatalogStore();
   const { clues } = useClueStore();
   
-  // State for UI interactions
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  // Local UI state (not managed by store)
   const [highlightedPath, setHighlightedPath] = useState<string[]>([]);
-  const [editingStorylet, setEditingStorylet] = useState<Storylet | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Storylet>>({});
   const [triggerConditionsText, setTriggerConditionsText] = useState<string>('{}');
   const [contextMenu, setContextMenu] = useState<{x: number, y: number, visible: boolean}>({x: 0, y: 0, visible: false});
@@ -38,13 +53,33 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState<boolean>(false);
 
-  // Get base storylets for the arc
-  const arcStorylets = useMemo(() => {
-    const normalizedArc = normalizeArcName(arcName);
-    const storylets = getStoryletsForArc(normalizedArc);
-    console.log(`📚 Arc "${arcName}" (normalized: "${normalizedArc}") has ${storylets.length} storylets:`, storylets.map(s => s.id));
-    return storylets;
-  }, [arcName, normalizeArcName, getStoryletsForArc, allStorylets]);
+  // Initialize the arc visualizer when component mounts or arcName changes
+  useEffect(() => {
+    console.log(`🏛️ Loading Arc Visualizer for "${arcName}"`);
+    
+    // Load storylets from the main catalog store
+    const existingStorylets = getStoryletsFromCatalog(arcName);
+    console.log(`📚 Found ${existingStorylets.length} existing storylets for arc "${arcName}"`);
+    
+    // Import them into our dedicated store
+    importFromMainStore(existingStorylets, arcName);
+    loadArc(arcName);
+  }, [arcName, importFromMainStore, loadArc, getStoryletsFromCatalog]);
+
+  // Handle closing the visualizer and sync back to main store
+  const handleClose = useCallback(() => {
+    console.log('🚪 Closing Arc Visualizer, syncing data back to main store...');
+    
+    // Export storylets back to main store (this could be implemented later)
+    const exportedStorylets = exportToMainStore();
+    console.log(`📤 Exported ${exportedStorylets.length} storylets back to main store`);
+    
+    // Reset the dedicated store
+    useArcVisualizerStore.getState().reset();
+    
+    // Call the original onClose callback
+    onClose();
+  }, [exportToMainStore, onClose]);
 
   // Use filtering hook
   const filterOptions: FilterOptions = {
@@ -72,10 +107,13 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
 
 
   const handleNodeClick = (nodeId: string) => {
-    setSelectedNode(nodeId === selectedNode ? null : nodeId);
+    // Use our store's selected storylet management
+    const currentSelectedId = useArcVisualizerStore.getState().selectedStoryletId;
+    const newSelectedId = nodeId === currentSelectedId ? null : nodeId;
+    setSelectedStorylet(newSelectedId);
     
     // Highlight paths from this node
-    if (nodeId !== selectedNode) {
+    if (nodeId !== currentSelectedId) {
       const paths: string[] = [nodeId];
       const visited = new Set<string>();
       const queue = [nodeId];
@@ -137,16 +175,15 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
         return;
       }
       
-      // Get the latest storylet data from the store and also from the current nodes
-      const storyletFromStore = allStorylets[nodeId];
-      const nodeFromVisual = nodes.find(n => n.id === nodeId);
+      console.log(`✏️ Opening edit mode for storylet: ${nodeId}`);
       
-      // Use the store data as the source of truth, but fallback to node data if needed
-      const storylet = storyletFromStore || nodeFromVisual?.storylet;
+      // Use our dedicated store to set editing mode
+      setEditingStorylet(nodeId);
       
+      // The editingStorylet will be available from our hook in the next render
+      // Set up the form data when the editing storylet is available
+      const storylet = useArcVisualizerStore.getState().getStorylet(nodeId);
       if (storylet) {
-        setEditingStorylet(storylet);
-        
         // Ensure flag triggers have at least one empty flag for editing
         let formData = { ...storylet };
         if (storylet.trigger?.type === 'flag' && (!storylet.trigger.conditions?.flags || storylet.trigger.conditions.flags.length === 0)) {
@@ -184,11 +221,13 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
       
       console.log('💾 Final storylet being saved:', updatedStorylet);
       updateStorylet(updatedStorylet);
+      
+      // Clear editing state using our store
       setEditingStorylet(null);
       setEditFormData({});
       setTriggerConditionsText('{}');
       
-      // The useEffect will automatically trigger a rebuild when the store updates
+      console.log('✅ Storylet saved and edit mode closed');
     } else {
       console.log('❌ Save failed - missing required fields:', {
         editingStorylet: !!editingStorylet,
@@ -540,63 +579,18 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   };
 
   const createNewStorylet = (template?: 'basic' | 'choice_hub' | 'branch_point') => {
-    const newId = `storylet_${Date.now()}`;
-    const templateData = getStoryletTemplate(template || 'basic');
+    console.log(`🆕 Creating new ${template || 'basic'} storylet in arc "${arcName}"`);
     
-    const newStorylet: Storylet = {
-      ...templateData,
-      id: newId,
-      storyArc: arcName
-    };
-    
-    console.log('🆕 Creating new storylet:', newStorylet);
-    addStorylet(newStorylet);
+    // Use our dedicated store's createStorylet function
+    const newStoryletId = createStorylet(template || 'basic', arcName);
     hideContextMenu();
     
+    // Automatically start editing the new storylet
     setTimeout(() => {
-      handleNodeDoubleClick(newId);
+      handleNodeDoubleClick(newStoryletId);
     }, 100);
   };
 
-  const getStoryletTemplate = (type: 'basic' | 'choice_hub' | 'branch_point') => {
-    const templates = {
-      basic: {
-        name: 'New Storylet',
-        description: 'A new storylet waiting to be written.',
-        deploymentStatus: 'dev' as StoryletDeploymentStatus,
-        trigger: { type: 'time' as const, conditions: { day: 1 } },
-        choices: [
-          {
-            id: 'choice_1',
-            text: 'Continue',
-            effects: []
-          }
-        ]
-      },
-      choice_hub: {
-        name: 'Choice Hub',
-        description: 'A storylet that presents multiple paths to the player.',
-        deploymentStatus: 'dev' as StoryletDeploymentStatus,
-        trigger: { type: 'flag' as const, conditions: { flags: [''] } },
-        choices: [
-          { id: 'choice_1', text: 'Take the analytical approach', effects: [{ type: 'flag' as const, key: 'analyticalApproach', value: true }] },
-          { id: 'choice_2', text: 'Take the social approach', effects: [{ type: 'flag' as const, key: 'socialApproach', value: true }] },
-          { id: 'choice_3', text: 'Take the creative approach', effects: [{ type: 'flag' as const, key: 'creativeApproach', value: true }] }
-        ]
-      },
-      branch_point: {
-        name: 'Branch Point',
-        description: 'A storylet that leads to different outcomes based on player state.',
-        deploymentStatus: 'dev' as StoryletDeploymentStatus,
-        trigger: { type: 'resource' as const, conditions: { energy: { min: 10 } } },
-        choices: [
-          { id: 'choice_1', text: 'High energy path', effects: [{ type: 'resource' as const, key: 'energy', delta: -10 }] },
-          { id: 'choice_2', text: 'Low energy path', effects: [{ type: 'resource' as const, key: 'energy', delta: -5 }] }
-        ]
-      }
-    };
-    return templates[type];
-  };
 
   useEffect(() => {
     const handleClickOutside = () => hideContextMenu();
@@ -773,7 +767,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
               <span className="text-sm font-medium">Path</span>
             </div>
           </div>
-          <Button onClick={onClose} variant="outline">
+          <Button onClick={handleClose} variant="outline">
             Close
           </Button>
         </div>
@@ -801,7 +795,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                       width="18"
                       height="7"
                       rx="1"
-                      fill={node.id === selectedNode ? '#3b82f6' : getNodeColor(node)}
+                      fill={node.id === selectedStorylet?.id ? '#3b82f6' : getNodeColor(node)}
                       className="cursor-pointer"
                       onClick={() => {
                         // Center view on this node
