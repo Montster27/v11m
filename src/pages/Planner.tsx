@@ -140,6 +140,26 @@ const Planner: React.FC = () => {
     timeoutRefs.current.forEach(timeoutId => clearTimeout(timeoutId));
     timeoutRefs.current.clear();
   }, []);
+
+  // Handle crash scenarios
+  const handleCrash = useCallback((type: 'exhaustion' | 'burnout') => {
+    setIsPlaying(false);
+    setCrashType(type);
+    setShowCrashModal(true);
+    setIsCrashRecovery(true);
+    
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    
+    // Force rest allocation
+    updateTimeAllocation('study', 0);
+    updateTimeAllocation('work', 0);
+    updateTimeAllocation('social', 0);
+    updateTimeAllocation('rest', 100);
+    updateTimeAllocation('exercise', 0);
+  }, [updateTimeAllocation]);
   
   // Consolidated effect for day changes and storylet evaluation
   useEffect(() => {
@@ -261,26 +281,6 @@ const Planner: React.FC = () => {
       handleCrash('burnout');
     }
   }, [createTimeout, evaluateStorylets, activeCharacter, currentCharacter, handleCrash]); // Add dependencies for useCallback
-  
-  // Handle crash scenarios
-  const handleCrash = useCallback((type: 'exhaustion' | 'burnout') => {
-    setIsPlaying(false);
-    setCrashType(type);
-    setShowCrashModal(true);
-    setIsCrashRecovery(true);
-    
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    
-    // Force rest allocation
-    updateTimeAllocation('study', 0);
-    updateTimeAllocation('work', 0);
-    updateTimeAllocation('social', 0);
-    updateTimeAllocation('rest', 100);
-    updateTimeAllocation('exercise', 0);
-  }, [updateTimeAllocation]);
   
   // Handle crash recovery completion
   const handleCrashRecovery = () => {
