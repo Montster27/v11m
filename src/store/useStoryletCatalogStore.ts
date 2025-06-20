@@ -71,20 +71,44 @@ const loadDefaultStorylets = (): Record<string, Storylet> => {
     minigameStorylets,
     integratedStorylets,
     developmentTriggeredStorylets,
-    startingStorylets,
+    startingStorylets
+  ];
+
+  const storyletObjects = [
     emmaRomanceStorylets,
     emmaInfluenceStorylets
   ];
 
   const storyletMap: Record<string, Storylet> = {};
   
+  // Process arrays of storylets
   allStoryletArrays.forEach(storyletArray => {
-    storyletArray.forEach(storylet => {
-      if (storylet.id in storyletMap) {
-        console.warn(`Duplicate storylet ID detected: ${storylet.id}`);
-      }
-      storyletMap[storylet.id] = storylet;
-    });
+    if (Array.isArray(storyletArray)) {
+      storyletArray.forEach(storylet => {
+        if (storylet.id in storyletMap) {
+          console.warn(`Duplicate storylet ID detected: ${storylet.id}`);
+        }
+        storyletMap[storylet.id] = storylet;
+      });
+    } else {
+      console.warn('Expected array but got:', typeof storyletArray, storyletArray);
+    }
+  });
+
+  // Process objects of storylets
+  storyletObjects.forEach(storyletObject => {
+    if (storyletObject && typeof storyletObject === 'object') {
+      Object.values(storyletObject).forEach(storylet => {
+        if (storylet && storylet.id) {
+          if (storylet.id in storyletMap) {
+            console.warn(`Duplicate storylet ID detected: ${storylet.id}`);
+          }
+          storyletMap[storylet.id] = storylet;
+        }
+      });
+    } else {
+      console.warn('Expected object but got:', typeof storyletObject, storyletObject);
+    }
   });
 
   console.log(`Loaded ${Object.keys(storyletMap).length} storylets from data files`);
