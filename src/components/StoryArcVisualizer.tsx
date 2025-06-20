@@ -17,8 +17,8 @@ interface StoryArcVisualizerProps {
 }
 
 const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClose }) => {
-  const { updateStorylet, addStorylet, allStorylets } = useStoryletCatalogStore();
-  const { getStoryletsByArc } = useStoryArcStore();
+  const { updateStorylet, addStorylet, allStorylets, getStoryletsForArc } = useStoryletCatalogStore();
+  const { normalizeArcName } = useStoryArcStore();
   const { clues } = useClueStore();
   
   // State for UI interactions
@@ -40,8 +40,11 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
 
   // Get base storylets for the arc
   const arcStorylets = useMemo(() => {
-    return getStoryletsByArc(arcName);
-  }, [arcName, getStoryletsByArc]);
+    const normalizedArc = normalizeArcName(arcName);
+    const storylets = getStoryletsForArc(normalizedArc);
+    console.log(`📚 Arc "${arcName}" (normalized: "${normalizedArc}") has ${storylets.length} storylets:`, storylets.map(s => s.id));
+    return storylets;
+  }, [arcName, normalizeArcName, getStoryletsForArc, allStorylets]);
 
   // Use filtering hook
   const filterOptions: FilterOptions = {
