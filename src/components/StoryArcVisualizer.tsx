@@ -34,8 +34,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   const selectedStorylet = useSelectedStorylet();
   const editingStorylet = useEditingStorylet();
   
-  // Get main store for import/export
-  const { getStoryletsForArc: getStoryletsFromCatalog } = useStoryletCatalogStore();
+  // We'll use useStoryletCatalogStore.getState() when needed to avoid reactive dependencies
   const { clues } = useClueStore();
   
   // Local UI state (not managed by store)
@@ -58,13 +57,13 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     console.log(`🏛️ Loading Arc Visualizer for "${arcName}"`);
     
     // Load storylets from the main catalog store
-    const existingStorylets = getStoryletsFromCatalog(arcName);
+    const existingStorylets = useStoryletCatalogStore.getState().getStoryletsForArc(arcName);
     console.log(`📚 Found ${existingStorylets.length} existing storylets for arc "${arcName}"`);
     
     // Import them into our dedicated store
     importFromMainStore(existingStorylets, arcName);
     loadArc(arcName);
-  }, [arcName, importFromMainStore, loadArc, getStoryletsFromCatalog]);
+  }, [arcName, importFromMainStore, loadArc]);
 
   // Handle closing the visualizer and sync back to main store
   const handleClose = useCallback(() => {
@@ -469,7 +468,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   };
 
   const getNodeColor = (node: Node) => {
-    if (node.id === selectedNode) return '#3b82f6'; // blue-500
+    if (node.id === selectedStorylet?.id) return '#3b82f6'; // blue-500
     if (isNodeHighlighted(node.id)) return '#10b981'; // emerald-500
     
     // Color by trigger type
@@ -617,7 +616,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
             </p>
             {(searchQuery || filterTriggerType !== 'all' || filterStatus !== 'all') && (
               <p className="text-xs text-blue-600">
-                {getStoryletsByArc(arcName).length - nodes.length} storylet(s) filtered out
+                {arcStorylets.length - nodes.length} storylet(s) filtered out
               </p>
             )}
             {connectionIssues.length > 0 && (
@@ -1018,19 +1017,19 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                       fill={selectedNodes.has(node.id) ? '#dbeafe' : getNodeColor(node)}
                       stroke={
                         selectedNodes.has(node.id) ? '#3b82f6' :
-                        node.id === selectedNode ? '#1d4ed8' : 
+                        node.id === selectedStorylet?.id ? '#1d4ed8' : 
                         editingStorylet?.id === node.id ? '#7c3aed' : 
                         hasErrors ? '#dc2626' : '#d1d5db'
                       }
                       strokeWidth={
                         selectedNodes.has(node.id) ? 4 :
-                        node.id === selectedNode || editingStorylet?.id === node.id ? 3 : 
+                        node.id === selectedStorylet?.id || editingStorylet?.id === node.id ? 3 : 
                         hasErrors ? 2 : 1
                       }
                       className="cursor-pointer hover:opacity-90 transition-all duration-200 hover:stroke-2"
-                      onClick={(e) => handleNodeClick(node.id, e)}
+                      onClick={() => handleNodeClick(node.id)}
                       onDoubleClick={() => handleNodeDoubleClick(node.id)}
-                      filter={node.id === selectedNode ? 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1))' : undefined}
+                      filter={node.id === selectedStorylet?.id ? 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1))' : undefined}
                     />
                     
                     {/* Status indicator badges */}
@@ -1606,8 +1605,8 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
           </div>
         ) : (
           /* Side panel for selected node details */
-          selectedNode && (() => {
-          const node = nodes.find(n => n.id === selectedNode);
+          selectedStorylet && (() => {
+          const node = nodes.find(n => n.id === selectedStorylet.id);
           if (!node) return null;
 
           return (
@@ -1659,7 +1658,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                 <h4 className="font-medium text-gray-900 mb-2">Connected Storylets</h4>
                 <div className="space-y-2">
                   {edges
-                    .filter(edge => edge.from === selectedNode)
+                    .filter(edge => edge.from === selectedStorylet.id)
                     .map(edge => {
                       const targetNode = nodes.find(n => n.id === edge.to);
                       return targetNode ? (
@@ -1669,7 +1668,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                         </div>
                       ) : null;
                     })}
-                  {edges.filter(edge => edge.from === selectedNode).length === 0 && (
+                  {edges.filter(edge => edge.from === selectedStorylet.id).length === 0 && (
                     <div className="text-sm text-gray-500">No outgoing connections</div>
                   )}
                 </div>
