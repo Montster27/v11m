@@ -1291,8 +1291,124 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                     )}
                   </label>
                   
-                  {/* Flag-specific editor */}
-                  {editFormData.trigger?.type === 'flag' ? (
+                  {/* Resource-specific editor */}
+                  {editFormData.trigger?.type === 'resource' ? (
+                    <div className="space-y-3">
+                      <div className="bg-orange-50 p-3 rounded border">
+                        <div className="text-sm font-medium text-orange-900 mb-2">⚡ Resource Conditions (AND logic)</div>
+                        <div className="space-y-2">
+                          {Object.entries(editFormData.trigger?.conditions || {}).map(([resourceKey, condition], index) => {
+                            const resourceCondition = condition as { min?: number; max?: number };
+                            return (
+                              <div key={index} className="p-2 bg-white border rounded">
+                                <div className="flex items-center justify-between mb-2">
+                                  <select
+                                    value={resourceKey}
+                                    onChange={(e) => {
+                                      const newConditions = { ...editFormData.trigger?.conditions };
+                                      const oldCondition = newConditions[resourceKey];
+                                      delete newConditions[resourceKey];
+                                      newConditions[e.target.value] = oldCondition;
+                                      setEditFormData({
+                                        ...editFormData,
+                                        trigger: { ...editFormData.trigger!, conditions: newConditions }
+                                      });
+                                      setTriggerConditionsText(JSON.stringify(newConditions, null, 2));
+                                    }}
+                                    className="px-2 py-1 border rounded text-sm"
+                                  >
+                                    <option value="energy">Energy</option>
+                                    <option value="stress">Stress</option>
+                                    <option value="knowledge">Knowledge</option>
+                                    <option value="social">Social</option>
+                                    <option value="money">Money</option>
+                                  </select>
+                                  <button
+                                    onClick={() => {
+                                      const newConditions = { ...editFormData.trigger?.conditions };
+                                      delete newConditions[resourceKey];
+                                      setEditFormData({
+                                        ...editFormData,
+                                        trigger: { ...editFormData.trigger!, conditions: newConditions }
+                                      });
+                                      setTriggerConditionsText(JSON.stringify(newConditions, null, 2));
+                                    }}
+                                    className="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-sm"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="block text-xs text-gray-600 mb-1">Minimum (≥)</label>
+                                    <input
+                                      type="number"
+                                      value={resourceCondition.min ?? ''}
+                                      onChange={(e) => {
+                                        const newConditions = { ...editFormData.trigger?.conditions };
+                                        const value = e.target.value === '' ? undefined : Number(e.target.value);
+                                        newConditions[resourceKey] = { ...resourceCondition, min: value };
+                                        setEditFormData({
+                                          ...editFormData,
+                                          trigger: { ...editFormData.trigger!, conditions: newConditions }
+                                        });
+                                        setTriggerConditionsText(JSON.stringify(newConditions, null, 2));
+                                      }}
+                                      placeholder="No min"
+                                      className="w-full px-2 py-1 border rounded text-sm"
+                                      min="0"
+                                      max="100"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-gray-600 mb-1">Maximum (≤)</label>
+                                    <input
+                                      type="number"
+                                      value={resourceCondition.max ?? ''}
+                                      onChange={(e) => {
+                                        const newConditions = { ...editFormData.trigger?.conditions };
+                                        const value = e.target.value === '' ? undefined : Number(e.target.value);
+                                        newConditions[resourceKey] = { ...resourceCondition, max: value };
+                                        setEditFormData({
+                                          ...editFormData,
+                                          trigger: { ...editFormData.trigger!, conditions: newConditions }
+                                        });
+                                        setTriggerConditionsText(JSON.stringify(newConditions, null, 2));
+                                      }}
+                                      placeholder="No max"
+                                      className="w-full px-2 py-1 border rounded text-sm"
+                                      min="0"
+                                      max="100"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newConditions = { 
+                                ...editFormData.trigger?.conditions,
+                                energy: { min: 10 }
+                              };
+                              setEditFormData({
+                                ...editFormData,
+                                trigger: { ...editFormData.trigger!, conditions: newConditions }
+                              });
+                              setTriggerConditionsText(JSON.stringify(newConditions, null, 2));
+                            }}
+                            className="w-full px-3 py-2 border-2 border-dashed border-orange-300 text-orange-600 hover:bg-orange-50 rounded text-sm"
+                          >
+                            + Add Resource Condition
+                          </button>
+                        </div>
+                        <div className="text-xs text-orange-700 mt-2">
+                          Storylet triggers when ALL resource conditions are met. Leave min/max empty for no limit.
+                        </div>
+                      </div>
+                    </div>
+                  ) : editFormData.trigger?.type === 'flag' ? (
                     <div className="space-y-3">
                       <div className="bg-blue-50 p-3 rounded border">
                         <div className="text-sm font-medium text-blue-900 mb-2">🎯 Required Flags (OR logic)</div>
