@@ -1,6 +1,6 @@
 // /Users/montysharma/V11M2/src/components/StoryArcVisualizer.tsx
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useStoryletStore } from '../store/useStoryletStore';
+import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
 import { useStoryArcStore } from '../store/useStoryArcStore';
 import { useClueStore } from '../store/useClueStore';
 import { Button, Card } from './ui';
@@ -17,7 +17,7 @@ interface StoryArcVisualizerProps {
 }
 
 const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClose }) => {
-  const { updateStorylet } = useStoryletStore();
+  const { updateStorylet, addStorylet, allStorylets } = useStoryletCatalogStore();
   const { getStoryletsByArc } = useStoryArcStore();
   const { clues } = useClueStore();
   
@@ -546,7 +546,8 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
       storyArc: arcName
     };
     
-    updateStorylet(newStorylet);
+    console.log('🆕 Creating new storylet:', newStorylet);
+    addStorylet(newStorylet);
     hideContextMenu();
     
     setTimeout(() => {
