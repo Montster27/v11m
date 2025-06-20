@@ -1441,13 +1441,24 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                           />
                           
-                          <input
-                            type="text"
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Next Storylet</label>
+                            <select
                             value={choice.nextStoryletId || ''}
                             onChange={(e) => updateChoice(choiceIndex, 'nextStoryletId', e.target.value || undefined)}
-                            placeholder="Next storylet ID (optional)"
                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                          />
+                          >
+                            <option value="">No next storylet</option>
+                            {arcStorylets
+                              .filter(s => s.id !== editingStorylet?.id) // Don't show current storylet
+                              .map(storylet => (
+                                <option key={storylet.id} value={storylet.id}>
+                                  {storylet.name || storylet.id}
+                                </option>
+                              ))
+                            }
+                            </select>
+                          </div>
                           
                           <div>
                             <div className="flex justify-between items-center mb-1">
