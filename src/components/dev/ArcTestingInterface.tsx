@@ -5,7 +5,8 @@ import React, { useState, useEffect } from 'react';
 import { ArcTester, type ArcTestSession, type PlaythroughStep, type ArcTestResults, type ArcIssue } from '../../utils/arcTesting';
 import { useStoryletStore } from '../../store/useStoryletStore';
 import { useStoryletCatalogStore } from '../../store/useStoryletCatalogStore';
-import type { Storylet, Choice } from '../../types/storylet';
+import type { Storylet, Choice, MinigameType } from '../../types/storylet';
+import MinigameManager from '../minigames/MinigameManager';
 
 interface ArcTestingInterfaceProps {
   onClose: () => void;
@@ -21,6 +22,11 @@ const ArcTestingInterface: React.FC<ArcTestingInterfaceProps> = ({ onClose }) =>
   const [activeTab, setActiveTab] = useState<'playthrough' | 'analysis' | 'history'>('playthrough');
   const [analysisResults, setAnalysisResults] = useState<ArcTestResults | null>(null);
   const [showGameState, setShowGameState] = useState(false);
+  const [activeMinigame, setActiveMinigame] = useState<{
+    type: MinigameType;
+    clueId: string;
+    difficulty?: 'easy' | 'medium' | 'hard';
+  } | null>(null);
 
   // Initialize arc tester when arc is selected
   useEffect(() => {
@@ -49,7 +55,27 @@ const ArcTestingInterface: React.FC<ArcTestingInterfaceProps> = ({ onClose }) =>
     
     try {
       const step = arcTester.executeChoice(storyletId, choiceId);
-      setSession({ ...arcTester.getSession()! });
+      const updatedSession = arcTester.getSession()!;
+      setSession({ ...updatedSession });
+      
+      // Check if there's a pending clue discovery that requires a minigame
+      const pendingClue = arcTester.getPendingClueDiscovery();
+      console.log(`🔍 Pending clue after choice execution:`, pendingClue);
+      
+      if (pendingClue && pendingClue.minigameType) {
+        console.log(`🎮 Launching minigame for clue discovery: ${pendingClue.clueId} (${pendingClue.minigameType})`);
+        const minigameData = {
+          type: pendingClue.minigameType as MinigameType,
+          clueId: pendingClue.clueId,
+          difficulty: 'medium' as const
+        };
+        console.log(`🎮 Setting active minigame:`, minigameData);
+        setActiveMinigame(minigameData);
+      } else if (pendingClue) {
+        console.log(`⚠️ Pending clue found but no minigameType specified:`, pendingClue);
+      } else {
+        console.log(`ℹ️ No pending clue discovery after choice execution`);
+      }
     } catch (error) {
       alert(`Failed to execute choice: ${error}`);
     }
@@ -61,6 +87,8 @@ const ArcTestingInterface: React.FC<ArcTestingInterfaceProps> = ({ onClose }) =>
     try {
       arcTester.goToStep(stepIndex);
       setSession({ ...arcTester.getSession()! });
+      // Clear any active minigame when navigating to previous steps
+      setActiveMinigame(null);
     } catch (error) {
       alert(`Failed to go to step: ${error}`);
     }
@@ -77,6 +105,39 @@ const ArcTestingInterface: React.FC<ArcTestingInterfaceProps> = ({ onClose }) =>
   const resetSession = () => {
     setSession(null);
     setAnalysisResults(null);
+    setActiveMinigame(null);
+  };
+
+  const handleMinigameComplete = (success: boolean, stats: any) => {
+    if (!arcTester || !activeMinigame) return;
+    
+    try {
+      console.log(`🎯 Minigame completed for clue ${activeMinigame.clueId}:`, { success, stats });
+      
+      // Complete the clue discovery in the arc tester
+      arcTester.completeClueDiscovery(success);
+      
+      // Update session state
+      setSession({ ...arcTester.getSession()! });
+      
+      // Clear the active minigame
+      setActiveMinigame(null);
+      
+      // Show feedback to user
+      const message = success 
+        ? `🎉 Clue discovery successful! Found: ${activeMinigame.clueId}`
+        : `😞 Clue discovery failed for: ${activeMinigame.clueId}`;
+      console.log(message);
+      
+    } catch (error) {
+      console.error('Failed to complete clue discovery:', error);
+      alert(`Failed to complete clue discovery: ${error}`);
+    }
+  };
+
+  const handleMinigameClose = () => {
+    // For testing purposes, treat close as failure
+    handleMinigameComplete(false, {});
   };
 
   const getAvailableStorylets = (): Storylet[] => {
@@ -258,6 +319,11 @@ const ArcTestingInterface: React.FC<ArcTestingInterfaceProps> = ({ onClose }) =>
                             <div>Day: {session.gameState.day}</div>
                             <div>Steps: {session.steps.length}</div>
                             <div>Completed: {session.metadata.completedStorylets}/{session.metadata.totalStorylets}</div>
+                            {session.pendingClueDiscovery && (
+                              <div className="text-blue-600 font-medium">
+                                🔍 Pending: {session.pendingClueDiscovery.clueId}
+                              </div>
+                            )}
                           </div>
 
                           {showGameState && (
@@ -491,6 +557,12 @@ const ArcTestingInterface: React.FC<ArcTestingInterfaceProps> = ({ onClose }) =>
                                           {effect.type === 'resource' && `${effect.key} ${effect.delta > 0 ? '+' : ''}${effect.delta}`}
                                           {effect.type === 'flag' && `Set ${effect.key} = ${effect.value}`}
                                           {effect.type === 'unlock' && `Unlock ${effect.storyletId}`}
+                                          {effect.type === 'clueDiscovery' && (
+                                            <div className="text-blue-600">
+                                              🔍 Clue Discovery: {effect.clueId}
+                                              {effect.minigameType && ` (${effect.minigameType})`}
+                                            </div>
+                                          )}
                                         </div>
                                       ))}
                                     </div>
@@ -536,6 +608,34 @@ const ArcTestingInterface: React.FC<ArcTestingInterfaceProps> = ({ onClose }) =>
           </>
         )}
       </div>
+
+      {/* Minigame Modal */}
+      {activeMinigame && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-lg p-6 max-w-4xl max-h-[90vh] overflow-auto">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold">Clue Discovery Minigame</h3>
+              <p className="text-sm text-gray-600">
+                Complete the {activeMinigame.type} minigame to discover: {activeMinigame.clueId}
+              </p>
+            </div>
+            
+            <MinigameManager
+              gameId={activeMinigame.type}
+              onGameComplete={handleMinigameComplete}
+              onClose={handleMinigameClose}
+              difficulty={activeMinigame.difficulty}
+            />
+          </div>
+        </div>
+      )}
+      
+      {/* Debug info - remove in production */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-4 right-4 bg-black text-white p-2 rounded text-xs opacity-75">
+          activeMinigame: {activeMinigame ? `${activeMinigame.type} for ${activeMinigame.clueId}` : 'null'}
+        </div>
+      )}
     </div>
   );
 };

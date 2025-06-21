@@ -41,6 +41,14 @@ export interface ArcTestSession {
     exploredPaths: number;
     issues: ArcIssue[];
   };
+  // Clue discovery state
+  pendingClueDiscovery?: {
+    clueId: string;
+    minigameType?: string;
+    onSuccess?: Effect[];
+    onFailure?: Effect[];
+    stepIndex: number;
+  };
 }
 
 export interface ArcIssue {
@@ -150,6 +158,27 @@ export class ArcTester {
       throw new Error(`Choice not found: ${choiceId} in storylet ${storyletId}`);
     }
 
+    // Check for clue discovery effects
+    console.log(`🔍 Choice effects:`, choice.effects);
+    const clueDiscoveryEffect = choice.effects.find(effect => effect.type === 'clueDiscovery');
+    console.log(`🔍 Found clueDiscovery effect:`, clueDiscoveryEffect);
+    
+    if (clueDiscoveryEffect) {
+      // Set up pending clue discovery
+      this.session.pendingClueDiscovery = {
+        clueId: clueDiscoveryEffect.clueId,
+        minigameType: clueDiscoveryEffect.minigameType,
+        onSuccess: clueDiscoveryEffect.onSuccess,
+        onFailure: clueDiscoveryEffect.onFailure,
+        stepIndex: this.session.steps.length
+      };
+      
+      console.log(`🔍 Clue discovery effect detected: ${clueDiscoveryEffect.clueId} with minigame: ${clueDiscoveryEffect.minigameType || 'none'}`);
+      console.log(`🔍 Set pending clue discovery:`, this.session.pendingClueDiscovery);
+    } else {
+      console.log(`ℹ️ No clue discovery effect found in choice effects`);
+    }
+
     const gameStateBefore = { ...this.session.gameState };
     const gameStateAfter = this.applyEffects(choice.effects, { ...gameStateBefore });
     
@@ -221,7 +250,8 @@ export class ArcTester {
     console.log(`🎭 Executed choice "${choice.text}" in storylet "${storylet.name}"`, {
       effects: choice.effects.length,
       unlockedStorylets: unlockedStorylets.length,
-      availableNext: this.session.availableStorylets.length
+      availableNext: this.session.availableStorylets.length,
+      clueDiscovery: !!clueDiscoveryEffect
     });
 
     return step;
@@ -255,6 +285,58 @@ export class ArcTester {
       gameState: this.session.gameState,
       availableStorylets: this.session.availableStorylets.length
     });
+  }
+
+  /**
+   * Complete a pending clue discovery with success or failure
+   */
+  completeClueDiscovery(success: boolean): void {
+    if (!this.session || !this.session.pendingClueDiscovery) {
+      throw new Error('No pending clue discovery to complete');
+    }
+
+    const pendingClue = this.session.pendingClueDiscovery;
+    const effects = success ? (pendingClue.onSuccess || []) : (pendingClue.onFailure || []);
+    
+    console.log(`🎯 Clue discovery ${success ? 'succeeded' : 'failed'}: ${pendingClue.clueId}`, {
+      effectsToApply: effects.length,
+      minigameType: pendingClue.minigameType
+    });
+
+    // Apply success/failure effects
+    if (effects.length > 0) {
+      this.session.gameState = this.applyEffects(effects, this.session.gameState);
+      
+      // Update the step with the additional effects
+      const stepIndex = pendingClue.stepIndex;
+      if (this.session.steps[stepIndex]) {
+        this.session.steps[stepIndex].effects = [
+          ...this.session.steps[stepIndex].effects,
+          ...effects
+        ];
+      }
+    }
+
+    // Clear pending clue discovery
+    this.session.pendingClueDiscovery = undefined;
+
+    // Re-evaluate available storylets after clue effects
+    const arcStorylets = this.getArcStorylets();
+    this.session.availableStorylets = this.evaluateAvailableStorylets(arcStorylets, this.session.gameState);
+  }
+
+  /**
+   * Check if there's a pending clue discovery
+   */
+  hasPendingClueDiscovery(): boolean {
+    return !!(this.session && this.session.pendingClueDiscovery);
+  }
+
+  /**
+   * Get pending clue discovery details
+   */
+  getPendingClueDiscovery() {
+    return this.session?.pendingClueDiscovery || null;
   }
 
   /**
@@ -408,6 +490,16 @@ export class ArcTester {
           if (effect.storyletId && !newState.activeStoryletIds.includes(effect.storyletId)) {
             newState.activeStoryletIds.push(effect.storyletId);
           }
+          break;
+
+        case 'clueDiscovery':
+          // Don't apply clue discovery effects immediately - they are handled separately
+          // through the pending clue discovery mechanism
+          console.log(`📝 Clue discovery effect noted: ${effect.clueId}`);
+          break;
+
+        default:
+          console.log(`⚠️ Unhandled effect type in arc testing: ${(effect as any).type}`);
           break;
       }
     });

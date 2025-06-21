@@ -18,6 +18,11 @@ if (process.env.NODE_ENV === 'development') {
   import('./utils/quickBalanceTools'); // Import quick balance analysis tools
   import('./utils/clearAllData'); // Import data clearing utilities
   import('./utils/testClueDiscovery'); // Import clue discovery test utilities
+  import('./utils/testArcClueDiscovery').then(module => {
+    // Expose test functions globally for browser console access
+    (window as any).createTestArcClueStorylets = module.createTestArcClueStorylets;
+    (window as any).removeTestArcClueStorylets = module.removeTestArcClueStorylets;
+  });
   import('./utils/testConcernFlags'); // Import character concerns test utilities
   import('./utils/testPathPlanner'); // Import path planner test utilities
 }
