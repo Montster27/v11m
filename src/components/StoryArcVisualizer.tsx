@@ -53,6 +53,14 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState<boolean>(false);
+  
+  // Create linked storylet modal state
+  const [showCreateLinkedStoryletModal, setShowCreateLinkedStoryletModal] = useState(false);
+  const [pendingLinkInfo, setPendingLinkInfo] = useState<{choiceIndex: number} | null>(null);
+  const [newLinkedStorylet, setNewLinkedStorylet] = useState({
+    title: '',
+    description: ''
+  });
 
   // Reactive subscription to catalog store
   const catalogStorylets = useStoryletCatalogStore(state => state.allStorylets);
@@ -307,6 +315,58 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
       choices[index] = { ...choices[index], [field]: value };
       setEditFormData({ ...editFormData, choices });
     }
+  };
+
+  // Handle create linked storylet modal
+  const handleCreateLinkedStorylet = (choiceIndex: number) => {
+    setPendingLinkInfo({ choiceIndex });
+    setNewLinkedStorylet({
+      title: '',
+      description: ''
+    });
+    setShowCreateLinkedStoryletModal(true);
+  };
+
+  // Create and link the new storylet
+  const createAndLinkStorylet = () => {
+    if (!newLinkedStorylet.title.trim() || !pendingLinkInfo) {
+      return;
+    }
+
+    // Create the new storylet using the Arc Visualizer's createStorylet function
+    const newStoryletId = createStorylet('basic', arcName);
+    
+    // Update the new storylet with our data
+    const newStorylet: Storylet = {
+      id: newStoryletId,
+      name: newLinkedStorylet.title,
+      description: newLinkedStorylet.description || `A new storylet linked from ${editingStorylet?.name || 'another storylet'}`,
+      trigger: {
+        type: 'time',
+        conditions: { day: 1 }
+      },
+      choices: [],
+      storyArc: arcName,
+      deploymentStatus: 'dev'
+    };
+
+    // Update the storylet in the visualizer store
+    updateStorylet(newStorylet);
+
+    // Link it to the current choice
+    updateChoice(pendingLinkInfo.choiceIndex, 'nextStoryletId', newStoryletId);
+
+    // Close modal and reset state
+    setShowCreateLinkedStoryletModal(false);
+    setPendingLinkInfo(null);
+    setNewLinkedStorylet({ title: '', description: '' });
+  };
+
+  // Cancel create linked storylet
+  const cancelCreateLinkedStorylet = () => {
+    setShowCreateLinkedStoryletModal(false);
+    setPendingLinkInfo(null);
+    setNewLinkedStorylet({ title: '', description: '' });
   };
 
   const removeChoice = (index: number) => {
@@ -1694,18 +1754,30 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                             <label className="block text-xs font-medium text-gray-600 mb-1">Next Storylet</label>
                             <select
                             value={choice.nextStoryletId || ''}
-                            onChange={(e) => updateChoice(choiceIndex, 'nextStoryletId', e.target.value || undefined)}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value === '__create_new__') {
+                                handleCreateLinkedStorylet(choiceIndex);
+                              } else {
+                                updateChoice(choiceIndex, 'nextStoryletId', value || undefined);
+                              }
+                            }}
                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                           >
                             <option value="">No next storylet</option>
-                            {arcStorylets
-                              .filter(s => s.id !== editingStorylet?.id) // Don't show current storylet
-                              .map(storylet => (
-                                <option key={storylet.id} value={storylet.id}>
-                                  {storylet.name || storylet.id}
-                                </option>
-                              ))
-                            }
+                            <option value="__create_new__" className="text-blue-600 font-medium">
+                              ➕ Create New Linked Storylet
+                            </option>
+                            <optgroup label="Existing Storylets">
+                              {arcStorylets
+                                .filter(s => s.id !== editingStorylet?.id) // Don't show current storylet
+                                .map(storylet => (
+                                  <option key={storylet.id} value={storylet.id}>
+                                    {storylet.name || storylet.id}
+                                  </option>
+                                ))
+                              }
+                            </optgroup>
                             </select>
                           </div>
                           
@@ -1966,6 +2038,70 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
             <span>🌿</span>
             <span>Branch Point (2 paths)</span>
           </button>
+        </div>
+      )}
+
+      {/* Create Linked Storylet Modal */}
+      {showCreateLinkedStoryletModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4">Create New Linked Storylet</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This will create a new storylet and automatically link it to the current choice.
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Storylet Title *
+                </label>
+                <input
+                  type="text"
+                  value={newLinkedStorylet.title}
+                  onChange={(e) => setNewLinkedStorylet(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Enter storylet title"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={newLinkedStorylet.description}
+                  onChange={(e) => setNewLinkedStorylet(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Brief description of the storylet"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                <p className="text-sm text-blue-700">
+                  <strong>Note:</strong> The new storylet will be created in the "{arcName}" story arc 
+                  and will be linked to the current choice automatically.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={cancelCreateLinkedStorylet}
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createAndLinkStorylet}
+                disabled={!newLinkedStorylet.title.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Create & Link Storylet
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </Card>

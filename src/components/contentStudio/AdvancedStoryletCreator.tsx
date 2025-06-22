@@ -121,13 +121,14 @@ const AdvancedStoryletCreator: React.FC<AdvancedStoryletCreatorProps> = ({
   editingStorylet,
   onStoryletSaved
 }) => {
-  const { addStorylet, updateStorylet, deleteStorylet, storyArcs, addStoryArc } = useStoryletStore();
+  const { addStorylet, updateStorylet, deleteStorylet, storyArcs, addStoryArc, allStorylets } = useStoryletStore();
   const { clues, createClue } = useClueStore();
   
   const [storylet, setStorylet] = useState<AdvancedStorylet>({
     id: `storylet_${Date.now()}`,
     title: '',
     content: '',
+    storyArc: '',
     triggers: [],
     choices: [],
     effects: [],
@@ -142,6 +143,15 @@ const AdvancedStoryletCreator: React.FC<AdvancedStoryletCreatorProps> = ({
   const [isEditMode, setIsEditMode] = useState(false);
 
   const [activeSection, setActiveSection] = useState<'basic' | 'triggers' | 'effects' | 'choices' | 'advanced'>('basic');
+  
+  // Create linked storylet modal state
+  const [showCreateLinkedStoryletModal, setShowCreateLinkedStoryletModal] = useState(false);
+  const [pendingLinkChoiceId, setPendingLinkChoiceId] = useState<string | null>(null);
+  const [newLinkedStorylet, setNewLinkedStorylet] = useState({
+    title: '',
+    content: '',
+    description: ''
+  });
 
   // Convert game storylet to editing format
   const convertGameStoryletToEdit = (gameStorylet: Storylet): AdvancedStorylet => {
@@ -254,26 +264,22 @@ const AdvancedStoryletCreator: React.FC<AdvancedStoryletCreatorProps> = ({
 
     const triggers = [];
     if (gameStorylet.trigger) {
-      if (gameStorylet.trigger.type === 'compound') {
-        // Handle compound triggers
-        triggers.push(...(gameStorylet.trigger.conditions || []).map(convertGameTrigger));
-      } else {
-        triggers.push(convertGameTrigger(gameStorylet.trigger));
-      }
+      // Convert single trigger from game format
+      triggers.push(convertGameTrigger(gameStorylet.trigger));
     }
 
     return {
       id: gameStorylet.id,
-      title: gameStorylet.name || gameStorylet.title || '',
-      content: gameStorylet.content || gameStorylet.description || '',
+      title: gameStorylet.name, // Use 'name' field from Storylet
+      content: gameStorylet.description, // Use 'description' field from Storylet 
       storyArc: gameStorylet.storyArc || '',
       triggers,
       choices: (gameStorylet.choices || []).map(convertGameChoice),
       effects: [], // Game storylets don't typically have effects at the storylet level
-      tags: gameStorylet.tags || [],
-      weight: gameStorylet.weight || 1,
-      cooldown: gameStorylet.cooldown || 0,
-      maxActivations: gameStorylet.maxActivations || 1,
+      tags: [], // Storylet type doesn't have tags field
+      weight: 1, // Default values since Storylet doesn't have these fields
+      cooldown: 0,
+      maxActivations: 1,
       prerequisites: [],
       exclusions: []
     };
@@ -434,6 +440,57 @@ const AdvancedStoryletCreator: React.FC<AdvancedStoryletCreatorProps> = ({
     updateChoice(choiceId, { effects: updatedEffects });
   };
 
+  // Handle create linked storylet modal
+  const handleCreateLinkedStorylet = (choiceId: string) => {
+    setPendingLinkChoiceId(choiceId);
+    setNewLinkedStorylet({
+      title: '',
+      content: '',
+      description: ''
+    });
+    setShowCreateLinkedStoryletModal(true);
+  };
+
+  // Create and link the new storylet
+  const createAndLinkStorylet = () => {
+    if (!newLinkedStorylet.title.trim() || !pendingLinkChoiceId) {
+      return;
+    }
+
+    // Create the new storylet
+    const newStoryletId = `storylet_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newStorylet: Storylet = {
+      id: newStoryletId,
+      name: newLinkedStorylet.title,
+      description: newLinkedStorylet.description || newLinkedStorylet.content,
+      trigger: {
+        type: 'time',
+        conditions: { day: 1 }
+      },
+      choices: [],
+      storyArc: storylet.storyArc,
+      deploymentStatus: 'dev'
+    };
+
+    // Add the storylet to the store
+    addStorylet(newStorylet);
+
+    // Link it to the current choice
+    updateChoice(pendingLinkChoiceId, { nextStorylet: newStoryletId });
+
+    // Close modal and reset state
+    setShowCreateLinkedStoryletModal(false);
+    setPendingLinkChoiceId(null);
+    setNewLinkedStorylet({ title: '', content: '', description: '' });
+  };
+
+  // Cancel create linked storylet
+  const cancelCreateLinkedStorylet = () => {
+    setShowCreateLinkedStoryletModal(false);
+    setPendingLinkChoiceId(null);
+    setNewLinkedStorylet({ title: '', content: '', description: '' });
+  };
+
   // Save storylet
   const saveStorylet = () => {
     // Enhanced validation
@@ -494,23 +551,19 @@ const AdvancedStoryletCreator: React.FC<AdvancedStoryletCreatorProps> = ({
     }
 
     // Convert to game storylet format
-    const gameStorylet = {
+    const gameStorylet: Storylet = {
       id: storylet.id,
-      title: storylet.title,
-      content: storylet.content,
+      name: storylet.title, // Use 'name' field for Storylet
+      description: storylet.content, // Use 'description' field for Storylet
       storyArc: storylet.storyArc,
-      trigger: storylet.triggers.length === 1 ? convertTriggerToGame(storylet.triggers[0]) : {
-        type: 'compound',
-        conditions: storylet.triggers.map(convertTriggerToGame),
-        operator: 'AND' // Could be made configurable
-      },
+      trigger: storylet.triggers.length === 1 
+        ? convertTriggerToGame(storylet.triggers[0]) 
+        : {
+            type: 'time', // Default to time trigger if multiple triggers
+            conditions: { day: 1 }
+          },
       choices: storylet.choices.map(convertChoiceToGame),
-      effects: storylet.effects.map(convertEffectToGame),
-      tags: storylet.tags,
-      isActive: true,
-      weight: storylet.weight,
-      cooldown: storylet.cooldown,
-      maxActivations: storylet.maxActivations
+      deploymentStatus: 'dev'
     };
 
     const undoRedoAction: UndoRedoAction = {
@@ -549,6 +602,7 @@ const AdvancedStoryletCreator: React.FC<AdvancedStoryletCreatorProps> = ({
         id: `storylet_${Date.now()}`,
         title: '',
         content: '',
+        storyArc: '',
         triggers: [],
         choices: [],
         effects: [],
@@ -651,7 +705,8 @@ const AdvancedStoryletCreator: React.FC<AdvancedStoryletCreatorProps> = ({
       text: choice.text,
       effects: choice.effects.map(convertEffectToGame),
       conditions: choice.conditions.map(convertTriggerToGame),
-      skillCheck: choice.skillCheck
+      skillCheck: choice.skillCheck,
+      nextStoryletId: choice.nextStorylet
     };
   };
 
@@ -1168,6 +1223,40 @@ const AdvancedStoryletCreator: React.FC<AdvancedStoryletCreatorProps> = ({
                     </div>
                     
                     <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Next Storylet</label>
+                      <select
+                        value={choice.nextStorylet || ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '__create_new__') {
+                            handleCreateLinkedStorylet(choice.id);
+                          } else {
+                            updateChoice(choice.id, { nextStorylet: value || undefined });
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">No next storylet</option>
+                        <option value="__create_new__" className="text-blue-600 font-medium">
+                          ➕ Create New Linked Storylet
+                        </option>
+                        <optgroup label="Existing Storylets">
+                          {Object.values(allStorylets)
+                            .filter(s => s.id !== storylet.id) // Don't show self
+                            .filter(s => !storylet.storyArc || s.storyArc === storylet.storyArc) // Filter by arc if current storylet has an arc
+                            .map(s => (
+                              <option key={s.id} value={s.id}>
+                                {s.name} {s.storyArc && `(${s.storyArc})`}
+                              </option>
+                            ))}
+                        </optgroup>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Choose what storylet follows this choice, or create a new one
+                      </p>
+                    </div>
+                    
+                    <div>
                       <div className="flex items-center justify-between mb-2">
                         <label className="block text-sm font-medium text-gray-700">Choice Effects</label>
                         <button
@@ -1272,6 +1361,70 @@ const AdvancedStoryletCreator: React.FC<AdvancedStoryletCreatorProps> = ({
           </div>
         )}
       </div>
+
+      {/* Create Linked Storylet Modal */}
+      {showCreateLinkedStoryletModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4">Create New Linked Storylet</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This will create a new storylet and automatically link it to the current choice.
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Storylet Title *
+                </label>
+                <input
+                  type="text"
+                  value={newLinkedStorylet.title}
+                  onChange={(e) => setNewLinkedStorylet(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Enter storylet title"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={newLinkedStorylet.description}
+                  onChange={(e) => setNewLinkedStorylet(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Brief description of the storylet"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                <p className="text-sm text-blue-700">
+                  <strong>Note:</strong> The new storylet will inherit the same story arc as the current storylet 
+                  {storylet.storyArc && ` (${storylet.storyArc})`} and will be created with development status.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={cancelCreateLinkedStorylet}
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createAndLinkStorylet}
+                disabled={!newLinkedStorylet.title.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Create & Link Storylet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
