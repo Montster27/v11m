@@ -29,10 +29,12 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
   
   const {
     storyArcs,
+    arcMetadata,
     getArcStats,
     addStoryArc,
     removeStoryArc,
-    updateStorylet
+    updateStorylet,
+    updateArcLastAccessed
   } = useStoryletStore();
   
   // Create a local getStoryletsByArc function that uses the catalog store
@@ -48,14 +50,21 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
   const [testingArc, setTestingArc] = useState<string | null>(null);
   const [testingFlags, setTestingFlags] = useState<Record<string, boolean>>({});
   const [showArcTesting, setShowArcTesting] = useState(false);
+  const [arcSortBy, setArcSortBy] = useState<'alphabetical' | 'lastWorked'>('alphabetical');
 
-  // Get arc statistics
+  // Get arc statistics with sorting
   const arcStats = useMemo(() => {
-    return storyArcs.map(arcName => {
+    console.log('🔍 ArcManager: Calculating arcStats with sortBy:', arcSortBy);
+    console.log('🔍 ArcManager: arcMetadata:', arcMetadata);
+    
+    const stats = storyArcs.map(arcName => {
       const storylets = getStoryletsByArc(arcName);
       const connections = storylets.reduce((total, storylet) => {
         return total + storylet.choices.filter(choice => choice.nextStoryletId).length;
       }, 0);
+      
+      const metadata = arcMetadata[arcName];
+      console.log(`🔍 ArcManager: Arc "${arcName}" metadata:`, metadata);
       
       return {
         name: arcName,
@@ -72,10 +81,26 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
             )
           ))
         ).length,
-        isValid: storylets.length > 0
+        isValid: storylets.length > 0,
+        lastAccessedAt: metadata?.lastAccessedAt || 0,
+        createdAt: metadata?.createdAt || 0
       };
     });
-  }, [storyArcs, allStorylets]);
+
+    console.log('🔍 ArcManager: Stats before sorting:', stats);
+
+    // Sort based on selected criteria
+    if (arcSortBy === 'alphabetical') {
+      const sorted = stats.sort((a, b) => a.name.localeCompare(b.name));
+      console.log('🔍 ArcManager: Alphabetically sorted:', sorted.map(s => s.name));
+      return sorted;
+    } else {
+      // Sort by lastAccessedAt descending (most recent first)
+      const sorted = stats.sort((a, b) => b.lastAccessedAt - a.lastAccessedAt);
+      console.log('🔍 ArcManager: Last worked sorted:', sorted.map(s => ({ name: s.name, lastAccessed: s.lastAccessedAt })));
+      return sorted;
+    }
+  }, [storyArcs, allStorylets, arcMetadata, arcSortBy]);
 
   // Get unassigned storylets
   const unassignedStorylets = useMemo(() => {
@@ -98,6 +123,13 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
         setSelectedArc('');
       }
     }
+  };
+
+  const handleArcAccess = (arcName: string) => {
+    // Update last accessed time when arc is opened/visualized
+    console.log('🔍 ArcManager: Updating access time for arc:', arcName);
+    updateArcLastAccessed(arcName);
+    console.log('🔍 ArcManager: After update, arcMetadata:', arcMetadata);
   };
 
   const handleAssignStoryletToArc = (storyletId: string, arcName: string) => {
@@ -167,6 +199,17 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h4 className="text-lg font-medium text-gray-800">Story Arcs ({storyArcs.length})</h4>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-600">Sort by:</label>
+                    <select
+                      value={arcSortBy}
+                      onChange={(e) => setArcSortBy(e.target.value as 'alphabetical' | 'lastWorked')}
+                      className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="alphabetical">Alphabetical</option>
+                      <option value="lastWorked">Last Worked On</option>
+                    </select>
+                  </div>
                 </div>
                 
                 <div className="space-y-3">
@@ -178,7 +221,10 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
                           ? 'border-blue-300 bg-blue-50'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
-                      onClick={() => setSelectedArc(arc.name)}
+                      onClick={() => {
+                        handleArcAccess(arc.name);
+                        setSelectedArc(arc.name);
+                      }}
                     >
                       <div className="flex items-center justify-between">
                         <h5 className="font-medium text-gray-800">{arc.name}</h5>
@@ -186,6 +232,7 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              handleArcAccess(arc.name);
                               setVisualizingArc(arc.name);
                               setActiveTab('visualizer');
                             }}
@@ -196,6 +243,7 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              handleArcAccess(arc.name);
                               setShowArcTesting(true);
                             }}
                             className="text-green-600 hover:text-green-800 text-sm"
@@ -229,7 +277,7 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
                         </div>
                       </div>
                       
-                      <div className="mt-2">
+                      <div className="mt-2 flex items-center justify-between">
                         <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
                           arc.isValid
                             ? 'bg-green-100 text-green-800'
@@ -237,6 +285,12 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
                         }`}>
                           {arc.isValid ? 'Valid' : 'Invalid'}
                         </span>
+                        
+                        {arcSortBy === 'lastWorked' && arc.lastAccessedAt > 0 && (
+                          <span className="text-xs text-gray-500">
+                            Last worked: {new Date(arc.lastAccessedAt).toLocaleDateString()}
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}

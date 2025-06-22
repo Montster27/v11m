@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useArcVisualizerStore, useArcStorylets, useSelectedStorylet, useEditingStorylet } from '../store/useArcVisualizerStore';
 import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
+import { useStoryletStore } from '../store/useStoryletStore';
 import { useClueStore } from '../store/useClueStore';
 import { Button, Card } from './ui';
 import { Storylet, Choice, Effect, StoryletDeploymentStatus } from '../types/storylet';
@@ -36,6 +37,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   
   // We'll use useStoryletCatalogStore.getState() when needed to avoid reactive dependencies
   const { clues } = useClueStore();
+  const { updateArcLastAccessed } = useStoryletStore();
   
   // Local UI state (not managed by store)
   const [highlightedPath, setHighlightedPath] = useState<string[]>([]);
@@ -60,6 +62,9 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     console.log(`🏛️ Loading Arc Visualizer for "${arcName}"`);
     console.log(`📦 Catalog has ${Object.keys(catalogStorylets).length} total storylets`);
     
+    // Update last accessed time for this arc
+    updateArcLastAccessed(arcName);
+    
     // Filter storylets for this arc from the catalog
     const arcStorylets = Object.values(catalogStorylets).filter(
       storylet => storylet.storyArc === arcName
@@ -69,7 +74,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     // Import them into our dedicated store
     importFromMainStore(arcStorylets, arcName);
     loadArc(arcName);
-  }, [arcName, catalogStorylets, importFromMainStore, loadArc]);
+  }, [arcName, catalogStorylets, importFromMainStore, loadArc, updateArcLastAccessed]);
 
   // Handle closing the visualizer and sync back to main store
   const handleClose = useCallback(() => {

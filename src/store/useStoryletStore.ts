@@ -33,6 +33,13 @@ interface ArcStats {
   failureReason?: string;
 }
 
+// Arc metadata for sorting and organization
+interface ArcMetadata {
+  name: string;
+  lastAccessedAt: number; // timestamp when arc was last opened/worked on
+  createdAt: number; // timestamp when arc was created
+}
+
 interface StoryletState {
   // Core storylet data
   allStorylets: Record<string, Storylet>;           // the full catalog loaded at startup
@@ -43,6 +50,7 @@ interface StoryletState {
   
   // Story arc management
   storyArcs: string[];                              // list of available story arcs
+  arcMetadata: Record<string, ArcMetadata>;         // metadata for each arc (access times, etc.)
   
   // Development settings
   deploymentFilter: Set<'live' | 'stage' | 'dev'>;  // which deployment statuses to show (can be multiple)
@@ -292,6 +300,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   
   // Story arc management
   storyArcs: ['Starting', 'Main Story', 'Side Quests', 'Character Development', 'Academic Journey'],
+  arcMetadata: {},
   
   // Development settings
   deploymentFilter: new Set(['live']) as Set<'live' | 'stage' | 'dev'>,
@@ -851,8 +860,17 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   addStoryArc: (arcName: string) => {
     set((state) => {
       if (!state.storyArcs.includes(arcName)) {
+        const now = Date.now();
         return {
-          storyArcs: [...state.storyArcs, arcName]
+          storyArcs: [...state.storyArcs, arcName],
+          arcMetadata: {
+            ...state.arcMetadata,
+            [arcName]: {
+              name: arcName,
+              createdAt: now,
+              lastAccessedAt: now
+            }
+          }
         };
       }
       return state;
@@ -878,15 +896,37 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
         ])
       );
       
+      // Remove arc metadata
+      const { [arcName]: removed, ...remainingMetadata } = state.arcMetadata;
+      
       return {
         storyArcs: newStoryArcs,
-        allStorylets: updatedStorylets
+        allStorylets: updatedStorylets,
+        arcMetadata: remainingMetadata
       };
     });
     
     if (process.env.NODE_ENV === 'development') {
       console.log(`🗑️ Removed story arc: ${arcName}`);
     }
+  },
+
+  // Update arc last accessed time
+  updateArcLastAccessed: (arcName: string) => {
+    set((state) => {
+      if (state.arcMetadata[arcName]) {
+        return {
+          arcMetadata: {
+            ...state.arcMetadata,
+            [arcName]: {
+              ...state.arcMetadata[arcName],
+              lastAccessedAt: Date.now()
+            }
+          }
+        };
+      }
+      return state;
+    });
   },
 
   getStoryletsByArc: (arcName: string) => {
@@ -1485,6 +1525,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     completedStoryletIds: state.completedStoryletIds,
     storyletCooldowns: state.storyletCooldowns,
     storyArcs: state.storyArcs,
+    arcMetadata: state.arcMetadata,
     deploymentFilter: Array.from(state.deploymentFilter) // Convert Set to Array for serialization
   }),
   merge: (persistedState: any, currentState: any) => {
@@ -1501,6 +1542,8 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       ...persistedState,
       // Always use current state's allStorylets to include any new storylets added in code
       allStorylets: mergedStorylets,
+      // Ensure arcMetadata is properly merged
+      arcMetadata: persistedState?.arcMetadata || {},
       deploymentFilter: new Set(persistedState?.deploymentFilter || ['live']) // Convert Array back to Set
     };
   }
