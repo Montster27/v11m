@@ -115,10 +115,25 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   const { nodes, edges } = useMemo(() => {
     console.log(`🎨 Arc Visualizer: Calculating layout for ${filteredStorylets.length} storylets`);
     console.log(`🎨 Filtered storylets:`, filteredStorylets.map(s => ({ id: s.id, name: s.name, arc: s.storyArc })));
-    const layout = calculateGraphLayout(filteredStorylets);
+    
+    // Filter clues that belong to this arc or are associated with storylets in this arc
+    console.log(`🔍 ALL CLUES COUNT: ${clues.length}`);
+    console.log(`🔍 All clues available:`, clues.map(c => ({ id: c.id, title: c.title, arc: c.storyArc, associated: c.associatedStorylets })));
+    
+    const arcClues = clues.filter(clue => 
+      clue.storyArc === arcName || 
+      clue.associatedStorylets.some(storyletId => 
+        filteredStorylets.some(storylet => storylet.id === storyletId)
+      )
+    );
+    
+    console.log(`🔍 Filtered clues for arc "${arcName}":`, arcClues.map(c => ({ id: c.id, title: c.title, outcomes: { pos: c.positiveOutcomeStorylet, neg: c.negativeOutcomeStorylet } })));
+    
+    const layout = calculateGraphLayout(filteredStorylets, arcClues);
     console.log(`🎨 Generated ${layout.nodes.length} nodes and ${layout.edges.length} edges`);
+    console.log(`🎨 Using ${arcClues.length} clues for outcome connections`);
     return layout;
-  }, [filteredStorylets]);
+  }, [filteredStorylets, clues, arcName]);
   const [isDragSelecting, setIsDragSelecting] = useState<boolean>(false);
   const [dragSelection, setDragSelection] = useState<{x1: number, y1: number, x2: number, y2: number} | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -834,6 +849,12 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                     const fromNode = nodes.find(n => n.id === edge.from);
                     const toNode = nodes.find(n => n.id === edge.to);
                     if (!fromNode || !toNode) return null;
+                    
+                    const miniEdgeColor = 
+                      edge.edgeType === 'clue_positive' ? '#22c55e' :
+                      edge.edgeType === 'clue_negative' ? '#ef4444' :
+                      '#6b7280';
+                    
                     return (
                       <line
                         key={index}
@@ -841,9 +862,10 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                         y1={(fromNode.y + 35) * 0.1}
                         x2={(toNode.x + 90) * 0.1}
                         y2={(toNode.y + 35) * 0.1}
-                        stroke="#6b7280"
+                        stroke={miniEdgeColor}
                         strokeWidth="1"
-                        opacity="0.6"
+                        opacity="0.7"
+                        strokeDasharray={edge.edgeType === 'clue_positive' || edge.edgeType === 'clue_negative' ? '2,1' : 'none'}
                       />
                     );
                   })}
@@ -912,6 +934,31 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                 {Math.round(viewport.zoom * 100)}% {viewport.isZooming && '🔍'}
               </div>
             </div>
+            
+            {/* Connection Legend */}
+            {edges.some(e => e.edgeType === 'clue_positive' || e.edgeType === 'clue_negative') && (
+              <div className="absolute bottom-4 right-4 z-10 bg-white border border-gray-300 rounded p-3 shadow-sm">
+                <div className="text-xs font-medium text-gray-700 mb-2">Connection Types</div>
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-6 h-0.5 bg-gray-500"></div>
+                    <span className="text-xs text-gray-600">Choice</span>
+                  </div>
+                  {edges.some(e => e.edgeType === 'clue_positive') && (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-6 h-0.5 bg-green-500" style={{borderTop: '2px dashed #22c55e'}}></div>
+                      <span className="text-xs text-green-700">✅ Clue Success</span>
+                    </div>
+                  )}
+                  {edges.some(e => e.edgeType === 'clue_negative') && (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-6 h-0.5 bg-red-500" style={{borderTop: '2px dashed #ef4444'}}></div>
+                      <span className="text-xs text-red-700">❌ Clue Failure</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           <svg 
             ref={svgRef}
             viewBox={viewBox}
@@ -980,6 +1027,48 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
 
               const isHighlighted = isEdgeHighlighted(edge);
               
+              // Determine edge color and style based on edge type
+              const getEdgeColor = () => {
+                if (isHighlighted) return '#10b981'; // Highlighted green
+                switch (edge.edgeType) {
+                  case 'clue_positive': return '#22c55e'; // Green for positive clue outcomes
+                  case 'clue_negative': return '#ef4444'; // Red for negative clue outcomes
+                  case 'choice':
+                  default: return '#6b7280'; // Gray for regular choices
+                }
+              };
+              
+              const getEdgeWidth = () => {
+                if (isHighlighted) return 3;
+                switch (edge.edgeType) {
+                  case 'clue_positive':
+                  case 'clue_negative': return 2.5; // Slightly thicker for clue outcomes
+                  case 'choice':
+                  default: return 2;
+                }
+              };
+              
+              const getEdgeOpacity = () => {
+                if (isHighlighted) return 1;
+                switch (edge.edgeType) {
+                  case 'clue_positive':
+                  case 'clue_negative': return 0.8; // More visible for clue outcomes
+                  case 'choice':
+                  default: return 0.6;
+                }
+              };
+              
+              const getStrokeDasharray = () => {
+                switch (edge.edgeType) {
+                  case 'clue_positive':
+                  case 'clue_negative': return '5,3'; // Dashed line for clue outcomes
+                  case 'choice':
+                  default: return 'none'; // Solid line for choices
+                }
+              };
+              
+              const edgeColor = getEdgeColor();
+              
               return (
                 <g key={index}>
                   <defs>
@@ -993,7 +1082,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                     >
                       <polygon
                         points="0 0, 10 3.5, 0 7"
-                        fill={isHighlighted ? '#10b981' : '#6b7280'}
+                        fill={edgeColor}
                       />
                     </marker>
                   </defs>
@@ -1002,19 +1091,24 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                     y1={fromNode.y + 35}
                     x2={toNode.x + 90}
                     y2={toNode.y + 35}
-                    stroke={isHighlighted ? '#10b981' : '#6b7280'}
-                    strokeWidth={isHighlighted ? 3 : 2}
+                    stroke={edgeColor}
+                    strokeWidth={getEdgeWidth()}
+                    strokeDasharray={getStrokeDasharray()}
                     markerEnd={`url(#arrowhead-${index})`}
-                    opacity={isHighlighted ? 1 : 0.6}
+                    opacity={getEdgeOpacity()}
                   />
                   <text
                     x={(fromNode.x + toNode.x) / 2 + 90}
                     y={(fromNode.y + toNode.y) / 2 + 30}
                     textAnchor="middle"
-                    className="text-xs fill-gray-600 pointer-events-none"
+                    className={`text-xs pointer-events-none ${
+                      edge.edgeType === 'clue_positive' ? 'fill-green-700' :
+                      edge.edgeType === 'clue_negative' ? 'fill-red-700' :
+                      'fill-gray-600'
+                    }`}
                     dy="-5"
                   >
-                    {edge.choiceText.length > 20 ? edge.choiceText.substring(0, 17) + '...' : edge.choiceText}
+                    {edge.choiceText.length > 25 ? edge.choiceText.substring(0, 22) + '...' : edge.choiceText}
                   </text>
                 </g>
               );
@@ -1118,38 +1212,46 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                     </text>
                   </g>
                   
-                  {/* Text content with improved typography */}
-                  <foreignObject
-                    x={node.x + 8}
-                    y={node.y + 8}
-                    width="150"
-                    height="54"
-                    className="pointer-events-none"
+                  {/* Title text */}
+                  <text
+                    x={node.x + 15}
+                    y={node.y + 22}
+                    className="fill-white pointer-events-none"
+                    fontSize="13"
+                    fontWeight="bold"
                   >
-                    <div className="text-white h-full flex flex-col justify-between" style={{lineHeight: '1.1'}}>
-                      {/* Title with better line breaking */}
-                      <div className="font-bold leading-tight" style={{fontSize: '13px', lineHeight: '1.15', height: '26px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'}}>
-                        {(node.storylet.name || 'Untitled Storylet').length > 25 ? 
-                          (node.storylet.name || 'Untitled Storylet').substring(0, 22) + '...'
-                          : (node.storylet.name || 'Untitled Storylet')
-                        }
-                      </div>
-                      
-                      {/* Trigger type with icon */}
-                      <div className="text-xs opacity-90" style={{fontSize: '10px'}}>
-                        {node.storylet.trigger?.type === 'time' && '⏰ '}
-                        {node.storylet.trigger?.type === 'flag' && '🏁 '}
-                        {node.storylet.trigger?.type === 'resource' && '💎 '}
-                        {(node.storylet.trigger?.type || 'unknown').charAt(0).toUpperCase() + (node.storylet.trigger?.type || 'unknown').slice(1)} trigger
-                      </div>
-                      
-                      {/* Choice count */}
-                      <div className="text-xs opacity-80" style={{fontSize: '9px', fontWeight: '500'}}>
-                        {node.storylet.choices?.length || 0} choice{(node.storylet.choices?.length || 0) !== 1 ? 's' : ''}
-                        {node.storylet.choices?.some(c => c.nextStoryletId) && ' →'}
-                      </div>
-                    </div>
-                  </foreignObject>
+                    {(node.storylet.name || 'Untitled Storylet').length > 20 ? 
+                      (node.storylet.name || 'Untitled Storylet').substring(0, 17) + '...'
+                      : (node.storylet.name || 'Untitled Storylet')
+                    }
+                  </text>
+                  
+                  {/* Trigger info that moves with the node */}
+                  <g>
+                    {/* Trigger icon */}
+                    <text
+                      x={node.x + 15}
+                      y={node.y + 50}
+                      className="fill-white pointer-events-none"
+                      fontSize="12"
+                    >
+                      {node.storylet.trigger?.type === 'time' && '⏰'}
+                      {node.storylet.trigger?.type === 'flag' && '🏁'}
+                      {node.storylet.trigger?.type === 'resource' && '💎'}
+                      {!node.storylet.trigger?.type && '⚙️'}
+                    </text>
+                    
+                    {/* Trigger type text */}
+                    <text
+                      x={node.x + 35}
+                      y={node.y + 50}
+                      className="fill-white pointer-events-none"
+                      fontSize="9"
+                      opacity="0.9"
+                    >
+                      {(node.storylet.trigger?.type || 'unknown').charAt(0).toUpperCase() + (node.storylet.trigger?.type || 'unknown').slice(1)} trigger
+                    </text>
+                  </g>
                 </g>
               );
             })}

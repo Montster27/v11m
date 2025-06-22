@@ -25,6 +25,8 @@ if (process.env.NODE_ENV === 'development') {
   });
   import('./utils/testConcernFlags'); // Import character concerns test utilities
   import('./utils/testPathPlanner'); // Import path planner test utilities
+  import('./utils/testClueOutcomes'); // Import clue outcome test utilities
+  import('./utils/debugClueConnections'); // Import clue connection debug utilities
 }
 
 function App() {

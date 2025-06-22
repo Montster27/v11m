@@ -2,6 +2,7 @@
 // Handles node positioning, level assignment, and connection mapping
 
 import { Storylet } from '../types/storylet';
+import { Clue } from '../types/clue';
 
 export interface Node {
   id: string;
@@ -16,6 +17,8 @@ export interface Edge {
   to: string;
   choiceText: string;
   choiceId: string;
+  edgeType?: 'choice' | 'clue_positive' | 'clue_negative';
+  clueId?: string; // For clue outcome edges
 }
 
 export interface GraphLayout {
@@ -42,9 +45,10 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
 /**
  * Finds connections between storylets based on choices and effects
  * @param storylets - Array of storylets to analyze
+ * @param clues - Array of clues to check for outcome connections
  * @returns Object containing connection map and edge list
  */
-export function findConnections(storylets: Storylet[]): { connections: Map<string, string[]>, edges: Edge[] } {
+export function findConnections(storylets: Storylet[], clues: Clue[] = []): { connections: Map<string, string[]>, edges: Edge[] } {
   const connections = new Map<string, string[]>();
   const edges: Edge[] = [];
   
@@ -86,7 +90,8 @@ export function findConnections(storylets: Storylet[]): { connections: Map<strin
               from: storylet.id,
               to: potentialNext.id,
               choiceText: choice.text,
-              choiceId: choice.id
+              choiceId: choice.id,
+              edgeType: 'choice'
             });
           }
         });
@@ -103,7 +108,88 @@ export function findConnections(storylets: Storylet[]): { connections: Map<strin
           from: storylet.id,
           to: choice.nextStoryletId,
           choiceText: choice.text,
-          choiceId: choice.id
+          choiceId: choice.id,
+          edgeType: 'choice'
+        });
+      }
+    });
+  });
+
+  // Add clue outcome connections [UPDATED v2]
+  console.log('🔍 Graph Layout v2: Processing clues for outcome connections...', clues.length);
+  console.log('🔍 Available storylets in map:', Array.from(storyletMap.keys()));
+  console.log('🔍 Total storylets passed to function:', storylets.length);
+  clues.forEach(clue => {
+    console.log('🔍 Processing clue:', clue.id, clue.title, {
+      storyArc: clue.storyArc,
+      associatedStorylets: clue.associatedStorylets,
+      positiveOutcome: clue.positiveOutcomeStorylet,
+      negativeOutcome: clue.negativeOutcomeStorylet
+    });
+    
+    // Find storylets that have clue discovery effects for this clue
+    const storyletsWithClueDiscovery: string[] = [];
+    storylets.forEach(storylet => {
+      storylet.choices.forEach(choice => {
+        choice.effects.forEach(effect => {
+          console.log(`🔍 Checking effect:`, effect);
+          
+          // Check both clueId field and value field for clue references
+          const matchesClueId = effect.clueId === clue.id;
+          const matchesValue = effect.value === clue.id || effect.value === clue.title;
+          const matchesKey = effect.key === clue.id || effect.key === clue.title;
+          const isClueDiscovery = effect.type === 'clue_discovery' || effect.type === 'clueDiscovery';
+          
+          if (isClueDiscovery && (matchesClueId || matchesValue || matchesKey)) {
+            storyletsWithClueDiscovery.push(storylet.id);
+            const matchType = matchesClueId ? 'clueId' : matchesValue ? 'value' : 'key';
+            console.log(`🔍 Found clue discovery effect: ${storylet.id} -> ${clue.id} (matched via ${matchType})`);
+          }
+        });
+      });
+    });
+    
+    // Use storylets with clue discovery effects as the source, or fall back to explicit associations
+    const sourceStorylets = storyletsWithClueDiscovery.length > 0 
+      ? storyletsWithClueDiscovery.filter(storyletId => storyletMap.has(storyletId))
+      : clue.associatedStorylets.filter(storyletId => storyletMap.has(storyletId));
+    
+    console.log('🔍 Source storylets for clue connections:', sourceStorylets);
+    
+    sourceStorylets.forEach(storyletId => {
+      // Add positive outcome connection
+      if (clue.positiveOutcomeStorylet && storyletMap.has(clue.positiveOutcomeStorylet)) {
+        console.log('🟢 Creating positive clue connection:', storyletId, '->', clue.positiveOutcomeStorylet);
+        if (!connections.has(storyletId)) {
+          connections.set(storyletId, []);
+        }
+        connections.get(storyletId)!.push(clue.positiveOutcomeStorylet);
+        
+        edges.push({
+          from: storyletId,
+          to: clue.positiveOutcomeStorylet,
+          choiceText: `✅ Success: ${clue.title}`,
+          choiceId: `clue-success-${clue.id}`,
+          edgeType: 'clue_positive',
+          clueId: clue.id
+        });
+      }
+      
+      // Add negative outcome connection
+      if (clue.negativeOutcomeStorylet && storyletMap.has(clue.negativeOutcomeStorylet)) {
+        console.log('🔴 Creating negative clue connection:', storyletId, '->', clue.negativeOutcomeStorylet);
+        if (!connections.has(storyletId)) {
+          connections.set(storyletId, []);
+        }
+        connections.get(storyletId)!.push(clue.negativeOutcomeStorylet);
+        
+        edges.push({
+          from: storyletId,
+          to: clue.negativeOutcomeStorylet,
+          choiceText: `❌ Failure: ${clue.title}`,
+          choiceId: `clue-failure-${clue.id}`,
+          edgeType: 'clue_negative',
+          clueId: clue.id
         });
       }
     });
@@ -227,14 +313,15 @@ export function findRootNodes(storylets: Storylet[], edges: Edge[]): Storylet[] 
  */
 export function calculateGraphLayout(
   storylets: Storylet[],
+  clues: Clue[] = [],
   config: LayoutConfig = DEFAULT_LAYOUT_CONFIG
 ): GraphLayout {
   if (storylets.length === 0) {
     return { nodes: [], edges: [] };
   }
 
-  // Step 1: Find connections and edges
-  const { connections, edges } = findConnections(storylets);
+  // Step 1: Find connections and edges (including clue outcomes)
+  const { connections, edges } = findConnections(storylets, clues);
 
   // Step 2: Find root nodes
   const rootNodes = findRootNodes(storylets, edges);
