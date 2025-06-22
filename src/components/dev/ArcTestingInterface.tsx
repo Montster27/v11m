@@ -54,6 +54,13 @@ const ArcTestingInterface: React.FC<ArcTestingInterfaceProps> = ({ onClose }) =>
     if (!arcTester || !session) return;
     
     try {
+      console.log(`🎭 Arc Testing: Executing choice ${choiceId} in storylet ${storyletId}`);
+      
+      // Get the storylet and choice details for debugging
+      const storylet = allStorylets[storyletId];
+      const choice = storylet?.choices.find(c => c.id === choiceId);
+      console.log(`🎭 Choice details:`, { choice: choice?.text, effects: choice?.effects });
+      
       const step = arcTester.executeChoice(storyletId, choiceId);
       const updatedSession = arcTester.getSession()!;
       setSession({ ...updatedSession });
@@ -73,10 +80,19 @@ const ArcTestingInterface: React.FC<ArcTestingInterfaceProps> = ({ onClose }) =>
         setActiveMinigame(minigameData);
       } else if (pendingClue) {
         console.log(`⚠️ Pending clue found but no minigameType specified:`, pendingClue);
+        // Still show a minigame with default type if clue is found
+        const minigameData = {
+          type: 'memory_cards' as MinigameType,
+          clueId: pendingClue.clueId,
+          difficulty: 'medium' as const
+        };
+        console.log(`🎮 Using default minigame type:`, minigameData);
+        setActiveMinigame(minigameData);
       } else {
         console.log(`ℹ️ No pending clue discovery after choice execution`);
       }
     } catch (error) {
+      console.error('Failed to execute choice:', error);
       alert(`Failed to execute choice: ${error}`);
     }
   };

@@ -158,22 +158,28 @@ export class ArcTester {
       throw new Error(`Choice not found: ${choiceId} in storylet ${storyletId}`);
     }
 
-    // Check for clue discovery effects
+    // Check for clue discovery effects (both camelCase and snake_case)
     console.log(`🔍 Choice effects:`, choice.effects);
-    const clueDiscoveryEffect = choice.effects.find(effect => effect.type === 'clueDiscovery');
+    const clueDiscoveryEffect = choice.effects.find(effect => 
+      effect.type === 'clueDiscovery' || effect.type === 'clue_discovery'
+    );
     console.log(`🔍 Found clueDiscovery effect:`, clueDiscoveryEffect);
     
     if (clueDiscoveryEffect) {
-      // Set up pending clue discovery
+      // Set up pending clue discovery - handle different field names
+      const clueId = clueDiscoveryEffect.clueId || clueDiscoveryEffect.value;
+      const minigameType = clueDiscoveryEffect.minigameType || 'memory_cards'; // default minigame
+      
       this.session.pendingClueDiscovery = {
-        clueId: clueDiscoveryEffect.clueId,
-        minigameType: clueDiscoveryEffect.minigameType,
+        clueId: clueId,
+        minigameType: minigameType,
         onSuccess: clueDiscoveryEffect.onSuccess,
         onFailure: clueDiscoveryEffect.onFailure,
         stepIndex: this.session.steps.length
       };
       
-      console.log(`🔍 Clue discovery effect detected: ${clueDiscoveryEffect.clueId} with minigame: ${clueDiscoveryEffect.minigameType || 'none'}`);
+      console.log(`🔍 Clue discovery effect detected: ${clueId} with minigame: ${minigameType}`);
+      console.log(`🔍 Full effect:`, clueDiscoveryEffect);
       console.log(`🔍 Set pending clue discovery:`, this.session.pendingClueDiscovery);
     } else {
       console.log(`ℹ️ No clue discovery effect found in choice effects`);
@@ -303,8 +309,27 @@ export class ArcTester {
       minigameType: pendingClue.minigameType
     });
 
-    // Apply success/failure effects
-    if (effects.length > 0) {
+    // If no specific effects are defined, create default effects
+    if (effects.length === 0 && success) {
+      console.log(`🎯 No specific success effects defined, marking clue as discovered`);
+      // Add a flag to mark the clue as discovered
+      const defaultEffect = {
+        type: 'flag' as const,
+        key: `clue_discovered_${pendingClue.clueId}`,
+        value: true
+      };
+      this.session.gameState = this.applyEffects([defaultEffect], this.session.gameState);
+      
+      // Update the step with the default effect
+      const stepIndex = pendingClue.stepIndex;
+      if (this.session.steps[stepIndex]) {
+        this.session.steps[stepIndex].effects = [
+          ...this.session.steps[stepIndex].effects,
+          defaultEffect
+        ];
+      }
+    } else if (effects.length > 0) {
+      // Apply success/failure effects
       this.session.gameState = this.applyEffects(effects, this.session.gameState);
       
       // Update the step with the additional effects
@@ -493,9 +518,11 @@ export class ArcTester {
           break;
 
         case 'clueDiscovery':
+        case 'clue_discovery':
           // Don't apply clue discovery effects immediately - they are handled separately
           // through the pending clue discovery mechanism
-          console.log(`📝 Clue discovery effect noted: ${effect.clueId}`);
+          const clueId = effect.clueId || effect.value;
+          console.log(`📝 Clue discovery effect noted: ${clueId}`);
           break;
 
         default:
