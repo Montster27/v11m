@@ -38,6 +38,7 @@ export type Effect =
   | { type: "unlock"; storyletId: string }           // unlock a new storylet immediately
   | { type: "minigame"; gameId: string; onSuccess?: Effect[]; onFailure?: Effect[] } // launch a minigame
   | { type: "clueDiscovery"; clueId: string; minigameType?: MinigameType; onSuccess?: Effect[]; onFailure?: Effect[] } // trigger clue discovery (minigame determined by clue or specified)
+  | { type: "arcJump"; destinationArc: string; targetStoryletId?: string; unlockStorylets?: string[] } // jump to different story arc and unlock specific storylets
   // NPC-related effects
   | { type: "npcRelationship"; npcId: string; delta: number; reason?: string }
   | { type: "npcMemory"; npcId: string; memory: NPCMemoryInput }

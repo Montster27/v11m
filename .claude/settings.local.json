@@ -41,7 +41,8 @@
       "Bash(node:*)",
       "WebFetch(domain:localhost)",
       "Bash(git stash:*)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "Bash(open http://localhost:5173/test-fix.html)"
     ],
     "deny": []
   }

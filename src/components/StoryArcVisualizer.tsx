@@ -37,7 +37,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   
   // We'll use useStoryletCatalogStore.getState() when needed to avoid reactive dependencies
   const { clues } = useClueStore();
-  const { updateArcLastAccessed } = useStoryletStore();
+  const { updateArcLastAccessed, storyArcs } = useStoryletStore();
   
   // Local UI state (not managed by store)
   const [highlightedPath, setHighlightedPath] = useState<string[]>([]);
@@ -1768,7 +1768,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                             <option value="__create_new__" className="text-blue-600 font-medium">
                               ➕ Create New Linked Storylet
                             </option>
-                            <optgroup label="Existing Storylets">
+                            <optgroup label="Current Arc Storylets">
                               {arcStorylets
                                 .filter(s => s.id !== editingStorylet?.id) // Don't show current storylet
                                 .map(storylet => (
@@ -1778,6 +1778,40 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                 ))
                               }
                             </optgroup>
+                            {(() => {
+                              // Check if this choice has an arcJump effect to show destination arc storylets
+                              const arcJumpEffect = choice.effects.find(effect => effect.type === 'arcJump');
+                              if (arcJumpEffect && arcJumpEffect.destinationArc) {
+                                const catalogStore = useStoryletCatalogStore.getState();
+                                const destinationArcStorylets = Object.values(catalogStore.allStorylets)
+                                  .filter(storylet => storylet.storyArc === arcJumpEffect.destinationArc);
+                                
+                                if (destinationArcStorylets.length > 0) {
+                                  // If there's a targetStoryletId, prioritize it and show it first
+                                  const targetStorylet = arcJumpEffect.targetStoryletId 
+                                    ? destinationArcStorylets.find(s => s.id === arcJumpEffect.targetStoryletId)
+                                    : null;
+                                  
+                                  const otherStorylets = destinationArcStorylets.filter(s => s.id !== arcJumpEffect.targetStoryletId);
+                                  
+                                  return (
+                                    <optgroup label={`${arcJumpEffect.destinationArc} (Jump Destination)`}>
+                                      {targetStorylet && (
+                                        <option key={targetStorylet.id} value={targetStorylet.id} className="font-semibold text-green-700">
+                                          🎯 {targetStorylet.name || targetStorylet.id} (Target)
+                                        </option>
+                                      )}
+                                      {otherStorylets.map(storylet => (
+                                        <option key={storylet.id} value={storylet.id}>
+                                          {storylet.name || storylet.id}
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                  );
+                                }
+                              }
+                              return null;
+                            })()}
                             </select>
                           </div>
                           
@@ -1806,6 +1840,8 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                       newEffect = { type: 'flag', key: '', value: true };
                                     } else if (e.target.value === 'clueDiscovery') {
                                       newEffect = { type: 'clueDiscovery', clueId: '', onSuccess: [], onFailure: [] };
+                                    } else if (e.target.value === 'arcJump') {
+                                      newEffect = { type: 'arcJump', destinationArc: '', targetStoryletId: '', unlockStorylets: [] };
                                     }
                                     console.log('🔄 New effect created:', newEffect);
                                     updateEffect(choiceIndex, effectIndex, newEffect);
@@ -1815,6 +1851,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                   <option value="resource">Resource</option>
                                   <option value="flag">Flag</option>
                                   <option value="clueDiscovery">Clue Discovery</option>
+                                  <option value="arcJump">Arc Jump</option>
                                 </select>
                                 
                                 {effect.type === 'resource' && (() => {
@@ -1910,6 +1947,61 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                         </option>
                                       ))}
                                     </select>
+                                  );
+                                })()}
+                                
+                                {effect.type === 'arcJump' && (() => {
+                                  const arcJumpEffect = effect as { type: 'arcJump'; destinationArc: string; targetStoryletId?: string; unlockStorylets?: string[] };
+                                  const catalogStore = useStoryletCatalogStore.getState();
+                                  const destinationArcStorylets = arcJumpEffect.destinationArc 
+                                    ? Object.values(catalogStore.allStorylets).filter(storylet => storylet.storyArc === arcJumpEffect.destinationArc)
+                                    : [];
+                                  
+                                  return (
+                                    <>
+                                      <select
+                                        value={arcJumpEffect.destinationArc || ''}
+                                        onChange={(e) => {
+                                          console.log('🚀 Destination arc changed to:', e.target.value);
+                                          updateEffect(choiceIndex, effectIndex, { 
+                                            ...arcJumpEffect,
+                                            destinationArc: e.target.value,
+                                            targetStoryletId: '' // Reset target storylet when arc changes
+                                          });
+                                        }}
+                                        className="text-xs border rounded px-1 py-0.5"
+                                        style={{ minWidth: '120px' }}
+                                      >
+                                        <option value="">Select destination arc</option>
+                                        {storyArcs.map((arc) => (
+                                          <option key={arc} value={arc}>
+                                            {arc}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      
+                                      {arcJumpEffect.destinationArc && (
+                                        <select
+                                          value={arcJumpEffect.targetStoryletId || ''}
+                                          onChange={(e) => {
+                                            console.log('🎯 Target storylet changed to:', e.target.value);
+                                            updateEffect(choiceIndex, effectIndex, { 
+                                              ...arcJumpEffect,
+                                              targetStoryletId: e.target.value || undefined
+                                            });
+                                          }}
+                                          className="text-xs border rounded px-1 py-0.5"
+                                          style={{ minWidth: '140px' }}
+                                        >
+                                          <option value="">Select target storylet (optional)</option>
+                                          {destinationArcStorylets.map((storylet) => (
+                                            <option key={storylet.id} value={storylet.id}>
+                                              {storylet.name || storylet.id}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      )}
+                                    </>
                                   );
                                 })()}
                                 

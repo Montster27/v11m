@@ -51,6 +51,11 @@ interface ClueState {
   getRandomClueForMinigame: (minigameType: string, storyletId?: string) => Clue | null;
   getNextStoryArcClue: (storyArcId: string) => Clue | null;
   
+  // Outcome Storylets
+  getPositiveOutcomeStorylet: (clueId: string) => string | null;
+  getNegativeOutcomeStorylet: (clueId: string) => string | null;
+  triggerOutcomeStorylet: (clueId: string, success: boolean) => string | null;
+  
   // Utility
   getDiscoveryStats: () => {
     totalClues: number;
@@ -86,6 +91,8 @@ export const useClueStore = create<ClueState>()(
           arcOrder: clueData.arcOrder || undefined,
           minigameTypes: clueData.minigameTypes,
           associatedStorylets: clueData.associatedStorylets,
+          positiveOutcomeStorylet: clueData.positiveOutcomeStorylet || undefined,
+          negativeOutcomeStorylet: clueData.negativeOutcomeStorylet || undefined,
           isDiscovered: false,
           tags: clueData.tags,
           rarity: clueData.rarity,
@@ -285,6 +292,35 @@ export const useClueStore = create<ClueState>()(
       getNextStoryArcClue: (storyArcId: string) => {
         const arcClues = get().getCluesByStoryArc(storyArcId);
         return arcClues.find(clue => !clue.isDiscovered) || null;
+      },
+      
+      // Outcome Storylets
+      getPositiveOutcomeStorylet: (clueId: string) => {
+        const clue = get().getClueById(clueId);
+        return clue?.positiveOutcomeStorylet || null;
+      },
+      
+      getNegativeOutcomeStorylet: (clueId: string) => {
+        const clue = get().getClueById(clueId);
+        return clue?.negativeOutcomeStorylet || null;
+      },
+      
+      triggerOutcomeStorylet: (clueId: string, success: boolean) => {
+        const clue = get().getClueById(clueId);
+        if (!clue) return null;
+        
+        const outcomeStoryletId = success 
+          ? clue.positiveOutcomeStorylet 
+          : clue.negativeOutcomeStorylet;
+        
+        if (outcomeStoryletId) {
+          // If we have access to storylet store, we could trigger the storylet here
+          // For now, just return the storylet ID for the caller to handle
+          console.log(`🎯 Clue outcome: ${success ? 'Success' : 'Failure'} - Triggering storylet: ${outcomeStoryletId}`);
+          return outcomeStoryletId;
+        }
+        
+        return null;
       },
       
       getDiscoveryStats: () => {

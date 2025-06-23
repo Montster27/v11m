@@ -5,11 +5,13 @@ import Navigation from './components/Navigation';
 import MinigameManager from './components/minigames/MinigameManager';
 import ClueNotification from './components/ClueNotification';
 import ClueDiscoveryManager from './components/ClueDiscoveryManager';
+import RefactorNotificationBanner from './components/RefactorNotificationBanner';
 import { CharacterCreation, Planner, Quests, Skills, StoryletDeveloper, ContentCreator, SplashScreen } from './pages';
 import { useAppStore } from './store/useAppStore';
 import { useStoryletStore } from './store/useStoryletStore';
 import { useGameOrchestrator, useStoryletNotifications } from './hooks/useGameOrchestrator';
 import { useAutoSave } from './hooks/useAutoSave';
+import { useCoreGameStore, useNarrativeStore, useSocialStore } from './stores/v2';
 import { Clue } from './types/clue';
 // Development-only imports for testing utilities
 if (process.env.NODE_ENV === 'development') {
@@ -27,6 +29,29 @@ if (process.env.NODE_ENV === 'development') {
   import('./utils/testPathPlanner'); // Import path planner test utilities
   import('./utils/testClueOutcomes'); // Import clue outcome test utilities
   import('./utils/debugClueConnections'); // Import clue connection debug utilities
+  import('./utils/refactorBackup'); // Import refactor backup utilities
+  import('./utils/storeMigration'); // Import store migration utilities
+  import('./utils/preRefactorBackup'); // Import pre-refactor backup utilities
+  import('./utils/atomicResetValidation'); // Import atomic reset validation utilities
+  import('./utils/legacyCleanup'); // Import legacy cleanup utilities
+  import('../test/migration/dataMigrationTests'); // Import migration test suite
+  import('../test/reset/atomicResetTests'); // Import atomic reset test suite
+  import('../test/autosave/autoSaveIntegrationTests'); // Import auto-save test suite
+  import('../test/consistency/crossStoreTests'); // Import cross-store consistency test suite
+  import('../test/parity/featureParityTests'); // Import feature parity test suite
+  // Enable Phase 3 imports one by one to debug
+  import('./dev/storeInspector'); // Import Phase 3: Store Inspector utilities
+  import('./store/middleware/optimisticUpdates'); // Import Phase 3: Optimistic Updates middleware
+  import('./dev/testRunner'); // Import Phase 3: Enhanced Test Runner
+  import('./test/storeTestUtils'); // Import Phase 3: Store Test Utilities
+  
+  // Expose consolidated stores globally for console access
+  import('./stores/v2').then(module => {
+    (window as any).useCoreGameStore = module.useCoreGameStore;
+    (window as any).useNarrativeStore = module.useNarrativeStore;
+    (window as any).useSocialStore = module.useSocialStore;
+    console.log('🏪 Consolidated stores exposed globally for console access');
+  });
 }
 
 function App() {
@@ -106,6 +131,7 @@ function App() {
     <Router>
       <div className="min-h-screen bg-gray-50">
         <Navigation />
+        <RefactorNotificationBanner />
         <Routes>
           <Route path="/" element={<Navigate to="/planner" replace />} />
           <Route path="/planner" element={<Planner />} />

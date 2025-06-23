@@ -19,6 +19,10 @@ export interface Clue {
   // Storylet connections
   associatedStorylets: string[]; // Storylet IDs that can trigger this clue
   
+  // Outcome storylets (triggered after clue discovery)
+  positiveOutcomeStorylet?: string; // Storylet ID to trigger on successful discovery
+  negativeOutcomeStorylet?: string; // Storylet ID to trigger on failed discovery
+  
   // Discovery tracking
   isDiscovered: boolean;
   discoveredAt?: Date;
@@ -71,6 +75,8 @@ export interface ClueFormData {
   arcOrder: number;
   minigameTypes: string[];
   associatedStorylets: string[];
+  positiveOutcomeStorylet?: string;
+  negativeOutcomeStorylet?: string;
   tags: string[];
   rarity: Clue['rarity'];
 }

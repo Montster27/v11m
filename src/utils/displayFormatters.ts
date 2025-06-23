@@ -106,6 +106,8 @@ export function formatEffectSummary(effects: Array<{
         return `Minigame: ${effect.gameId || effect.minigameType || 'unknown'}`;
       case 'clueDiscovery':
         return `Discover clue: ${effect.clueId}`;
+      case 'arcJump':
+        return `Jump to arc: ${effect.destinationArc}${effect.targetStoryletId ? ` → ${effect.targetStoryletId}` : ''}`;
       case 'npcRelationship':
         const relSign = effect.delta >= 0 ? '+' : '';
         return `${effect.npcId} ${relSign}${effect.delta}`;

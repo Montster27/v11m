@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { useClueStore } from '../../store/useClueStore';
 import { useStoryletStore } from '../../store/useStoryletStore';
+import { useStoryletCatalogStore } from '../../store/useStoryletCatalogStore';
 import type { Clue } from '../../types/clue';
 import HelpTooltip from '../ui/HelpTooltip';
 import MinigameManagementPanel from '../MinigameManagementPanel';
@@ -32,7 +33,8 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
     getCluesByStorylet
   } = useClueStore();
 
-  const { storyArcs, allStorylets } = useStoryletStore();
+  const { storyArcs } = useStoryletStore();
+  const { getStoryletsForArc } = useStoryletCatalogStore();
 
   const [activeTab, setActiveTab] = useState<ClueManagerTab>('clues');
   const [selectedClue, setSelectedClue] = useState<string>('');
@@ -48,6 +50,8 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
     arcOrder: 1,
     minigameTypes: [] as string[],
     associatedStorylets: [] as string[],
+    positiveOutcomeStorylet: '',
+    negativeOutcomeStorylet: '',
     tags: '',
     rarity: 'common' as const
   });
@@ -78,6 +82,12 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
     return { total, discovered, byCategory, byDifficulty };
   }, [clues]);
 
+  // Get storylets for the currently selected story arc
+  const arcStorylets = useMemo(() => {
+    if (!clueFormData.storyArc) return [];
+    return getStoryletsForArc(clueFormData.storyArc);
+  }, [getStoryletsForArc, clueFormData.storyArc]);
+
   const resetClueForm = () => {
     setClueFormData({
       title: '',
@@ -89,6 +99,8 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
       arcOrder: 1,
       minigameTypes: [],
       associatedStorylets: [],
+      positiveOutcomeStorylet: '',
+      negativeOutcomeStorylet: '',
       tags: '',
       rarity: 'common'
     });
@@ -120,6 +132,8 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
       arcOrder: clue.arcOrder || 1,
       minigameTypes: clue.minigameTypes,
       associatedStorylets: clue.associatedStorylets,
+      positiveOutcomeStorylet: clue.positiveOutcomeStorylet || '',
+      negativeOutcomeStorylet: clue.negativeOutcomeStorylet || '',
       tags: clue.tags.join(', '),
       rarity: clue.rarity
     });
@@ -279,6 +293,21 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                         {clue.minigameTypes.length > 0 && (
                           <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
                             {clue.minigameTypes.length} minigame{clue.minigameTypes.length !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {clue.positiveOutcomeStorylet && clue.negativeOutcomeStorylet && (
+                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                            ⚡ Both Outcomes
+                          </span>
+                        )}
+                        {clue.positiveOutcomeStorylet && !clue.negativeOutcomeStorylet && (
+                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                            ✅ Success Outcome
+                          </span>
+                        )}
+                        {!clue.positiveOutcomeStorylet && clue.negativeOutcomeStorylet && (
+                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800">
+                            ❌ Failure Outcome
                           </span>
                         )}
                       </div>
@@ -525,7 +554,13 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Story Arc</label>
                 <select
                   value={clueFormData.storyArc}
-                  onChange={(e) => setClueFormData(prev => ({ ...prev, storyArc: e.target.value }))}
+                  onChange={(e) => setClueFormData(prev => ({ 
+                    ...prev, 
+                    storyArc: e.target.value,
+                    // Reset outcome storylets when arc changes
+                    positiveOutcomeStorylet: '',
+                    negativeOutcomeStorylet: ''
+                  }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded"
                 >
                   <option value="">-- No Story Arc --</option>
@@ -534,6 +569,61 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                   ))}
                 </select>
               </div>
+
+              {/* Outcome Storylets - only show if story arc is selected */}
+              {clueFormData.storyArc && (
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-green-700 mb-1">
+                      ✅ Positive Outcome Storylet
+                      <HelpTooltip content="Storylet to trigger when clue discovery succeeds" />
+                    </label>
+                    <select
+                      value={clueFormData.positiveOutcomeStorylet}
+                      onChange={(e) => setClueFormData(prev => ({ ...prev, positiveOutcomeStorylet: e.target.value }))}
+                      className="w-full px-3 py-2 border border-green-300 rounded focus:border-green-500 focus:ring-green-500"
+                    >
+                      <option value="">-- No Success Storylet --</option>
+                      {arcStorylets.map(storylet => (
+                        <option key={storylet.id} value={storylet.id}>
+                          {storylet.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-red-700 mb-1">
+                      ❌ Negative Outcome Storylet
+                      <HelpTooltip content="Storylet to trigger when clue discovery fails" />
+                    </label>
+                    <select
+                      value={clueFormData.negativeOutcomeStorylet}
+                      onChange={(e) => setClueFormData(prev => ({ ...prev, negativeOutcomeStorylet: e.target.value }))}
+                      className="w-full px-3 py-2 border border-red-300 rounded focus:border-red-500 focus:ring-red-500"
+                    >
+                      <option value="">-- No Failure Storylet --</option>
+                      {arcStorylets.map(storylet => (
+                        <option key={storylet.id} value={storylet.id}>
+                          {storylet.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {arcStorylets.length === 0 && (
+                    <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded">
+                      No storylets found in the "{clueFormData.storyArc}" arc. Create storylets for this arc to enable outcome triggers.
+                    </div>
+                  )}
+                  
+                  {arcStorylets.length > 0 && (
+                    <div className="text-sm text-blue-600 bg-blue-50 p-3 rounded">
+                      Found {arcStorylets.length} storylet{arcStorylets.length !== 1 ? 's' : ''} in "{clueFormData.storyArc}" arc
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
