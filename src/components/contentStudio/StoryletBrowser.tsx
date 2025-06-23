@@ -105,7 +105,12 @@ const StoryletBrowser: React.FC<StoryletBrowserProps> = ({ onEditStorylet, onEdi
 
     // Story arc filter
     if (filters.storyArc !== 'all') {
-      storylets = storylets.filter(storylet => storylet.storyArc === filters.storyArc);
+      if (filters.storyArc === '') {
+        // Show storylets with no arc (undefined, null, or empty string)
+        storylets = storylets.filter(storylet => !storylet.storyArc || storylet.storyArc.trim() === '');
+      } else {
+        storylets = storylets.filter(storylet => storylet.storyArc === filters.storyArc);
+      }
     }
 
     // Deployment status filter
@@ -320,12 +325,19 @@ const StoryletBrowser: React.FC<StoryletBrowserProps> = ({ onEditStorylet, onEdi
               <button
                 onClick={() => {
                   if (confirm(`Are you sure you want to delete "${storylet.name}"?`)) {
+                    console.log(`🗑️ Deleting storylet: ${storylet.id} - ${storylet.name}`);
                     const undoAction = {
                       id: `delete_${storylet.id}`,
                       description: `Delete storylet "${storylet.name}"`,
                       timestamp: new Date(),
-                      redoAction: () => deleteStorylet(storylet.id),
-                      undoAction: () => useStoryletStore.getState().addStorylet(storylet)
+                      redoAction: () => {
+                        console.log(`🔄 Redo: Deleting storylet ${storylet.id}`);
+                        deleteStorylet(storylet.id);
+                      },
+                      undoAction: () => {
+                        console.log(`↩️ Undo: Restoring storylet ${storylet.id}`);
+                        useStoryletStore.getState().addStorylet(storylet);
+                      }
                     };
                     undoRedoSystem.executeAction(undoAction);
                   }
@@ -401,12 +413,19 @@ const StoryletBrowser: React.FC<StoryletBrowserProps> = ({ onEditStorylet, onEdi
             <button
               onClick={() => {
                 if (confirm(`Are you sure you want to delete "${storylet.name}"?`)) {
+                  console.log(`🗑️ Deleting storylet: ${storylet.id} - ${storylet.name}`);
                   const undoAction = {
                     id: `delete_${storylet.id}`,
                     description: `Delete storylet "${storylet.name}"`,
                     timestamp: new Date(),
-                    redoAction: () => deleteStorylet(storylet.id),
-                    undoAction: () => useStoryletStore.getState().addStorylet(storylet)
+                    redoAction: () => {
+                      console.log(`🔄 Redo: Deleting storylet ${storylet.id}`);
+                      deleteStorylet(storylet.id);
+                    },
+                    undoAction: () => {
+                      console.log(`↩️ Undo: Restoring storylet ${storylet.id}`);
+                      useStoryletStore.getState().addStorylet(storylet);
+                    }
                   };
                   undoRedoSystem.executeAction(undoAction);
                 }

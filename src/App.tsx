@@ -32,6 +32,7 @@ if (process.env.NODE_ENV === 'development') {
 function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [clueNotification, setClueNotification] = useState<{clue: Clue; isVisible: boolean} | null>(null);
+  const [orphanedStateChecked, setOrphanedStateChecked] = useState(false);
   
   // Core store hooks
   const { activeCharacter, day, userLevel, experience } = useAppStore();
@@ -40,9 +41,9 @@ function App() {
   // Debug: Log app state on startup
   console.log('🚀 App startup - Current state:', { day, userLevel, experience, activeCharacter });
   
-  // CRITICAL FIX: Check if we have unexpected state on startup
+  // CRITICAL FIX: Check if we have unexpected state on startup (only once)
   useEffect(() => {
-    if (!showSplash && (day > 1 || userLevel > 1 || experience > 0)) {
+    if (!showSplash && !orphanedStateChecked && (day > 1 || userLevel > 1 || experience > 0)) {
       console.log('⚠️ Detected unexpected persisted state on startup');
       console.log('📦 localStorage keys:', Object.keys(localStorage));
       
@@ -50,8 +51,8 @@ function App() {
       const saveStore = (window as any).useSaveStore?.getState();
       const currentSaveId = saveStore?.currentSaveId;
       
-      if (!currentSaveId) {
-        console.log('🚨 No currentSaveId but state is not fresh - forcing reset');
+      if (!currentSaveId && !activeCharacter) {
+        console.log('🚨 No currentSaveId and no active character - forcing reset');
         // Force reset to initial state if no active save justifies the persisted data
         (window as any).useAppStore.setState({
           userLevel: 1,
@@ -60,10 +61,12 @@ function App() {
           activeCharacter: null
         });
       } else {
-        console.log('ℹ️ State justified by currentSaveId:', currentSaveId);
+        console.log('ℹ️ State justified by:', { currentSaveId, activeCharacter: activeCharacter?.name });
       }
+      
+      setOrphanedStateChecked(true);
     }
-  }, [showSplash, day, userLevel, experience]);
+  }, [showSplash, orphanedStateChecked, day, userLevel, experience, activeCharacter]);
   
   // Set up reactive orchestration (replaces setTimeout patterns)
   useGameOrchestrator();

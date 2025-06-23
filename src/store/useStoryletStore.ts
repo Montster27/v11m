@@ -3,17 +3,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Storylet, Effect, MinigameType } from '../types/storylet';
-import { collegeStorylets } from '../data/collegeStorylets';
-import { immediateStorylets } from '../data/immediateStorylets';
-import { frequentStorylets } from '../data/frequentStorylets';
-import { minigameStorylets } from '../data/minigameStorylets';
-import { integratedStorylets } from '../data/integratedStorylets';
-import { developmentTriggeredStorylets } from '../data/developmentTriggeredStorylets';
-import { startingStorylets } from '../data/startingStorylets';
-import { emmaRomanceStorylets, emmaInfluenceStorylets } from '../data/emmaRomanceArc';
 import { globalTimeoutManager } from '../utils/timeoutManager';
 import { getAppState, getNPCStore, isAppStoreAvailable, isNPCStoreAvailable, isIntegratedCharacterStoreAvailable, isSkillSystemV2StoreAvailable, isSaveStoreAvailable } from '../types/global';
 import { debounce, AsyncQueue } from '../utils/debounce';
+import { useStoryletCatalogStore } from './useStoryletCatalogStore';
 
 // Arc progression types
 interface ArcProgress {
@@ -71,6 +64,7 @@ interface StoryletState {
   } | null;
   
   // Actions
+  syncFromCatalogStore: () => void;                 // sync storylets from catalog store
   evaluateStorylets: () => void;                    // scan and unlock storylets based on triggers
   chooseStorylet: (storyletId: string, choiceId: string) => void;  // make a choice in a storylet
   unlockStorylet: (storyletId: string) => void;     // manually unlock a storylet
@@ -281,18 +275,8 @@ const evaluateStoryletTrigger = (trigger: any, activeFlags: any, appState: any) 
 };
 
 export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
-  // Initial state
-  allStorylets: { 
-    ...startingStorylets,
-    ...immediateStorylets, 
-    ...frequentStorylets, 
-    ...collegeStorylets, 
-    ...minigameStorylets, 
-    ...integratedStorylets,
-    ...developmentTriggeredStorylets,
-    ...emmaRomanceStorylets,
-    ...emmaInfluenceStorylets
-  },
+  // Initial state - load storylets from catalog store
+  allStorylets: {},
   activeFlags: {},
   activeStoryletIds: [],
   completedStoryletIds: [],
@@ -303,7 +287,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   arcMetadata: {},
   
   // Development settings
-  deploymentFilter: new Set(['live']) as Set<'live' | 'stage' | 'dev'>,
+  deploymentFilter: new Set(['live', 'dev']) as Set<'live' | 'stage' | 'dev'>,
   
   // Minigame state
   activeMinigame: null,
@@ -314,7 +298,22 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   clueDiscoveryRequest: null,
   
   // Evaluate storylets - check triggers and unlock eligible storylets
+  // Sync storylets from catalog store
+  syncFromCatalogStore: () => {
+    const catalogStore = useStoryletCatalogStore.getState();
+    const currentStorylets = catalogStore.allStorylets;
+    
+    console.log('🔄 Syncing storylets from catalog store:', Object.keys(currentStorylets).length);
+    
+    set((state) => ({
+      allStorylets: currentStorylets
+    }));
+  },
+
   evaluateStorylets: () => {
+    // First sync from catalog store to get latest storylets
+    get().syncFromCatalogStore();
+    
     // Use queue to prevent race conditions during evaluation
     evaluationQueue.add(async () => {
       return get()._evaluateStoryletsSync();
@@ -779,6 +778,68 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
           console.warn('Could not set NPC availability:', error);
         }
         break;
+        
+      case 'arcJump':
+        try {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`🚀 Arc Jump: Transitioning to "${effect.destinationArc}"${effect.targetStoryletId ? ` → ${effect.targetStoryletId}` : ''}`);
+          }
+          
+          // Get storylets from destination arc
+          const arcStorylets = get().getStoryletsByArc(effect.destinationArc);
+          
+          if (arcStorylets.length === 0) {
+            console.warn(`Arc "${effect.destinationArc}" contains no storylets`);
+            break;
+          }
+          
+          // Priority 1: If targetStoryletId is specified, unlock that specific storylet
+          if (effect.targetStoryletId) {
+            const targetStorylet = arcStorylets.find(s => s.id === effect.targetStoryletId);
+            if (targetStorylet) {
+              get().unlockStorylet(effect.targetStoryletId);
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`🎯 Unlocked target storylet "${effect.targetStoryletId}" in arc "${effect.destinationArc}"`);
+              }
+            } else {
+              console.warn(`Target storylet "${effect.targetStoryletId}" not found in arc "${effect.destinationArc}"`);
+            }
+          }
+          
+          // Priority 2: If specific storylets are specified, unlock those
+          if (effect.unlockStorylets && effect.unlockStorylets.length > 0) {
+            effect.unlockStorylets.forEach(storyletId => {
+              if (arcStorylets.some(s => s.id === storyletId)) {
+                get().unlockStorylet(storyletId);
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`✨ Unlocked storylet "${storyletId}" in arc "${effect.destinationArc}"`);
+                }
+              } else {
+                console.warn(`Storylet "${storyletId}" not found in arc "${effect.destinationArc}"`);
+              }
+            });
+          } else if (!effect.targetStoryletId) {
+            // Priority 3: No specific target or unlockStorylets - unlock all available storylets from the arc
+            // that can be triggered (have no prerequisites or whose prerequisites are met)
+            arcStorylets.forEach(storylet => {
+              // Simple check: if it's a time trigger with no conditions, or flag trigger with empty conditions, unlock it
+              const isSimpleTrigger = (
+                (storylet.trigger.type === 'time' && Object.keys(storylet.trigger.conditions).length === 0) ||
+                (storylet.trigger.type === 'flag' && (!storylet.trigger.conditions.flags || storylet.trigger.conditions.flags.length === 0))
+              );
+              
+              if (isSimpleTrigger) {
+                get().unlockStorylet(storylet.id);
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`✨ Auto-unlocked storylet "${storylet.id}" from arc "${effect.destinationArc}"`);
+                }
+              }
+            });
+          }
+        } catch (error) {
+          console.warn('Could not process arcJump effect:', error);
+        }
+        break;
     }
   },
   
@@ -803,18 +864,13 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   // Add a new storylet to the catalog
   addStorylet: (storylet: Storylet) => {
     console.log(`🎯 addStorylet called with:`, storylet);
-    console.log(`🎯 Current allStorylets keys:`, Object.keys(get().allStorylets));
     
-    set((state) => {
-      const newState = {
-        allStorylets: {
-          ...state.allStorylets,
-          [storylet.id]: storylet
-        }
-      };
-      console.log(`🎯 New allStorylets keys:`, Object.keys(newState.allStorylets));
-      return newState;
-    });
+    // Add to catalog store (source of truth)
+    const catalogStore = useStoryletCatalogStore.getState();
+    catalogStore.addStorylet(storylet);
+    
+    // Sync from catalog store to update local state
+    get().syncFromCatalogStore();
     
     console.log(`🎯 After set, allStorylets keys:`, Object.keys(get().allStorylets));
     
@@ -825,12 +881,12 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
 
   // Update an existing storylet
   updateStorylet: (storylet: Storylet) => {
-    set((state) => ({
-      allStorylets: {
-        ...state.allStorylets,
-        [storylet.id]: storylet
-      }
-    }));
+    // Update in catalog store (source of truth)
+    const catalogStore = useStoryletCatalogStore.getState();
+    catalogStore.updateStorylet(storylet);
+    
+    // Sync from catalog store to update local state
+    get().syncFromCatalogStore();
     
     if (process.env.NODE_ENV === 'development') {
       console.log(`✏️ Updated storylet: ${storylet.id}`);
@@ -839,17 +895,21 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
 
   // Delete a storylet from the catalog
   deleteStorylet: (storyletId: string) => {
-    set((state) => {
-      const { [storyletId]: deleted, ...remaining } = state.allStorylets;
-      return {
-        allStorylets: remaining,
-        activeStoryletIds: state.activeStoryletIds.filter(id => id !== storyletId),
-        completedStoryletIds: state.completedStoryletIds.filter(id => id !== storyletId),
-        storyletCooldowns: Object.fromEntries(
-          Object.entries(state.storyletCooldowns).filter(([id]) => id !== storyletId)
-        )
-      };
-    });
+    // Delete from catalog store (source of truth)
+    const catalogStore = useStoryletCatalogStore.getState();
+    catalogStore.deleteStorylet(storyletId);
+    
+    // Also clean up from local state
+    set((state) => ({
+      activeStoryletIds: state.activeStoryletIds.filter(id => id !== storyletId),
+      completedStoryletIds: state.completedStoryletIds.filter(id => id !== storyletId),
+      storyletCooldowns: Object.fromEntries(
+        Object.entries(state.storyletCooldowns).filter(([id]) => id !== storyletId)
+      )
+    }));
+    
+    // Sync from catalog store to update local state
+    get().syncFromCatalogStore();
     
     if (process.env.NODE_ENV === 'development') {
       console.log(`🗑️ Deleted storylet: ${storyletId}`);
