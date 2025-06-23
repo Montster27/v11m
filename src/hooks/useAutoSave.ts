@@ -10,6 +10,7 @@ export function useAutoSave() {
   const day = useAppStore(state => state.day);
   const resources = useAppStore(state => state.resources);
   const skills = useAppStore(state => state.skills);
+  const isResetting = useAppStore(state => state.isResetting);
   
   // Track previous values to debounce saves
   const previousValuesRef = useRef({
@@ -20,6 +21,18 @@ export function useAutoSave() {
 
   // Auto-save when significant game state changes
   useEffect(() => {
+    // Skip auto-save during character reset to prevent race conditions
+    if (isResetting) {
+      console.log('⏸️ Auto-save skipped - character reset in progress');
+      return;
+    }
+    
+    // Additional safety: Skip if we detect fresh start values during potential reset
+    if (day === 1 && useAppStore.getState().experience === 0 && useAppStore.getState().userLevel === 1) {
+      console.log('⏸️ Auto-save skipped - fresh start detected');
+      return;
+    }
+    
     const hasSignificantChange = (
       previousValuesRef.current.day !== day ||
       JSON.stringify(previousValuesRef.current.resources) !== JSON.stringify(resources) ||
@@ -49,7 +62,7 @@ export function useAutoSave() {
         console.warn('Auto-save not available:', error);
       }
     }
-  }, [day, resources, skills]);
+  }, [day, resources, skills, isResetting]);
 
   return null; // This hook manages side effects only
 }

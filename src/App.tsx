@@ -34,8 +34,36 @@ function App() {
   const [clueNotification, setClueNotification] = useState<{clue: Clue; isVisible: boolean} | null>(null);
   
   // Core store hooks
-  const { activeCharacter } = useAppStore();
+  const { activeCharacter, day, userLevel, experience } = useAppStore();
   const { activeMinigame, completeMinigame, closeMinigame } = useStoryletStore();
+  
+  // Debug: Log app state on startup
+  console.log('🚀 App startup - Current state:', { day, userLevel, experience, activeCharacter });
+  
+  // CRITICAL FIX: Check if we have unexpected state on startup
+  useEffect(() => {
+    if (!showSplash && (day > 1 || userLevel > 1 || experience > 0)) {
+      console.log('⚠️ Detected unexpected persisted state on startup');
+      console.log('📦 localStorage keys:', Object.keys(localStorage));
+      
+      // Check if we have a valid currentSaveId that justifies this state
+      const saveStore = (window as any).useSaveStore?.getState();
+      const currentSaveId = saveStore?.currentSaveId;
+      
+      if (!currentSaveId) {
+        console.log('🚨 No currentSaveId but state is not fresh - forcing reset');
+        // Force reset to initial state if no active save justifies the persisted data
+        (window as any).useAppStore.setState({
+          userLevel: 1,
+          experience: 0,
+          day: 1,
+          activeCharacter: null
+        });
+      } else {
+        console.log('ℹ️ State justified by currentSaveId:', currentSaveId);
+      }
+    }
+  }, [showSplash, day, userLevel, experience]);
   
   // Set up reactive orchestration (replaces setTimeout patterns)
   useGameOrchestrator();

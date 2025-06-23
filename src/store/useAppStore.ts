@@ -73,6 +73,9 @@ interface AppState {
   // Time control
   isTimePaused: boolean;
   
+  // Reset control flag to prevent auto-save interference
+  isResetting: boolean;
+  
   // Skill actions
   addSkillXp: (skillId: string, amount: number, source?: string) => void;
   addSkillEvent: (event: { skillId: string; amount: number; timestamp: number; source: string }) => void;
@@ -247,6 +250,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   lastEventCheck: 0,
   
   isTimePaused: false,
+  isResetting: false,
   
   // Actions
   setTheme: (theme) => set({ theme }),
@@ -534,7 +538,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       resources: {
         energy: 75,
         stress: 25,
-        money: 150,
+        money: 20,
         knowledge: 100,
         social: 200
       },
@@ -598,7 +602,8 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       tasks: [],
       isSimulationRunning: false,
       lastEventCheck: 0,
-      isTimePaused: false
+      isTimePaused: false,
+      isResetting: false
     });
     
     // Reset storylets via storylet store

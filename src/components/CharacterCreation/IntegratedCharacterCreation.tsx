@@ -67,6 +67,8 @@ const IntegratedCharacterCreation: React.FC<IntegratedCharacterCreationProps> = 
   const { createCharacter, updateCharacter } = useIntegratedCharacterStore();
   const { setActiveCharacter } = useAppStore();
   
+  console.log('🎭 IntegratedCharacterCreation component mounted');
+  
   const [step, setStep] = useState(1);
   const [characterName, setCharacterName] = useState('');
   const [domainAdjustments, setDomainAdjustments] = useState<DomainAdjustment>({
@@ -87,8 +89,7 @@ const IntegratedCharacterCreation: React.FC<IntegratedCharacterCreationProps> = 
 
   const handleNameSubmit = () => {
     if (characterName.trim()) {
-      const newCharacter = createCharacter(characterName.trim());
-      setTempCharacter(newCharacter);
+      // DON'T create character yet - just move to next step
       setStep(2);
     }
   };
@@ -104,74 +105,54 @@ const IntegratedCharacterCreation: React.FC<IntegratedCharacterCreationProps> = 
   };
 
   const handleFinalize = () => {
-    if (!tempCharacter) return;
+    if (!characterName.trim()) return;
 
-    // Reset all game state before setting new character
-    console.log('🔄 Resetting game state for new character...');
+    console.log('🔄 Creating new character with full reset...');
     
-    // Reset app store (day, resources, storylets, etc.)
-    try {
-      if (typeof window !== 'undefined' && (window as any).useAppStore) {
-        (window as any).useAppStore.getState().resetGame();
-      }
-    } catch (error) {
-      console.warn('Could not reset app store:', error);
-    }
-
-    // Reset storylet store
-    try {
-      if (typeof window !== 'undefined' && (window as any).useStoryletStore) {
-        (window as any).useStoryletStore.getState().resetStorylets();
-      }
-    } catch (error) {
-      console.warn('Could not reset storylet store:', error);
-    }
-
-    // Reset skill system V2 store
-    try {
-      if (typeof window !== 'undefined' && (window as any).useSkillSystemV2Store) {
-        (window as any).useSkillSystemV2Store.getState().resetSkillSystem();
-      }
-    } catch (error) {
-      console.warn('Could not reset skill system V2 store:', error);
-    }
-
+    // Create character - this will trigger the full reset in the store
+    const newCharacter = createCharacter(characterName.trim());
+    
     // Apply domain adjustments to the character
     const updatedCharacter: IntegratedCharacter = {
-      ...tempCharacter,
+      ...newCharacter,
       intellectualCompetence: {
-        ...tempCharacter.intellectualCompetence,
-        level: Math.max(5, Math.min(100, tempCharacter.intellectualCompetence.level + domainAdjustments.intellectualCompetence))
+        ...newCharacter.intellectualCompetence,
+        level: Math.max(5, Math.min(100, newCharacter.intellectualCompetence.level + domainAdjustments.intellectualCompetence))
       },
       physicalCompetence: {
-        ...tempCharacter.physicalCompetence,
-        level: Math.max(5, Math.min(100, tempCharacter.physicalCompetence.level + domainAdjustments.physicalCompetence))
+        ...newCharacter.physicalCompetence,
+        level: Math.max(5, Math.min(100, newCharacter.physicalCompetence.level + domainAdjustments.physicalCompetence))
       },
       emotionalIntelligence: {
-        ...tempCharacter.emotionalIntelligence,
-        level: Math.max(5, Math.min(100, tempCharacter.emotionalIntelligence.level + domainAdjustments.emotionalIntelligence))
+        ...newCharacter.emotionalIntelligence,
+        level: Math.max(5, Math.min(100, newCharacter.emotionalIntelligence.level + domainAdjustments.emotionalIntelligence))
       },
       socialCompetence: {
-        ...tempCharacter.socialCompetence,
-        level: Math.max(5, Math.min(100, tempCharacter.socialCompetence.level + domainAdjustments.socialCompetence))
+        ...newCharacter.socialCompetence,
+        level: Math.max(5, Math.min(100, newCharacter.socialCompetence.level + domainAdjustments.socialCompetence))
       },
       personalAutonomy: {
-        ...tempCharacter.personalAutonomy,
-        level: Math.max(5, Math.min(100, tempCharacter.personalAutonomy.level + domainAdjustments.personalAutonomy))
+        ...newCharacter.personalAutonomy,
+        level: Math.max(5, Math.min(100, newCharacter.personalAutonomy.level + domainAdjustments.personalAutonomy))
       },
       identityClarity: {
-        ...tempCharacter.identityClarity,
-        level: Math.max(5, Math.min(100, tempCharacter.identityClarity.level + domainAdjustments.identityClarity))
+        ...newCharacter.identityClarity,
+        level: Math.max(5, Math.min(100, newCharacter.identityClarity.level + domainAdjustments.identityClarity))
       },
       lifePurpose: {
-        ...tempCharacter.lifePurpose,
-        level: Math.max(5, Math.min(100, tempCharacter.lifePurpose.level + domainAdjustments.lifePurpose))
+        ...newCharacter.lifePurpose,
+        level: Math.max(5, Math.min(100, newCharacter.lifePurpose.level + domainAdjustments.lifePurpose))
       }
     };
 
     updateCharacter(updatedCharacter);
     setActiveCharacter(updatedCharacter);
-    navigate('/planner');
+    
+    // Navigate to planner after character creation
+    setTimeout(() => {
+      console.log('✅ Character creation complete - navigating to planner');
+      navigate('/planner');
+    }, 300); // Wait for all the store resets to complete
   };
 
   if (step === 1) {

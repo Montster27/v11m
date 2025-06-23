@@ -16,12 +16,19 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onChoiceMade }) => {
   const latestSave = saveSlots.sort((a, b) => b.timestamp - a.timestamp)[0];
 
   const handleNewGame = () => {
+    console.log('🎮 User clicked New Game');
+    console.log('📊 Current save slots:', saveSlots);
+    console.log('📊 Has saves:', hasSaves);
+    console.log('📊 Latest save:', latestSave);
+    
     onChoiceMade();
+    console.log('🎮 Navigating to character-creation');
     navigate('/character-creation');
   };
 
   const handleContinue = () => {
     if (latestSave) {
+      console.log('🔄 Loading save file:', latestSave);
       const success = loadSave(latestSave.id);
       if (success) {
         onChoiceMade();
@@ -30,6 +37,47 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onChoiceMade }) => {
         console.error('Failed to load save');
         // Could show an error message to user
       }
+    }
+  };
+
+  const handleDeleteProgress = () => {
+    if (confirm('Are you sure you want to delete ALL progress and start completely fresh? This cannot be undone.')) {
+      console.log('🗑️ User requested complete progress deletion');
+      
+      // Clear all localStorage
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Delete all save files
+      const saveSlots = getSaveSlots();
+      saveSlots.forEach(slot => {
+        console.log(`🗑️ Deleting save: ${slot.name}`);
+      });
+      
+      // Reset save store - CRITICAL: Clear currentSaveId to prevent auto-save interference
+      if (typeof window !== 'undefined' && (window as any).useSaveStore) {
+        (window as any).useSaveStore.setState({
+          saveSlots: [],
+          currentSaveId: null,
+          storyletCompletions: []
+        });
+        console.log('🔄 Cleared currentSaveId to prevent auto-save interference');
+      }
+      
+      // Reset app store
+      if (typeof window !== 'undefined' && (window as any).useAppStore) {
+        (window as any).useAppStore.getState().resetGame();
+        (window as any).useAppStore.setState({
+          userLevel: 1,
+          experience: 0,
+          day: 1,
+          activeCharacter: null
+        });
+      }
+      
+      console.log('✅ All progress deleted - redirecting to character creation');
+      onChoiceMade();
+      navigate('/character-creation');
     }
   };
 
@@ -69,6 +117,15 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onChoiceMade }) => {
           >
             Continue
           </Button>
+          
+          {hasSaves && (
+            <Button
+              onClick={handleDeleteProgress}
+              className="w-full py-2 text-sm font-medium bg-red-500 hover:bg-red-600 text-white rounded-lg shadow transition-all duration-200"
+            >
+              🗑️ Delete All Progress
+            </Button>
+          )}
           
           {hasSaves && latestSave && (
             <div className="text-sm text-amber-600 mt-2">

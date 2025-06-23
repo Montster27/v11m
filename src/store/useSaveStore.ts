@@ -278,7 +278,25 @@ export const useSaveStore = create<SaveState & {
   // Update current save with latest game state
   updateCurrentSave: () => {
     const { currentSaveId, saveSlots } = get();
-    if (!currentSaveId) return;
+    if (!currentSaveId) {
+      console.log('⏸️ updateCurrentSave skipped - no currentSaveId');
+      return;
+    }
+    
+    // 🎯 DEFENSIVE: Multiple checks to prevent race condition during reset
+    if (typeof window !== 'undefined' && (window as any).useAppStore) {
+      const appState = (window as any).useAppStore.getState();
+      if (appState.isResetting) {
+        console.log('⏸️ updateCurrentSave skipped - reset in progress');
+        return;
+      }
+      
+      // Additional safety: Don't save if we detect "fresh start" values
+      if (appState.day === 1 && appState.experience === 0 && appState.userLevel === 1) {
+        console.log('⏸️ updateCurrentSave skipped - fresh start detected');
+        return;
+      }
+    }
     
     const currentSlot = saveSlots.find(slot => slot.id === currentSaveId);
     if (!currentSlot) return;

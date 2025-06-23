@@ -84,63 +84,63 @@ export const useIntegratedCharacterStore = create<IntegratedCharacterState>()(
           name,
           version: 2,
           
-          // Initialize all domains at stage 1 with basic levels
+          // Initialize all domains at stage 1 with minimal starting levels (zero progress)
           intellectualCompetence: {
-            level: 25,
-            components: { reasoning: 25, innovation: 25, retention: 25 },
+            level: 1,
+            components: { reasoning: 1, innovation: 1, retention: 1 },
             developmentStage: 1,
             experiencePoints: 0,
-            confidence: 30
+            confidence: 10
           },
           physicalCompetence: {
-            level: 25,
-            components: { power: 25, coordination: 25, discipline: 25 },
+            level: 1,
+            components: { power: 1, coordination: 1, discipline: 1 },
             developmentStage: 1,
             experiencePoints: 0,
-            confidence: 30
+            confidence: 10
           },
           emotionalIntelligence: {
-            level: 25,
-            components: { awareness: 25, regulation: 25, resilience: 25 },
+            level: 1,
+            components: { awareness: 1, regulation: 1, resilience: 1 },
             developmentStage: 1,
             experiencePoints: 0,
-            confidence: 30
+            confidence: 10
           },
           socialCompetence: {
-            level: 25,
-            components: { connection: 25, communication: 25, relationships: 25 },
+            level: 1,
+            components: { connection: 1, communication: 1, relationships: 1 },
             developmentStage: 1,
             experiencePoints: 0,
-            confidence: 30
+            confidence: 10
           },
           personalAutonomy: {
-            level: 20,
-            components: { independence: 20, interdependence: 15, responsibility: 25 },
+            level: 1,
+            components: { independence: 1, interdependence: 1, responsibility: 1 },
             developmentStage: 1,
             experiencePoints: 0,
-            confidence: 25
+            confidence: 10
           },
           identityClarity: {
-            level: 15,
-            components: { selfAwareness: 20, values: 15, authenticity: 10 },
+            level: 1,
+            components: { selfAwareness: 1, values: 1, authenticity: 1 },
             developmentStage: 1,
             experiencePoints: 0,
-            confidence: 20
+            confidence: 10
           },
           lifePurpose: {
-            level: 10,
-            components: { direction: 15, meaning: 10, integrity: 5 },
+            level: 1,
+            components: { direction: 1, meaning: 1, integrity: 1 },
             developmentStage: 1,
             experiencePoints: 0,
-            confidence: 15
+            confidence: 10
           },
           
           initialResources: {
-            grades: 75,
-            money: 100,
-            social: 50,
-            energy: 80,
-            stress: 20
+            grades: 50,
+            money: 20,
+            social: 25,
+            energy: 75,
+            stress: 25
           },
           
           totalDevelopmentPoints: 0,
@@ -161,8 +161,59 @@ export const useIntegratedCharacterStore = create<IntegratedCharacterState>()(
         
         set(state => ({
           characters: [...state.characters, newCharacter],
-          currentCharacter: newCharacter
+          currentCharacter: newCharacter,
+          // Reset development stats for new character
+          developmentStats: {
+            totalXP: 0,
+            currentStreak: 0,
+            longestStreak: 0,
+            milestonesReached: 0
+          }
         }));
+        
+        // Atomic reset pattern - fixed logic
+        if (typeof window !== 'undefined') {
+          console.log('🔄 Starting atomic character reset...');
+          
+          // Step 1: Clear save system interference FIRST (before any state changes)
+          if ((window as any).useSaveStore) {
+            (window as any).useSaveStore.setState({ 
+              currentSaveId: null,
+              saveSlots: [],
+              storyletCompletions: []
+            });
+            console.log('🔄 Save system cleared');
+          }
+          
+          // Step 2: Clear all persistence
+          localStorage.clear();
+          sessionStorage.clear();
+          console.log('🗑️ Storage cleared');
+          
+          // Step 3: Reset stores to initial state (after persistence cleared)
+          if ((window as any).useAppStore) {
+            (window as any).useAppStore.getState().resetGame();
+            console.log('🎯 App store reset');
+          }
+          
+          if ((window as any).useStoryletStore) {
+            (window as any).useStoryletStore.getState().resetStorylets();
+            console.log('🎯 Storylet store reset');
+          }
+          
+          // Step 4: Force set fresh character state
+          if ((window as any).useAppStore) {
+            (window as any).useAppStore.setState({
+              userLevel: 1,
+              experience: 0,
+              day: 1,
+              activeCharacter: newCharacter
+            });
+            console.log('🎯 Character state set');
+          }
+          
+          console.log('✅ Atomic reset complete');
+        }
         
         return newCharacter;
       },
