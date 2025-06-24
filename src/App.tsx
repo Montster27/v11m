@@ -58,6 +58,9 @@ if (process.env.NODE_ENV === 'development') {
   import('./test/characterFlow/fixSaveTest'); // Import save test debugger
   import('./test/characterFlow/quickTestFix'); // Import fixed quick test
   
+  // Phase 2: Planner Decomposition Tests
+  import('./test/plannerRefactor/decompositionTest'); // Import planner decomposition tests
+  
   // Show test availability banner
   setTimeout(() => {
     console.log('\n🧪 CHARACTER FLOW TESTS LOADED!');
@@ -67,7 +70,8 @@ if (process.env.NODE_ENV === 'development') {
     console.log('Type quickStatusCheck() for quick validation overview');
     console.log('Type runCompleteValidation() for COMPLETE validation suite');
     console.log('Type generateSuccessReport() for final success validation');
-    console.log('Type testRecentFixes() to validate recent bug fixes\n');
+    console.log('Type testRecentFixes() to validate recent bug fixes');
+    console.log('Type runDecompositionTests() to test Planner refactoring\n');
   }, 2000);
   import('./utils/debugClueConnections'); // Import clue connection debug utilities
   import('./utils/refactorBackup'); // Import refactor backup utilities

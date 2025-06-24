@@ -8,6 +8,10 @@ export interface ValidationResult {
   type?: 'error' | 'warning' | 'success';
 }
 
+export interface CrashCheckResult extends ValidationResult {
+  // Same as ValidationResult but with specific crash semantics
+}
+
 export class ValidationError extends Error {
   constructor(message: string, public field?: string, public code?: string) {
     super(message);
