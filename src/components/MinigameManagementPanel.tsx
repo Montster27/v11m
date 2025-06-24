@@ -1,83 +1,40 @@
 // /Users/montysharma/V11M2/src/components/MinigameManagementPanel.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button, Card } from './ui';
-import { MemoryCardGame, MinigameManager } from './minigames';
-import StroopTestGame from './minigames/StroopTestGame';
-import WordScrambleGame from './minigames/WordScrambleGame';
-import ColorMatchGame from './minigames/ColorMatchGame';
-import PathPlannerGame from './minigames/PathPlannerGame';
+import { MinigameRegistry } from './minigames/plugins';
+import ModernMinigameManager from './minigames/ModernMinigameManager';
+import { MinigamePlugin } from './minigames/core/types';
+import MinigameSettings from './minigames/ui/MinigameSettings';
+import { useMinigameStore } from '../stores/useMinigameStore';
 
-type MinigameType = 'memory' | 'stroop' | 'wordscramble' | 'colormatch' | 'pathplanner';
-type DifficultyLevel = 'easy' | 'medium' | 'hard';
-type PathPlannerVariant = 'classic' | 'keyLock' | 'dynamic' | 'costOptim';
+type DifficultyLevel = 'easy' | 'medium' | 'hard' | 'expert';
 
-interface MinigameInfo {
-  id: MinigameType;
-  name: string;
-  description: string;
-  component: React.ComponentType<any>;
-  defaultProps?: any;
-  variants?: Array<{ id: string; name: string; description: string }>;
-  supportsDifficulty?: boolean;
+interface TestGameState {
+  gameId: string | null;
+  difficulty: DifficultyLevel;
+  isActive: boolean;
 }
-
-const AVAILABLE_MINIGAMES: MinigameInfo[] = [
-  {
-    id: 'memory',
-    name: 'Memory Card Game',
-    description: 'Match pairs of cards by remembering their positions. Tests working memory and concentration.',
-    component: MemoryCardGame,
-    defaultProps: { difficulty: 'medium' },
-    supportsDifficulty: true
-  },
-  {
-    id: 'stroop',
-    name: 'Stroop Test',
-    description: 'Name the color of words while ignoring the text. Tests cognitive flexibility and attention.',
-    component: StroopTestGame,
-    defaultProps: { difficulty: 'medium' },
-    supportsDifficulty: true
-  },
-  {
-    id: 'wordscramble',
-    name: 'Word Scramble',
-    description: 'Unscramble letters to form words. Tests vocabulary and pattern recognition.',
-    component: WordScrambleGame,
-    defaultProps: { difficulty: 'medium' },
-    supportsDifficulty: true
-  },
-  {
-    id: 'colormatch',
-    name: 'Color Match',
-    description: 'Match colors quickly and accurately. Tests reaction time and visual processing.',
-    component: ColorMatchGame,
-    defaultProps: { difficulty: 'medium' },
-    supportsDifficulty: true
-  },
-  {
-    id: 'pathplanner',
-    name: 'Path Planner',
-    description: 'Navigate through obstacles and solve routing puzzles. Tests spatial reasoning and planning skills.',
-    component: PathPlannerGame,
-    defaultProps: { difficulty: 'medium', variant: 'classic' },
-    supportsDifficulty: true,
-    variants: [
-      { id: 'classic', name: 'Classic Maze', description: 'Navigate through walls to reach the goal' },
-      { id: 'keyLock', name: 'Key & Lock', description: 'Collect keys to unlock doors blocking your path' },
-      { id: 'dynamic', name: 'Dynamic Obstacles', description: 'Avoid moving obstacles that patrol the maze' },
-      { id: 'costOptim', name: 'Cost Optimization', description: 'Find the most efficient path within budget constraints' }
-    ]
-  }
-];
 
 type TabType = 'overview' | 'test' | 'integration';
 
 const MinigameManagementPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [selectedMinigame, setSelectedMinigame] = useState<MinigameType>('memory');
-  const [testingMinigame, setTestingMinigame] = useState<MinigameType | null>(null);
-  const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>('medium');
-  const [selectedVariant, setSelectedVariant] = useState<PathPlannerVariant>('classic');
+  const [availableGames, setAvailableGames] = useState<MinigamePlugin[]>([]);
+  const [testGameState, setTestGameState] = useState<TestGameState>({
+    gameId: null,
+    difficulty: 'medium',
+    isActive: false
+  });
+  const [showSettings, setShowSettings] = useState(false);
+  
+  const minigameStore = useMinigameStore();
+
+  // Load available games from the registry
+  useEffect(() => {
+    const games = MinigameRegistry.list();
+    setAvailableGames(games);
+    console.log('🎮 Loaded games from registry:', games.map(g => ({ id: g.id, name: g.name })));
+  }, []);
 
   const tabs = [
     { id: 'overview' as TabType, label: 'Overview', icon: '🎮' },
@@ -85,91 +42,223 @@ const MinigameManagementPanel: React.FC = () => {
     { id: 'integration' as TabType, label: 'Integration', icon: '🔗' }
   ];
 
-  const renderOverview = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Minigame System Overview</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h4 className="font-semibold text-gray-800 mb-3">Available Minigames</h4>
-            <div className="space-y-3">
-              {AVAILABLE_MINIGAMES.map((game) => (
-                <div key={game.id} className="bg-gray-50 p-3 rounded-lg">
-                  <div className="font-medium text-gray-900">{game.name}</div>
-                  <div className="text-sm text-gray-600 mt-1">{game.description}</div>
-                  <div className="text-xs text-blue-600 mt-2">ID: {game.id}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          <div>
-            <h4 className="font-semibold text-gray-800 mb-3">Integration Points</h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                <span>Storylet effects can trigger minigames</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                <span>Clue discovery can require minigame completion</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                <span>Skill progression affects minigame difficulty</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                <span>Minigame performance affects character development</span>
-              </div>
-            </div>
-            
-            <h4 className="font-semibold text-gray-800 mt-6 mb-3">Usage Statistics</h4>
-            <div className="text-sm text-gray-600">
-              <div>Total Minigames: {AVAILABLE_MINIGAMES.length}</div>
-              <div>Integration Types: Storylets, Clues, Skills</div>
-              <div>Difficulty Levels: Easy, Medium, Hard</div>
-            </div>
-            
-            <h4 className="font-semibold text-gray-800 mt-6 mb-3">Sample Data Available</h4>
-            <div className="text-sm text-gray-600 space-y-1">
-              <div>✅ Memory Game Test Storylet</div>
-              <div>✅ Stroop Test Integration Examples</div>
-              <div>✅ Word Scramble Clue Discovery</div>
-              <div>✅ Color Match Skill Training</div>
-              <div>✅ Path Planner Cognitive Training</div>
-            </div>
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
+  // Get overall statistics for the overview
+  const overallStats = minigameStore.getOverallStats();
+  const achievements = Object.values(minigameStore.achievements);
+  const recentAchievements = achievements
+    .filter(achievement => Date.now() - achievement.unlockedAt < 7 * 24 * 60 * 60 * 1000) // Last 7 days
+    .sort((a, b) => b.unlockedAt - a.unlockedAt)
+    .slice(0, 5);
 
-  const renderTestGames = () => {
-    const selectedGameInfo = AVAILABLE_MINIGAMES.find(g => g.id === selectedMinigame);
+  const renderOverview = () => {
+    const stats = MinigameRegistry.getRegistryStats();
     
     return (
       <div className="space-y-6">
         <Card className="p-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">Test Minigames</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold text-gray-900">Modern Minigame System Overview</h3>
+            <Button
+              onClick={() => setShowSettings(true)}
+              variant="outline"
+              className="text-sm"
+            >
+              ⚙️ Settings
+            </Button>
+          </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {/* Player Statistics Summary */}
+          {overallStats.totalGames > 0 && (
+            <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border">
+              <h4 className="font-semibold text-gray-900 mb-3">Your Progress</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{overallStats.totalGames}</div>
+                  <div className="text-sm text-gray-600">Games Played</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {Math.round(overallStats.overallWinRate * 100)}%
+                  </div>
+                  <div className="text-sm text-gray-600">Win Rate</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {Math.round(overallStats.totalPlayTime / 60000)}m
+                  </div>
+                  <div className="text-sm text-gray-600">Play Time</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-yellow-600">{achievements.length}</div>
+                  <div className="text-sm text-gray-600">Achievements</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Recent Achievements */}
+          {recentAchievements.length > 0 && (
+            <div className="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+              <h4 className="font-semibold text-yellow-900 mb-3">🏆 Recent Achievements</h4>
+              <div className="space-y-2">
+                {recentAchievements.map((achievement) => (
+                  <div key={achievement.id} className="flex items-center space-x-3">
+                    <div className="text-yellow-600">🏆</div>
+                    <div>
+                      <div className="font-medium text-yellow-900 text-sm">{achievement.name}</div>
+                      <div className="text-xs text-yellow-700">{achievement.description}</div>
+                    </div>
+                    <div className="text-xs text-yellow-600">
+                      {Math.floor((Date.now() - achievement.unlockedAt) / (24 * 60 * 60 * 1000))}d ago
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-semibold text-gray-800 mb-3">Available Minigames ({availableGames.length})</h4>
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {availableGames.map((game) => (
+                  <div key={game.id} className="bg-gray-50 p-3 rounded-lg">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <div className="font-medium text-gray-900">{game.name}</div>
+                          {(() => {
+                            const gameStats = minigameStore.getGameStats(game.id);
+                            if (gameStats && gameStats.totalPlays > 0) {
+                              return (
+                                <div className="text-xs text-gray-500">
+                                  {gameStats.totalPlays} plays
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                        <div className="text-sm text-gray-600 mt-1">{game.description}</div>
+                        <div className="flex space-x-2 mt-2">
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                            {game.category}
+                          </span>
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                            {game.cognitiveLoad} load
+                          </span>
+                          <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                            {Math.floor(game.estimatedDuration / 60)}m {game.estimatedDuration % 60}s
+                          </span>
+                        </div>
+                        
+                        {/* Player statistics for this game */}
+                        {(() => {
+                          const gameStats = minigameStore.getGameStats(game.id);
+                          if (gameStats && gameStats.totalPlays > 0) {
+                            const winRate = Math.round((gameStats.totalWins / gameStats.totalPlays) * 100);
+                            const avgScore = Math.round(gameStats.averageScore);
+                            return (
+                              <div className="flex space-x-2 mt-2">
+                                <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                  {winRate}% win rate
+                                </span>
+                                <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                  Avg: {avgScore}
+                                </span>
+                                {gameStats.currentStreak > 0 && (
+                                  <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">
+                                    🔥 {gameStats.currentStreak}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                        
+                        <div className="text-xs text-blue-600 mt-2">ID: {game.id}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold text-gray-800 mb-3">System Features</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  <span>Plugin-based architecture with hot-reloading</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  <span>Adaptive difficulty based on player skills</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  <span>Comprehensive performance analytics</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  <span>Achievement system integration</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  <span>Storylet and clue integration support</span>
+                </div>
+              </div>
+              
+              <h4 className="font-semibold text-gray-800 mt-6 mb-3">Registry Statistics</h4>
+              <div className="text-sm text-gray-600 space-y-1">
+                <div>Total Games: {stats.totalGames}</div>
+                <div>Categories: {stats.categories.join(', ')}</div>
+                <div>Average Duration: {stats.averageDuration}s</div>
+                <div>Cognitive Loads: Low({stats.cognitiveLoads.low}), Med({stats.cognitiveLoads.medium}), High({stats.cognitiveLoads.high})</div>
+              </div>
+              
+              <h4 className="font-semibold text-gray-800 mt-6 mb-3">Game Categories</h4>
+              <div className="flex flex-wrap gap-2">
+                {stats.categories.map(category => (
+                  <span key={category} className="text-xs bg-gray-200 text-gray-800 px-2 py-1 rounded capitalize">
+                    {category} ({MinigameRegistry.listByCategory(category).length})
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  };
+
+  const renderTestGames = () => {
+    const selectedGameId = testGameState.gameId;
+    const selectedGame = selectedGameId ? MinigameRegistry.get(selectedGameId) : null;
+    
+    return (
+      <div className="space-y-6">
+        <Card className="p-6">
+          <h3 className="text-xl font-bold text-gray-900 mb-4">Test Modern Minigames</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Select Minigame to Test
               </label>
               <select
-                value={selectedMinigame}
+                value={selectedGameId || ''}
                 onChange={(e) => {
-                  setSelectedMinigame(e.target.value as MinigameType);
-                  // Reset variant when changing games
-                  if (e.target.value === 'pathplanner') {
-                    setSelectedVariant('classic');
-                  }
+                  setTestGameState(prev => ({
+                    ...prev,
+                    gameId: e.target.value || null
+                  }));
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
-                {AVAILABLE_MINIGAMES.map((game) => (
+                <option value="">Select a game...</option>
+                {availableGames.map((game) => (
                   <option key={game.id} value={game.id}>
                     {game.name}
                   </option>
@@ -177,200 +266,145 @@ const MinigameManagementPanel: React.FC = () => {
               </select>
             </div>
 
-            {selectedGameInfo?.supportsDifficulty && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Difficulty Level
-                </label>
-                <select
-                  value={selectedDifficulty}
-                  onChange={(e) => setSelectedDifficulty(e.target.value as DifficultyLevel)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="easy">Easy</option>
-                  <option value="medium">Medium</option>
-                  <option value="hard">Hard</option>
-                </select>
-              </div>
-            )}
-
-            {selectedMinigame === 'pathplanner' && selectedGameInfo?.variants && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Path Planner Variant
-                </label>
-                <select
-                  value={selectedVariant}
-                  onChange={(e) => setSelectedVariant(e.target.value as PathPlannerVariant)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  {selectedGameInfo.variants.map((variant) => (
-                    <option key={variant.id} value={variant.id}>
-                      {variant.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Difficulty Level
+              </label>
+              <select
+                value={testGameState.difficulty}
+                onChange={(e) => setTestGameState(prev => ({
+                  ...prev,
+                  difficulty: e.target.value as DifficultyLevel
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+                <option value="expert">Expert</option>
+              </select>
+            </div>
           </div>
 
           <div className="mb-6">
             <Button
-              onClick={() => setTestingMinigame(selectedMinigame)}
+              onClick={() => setTestGameState(prev => ({ ...prev, isActive: true }))}
+              disabled={!selectedGameId}
               className="w-full md:w-auto"
             >
               Launch Test Game
             </Button>
           </div>
 
-        {selectedMinigame && (
-          <div className="bg-blue-50 p-4 rounded-lg mb-4">
-            <div className="font-medium text-blue-900">
-              {selectedGameInfo?.name}
-              {selectedGameInfo?.supportsDifficulty && (
+          {selectedGame && (
+            <div className="bg-blue-50 p-4 rounded-lg mb-4">
+              <div className="font-medium text-blue-900">
+                {selectedGame.name}
                 <span className="ml-2 text-sm bg-blue-200 text-blue-800 px-2 py-1 rounded capitalize">
-                  {selectedDifficulty}
+                  {testGameState.difficulty}
                 </span>
-              )}
-            </div>
-            <div className="text-sm text-blue-800 mt-1">
-              {selectedGameInfo?.description}
-            </div>
-            {selectedMinigame === 'pathplanner' && selectedGameInfo?.variants && (
-              <div className="mt-2 p-3 bg-blue-100 rounded">
-                <div className="font-medium text-blue-900 text-sm">
-                  Selected Variant: {selectedGameInfo.variants.find(v => v.id === selectedVariant)?.name}
-                </div>
-                <div className="text-xs text-blue-700 mt-1">
-                  {selectedGameInfo.variants.find(v => v.id === selectedVariant)?.description}
-                </div>
+                <span className="ml-2 text-xs bg-green-200 text-green-800 px-2 py-1 rounded">
+                  {selectedGame.category}
+                </span>
               </div>
-            )}
-          </div>
-        )}
-
-        {testingMinigame && (
-          <Card className="p-4 bg-gray-50">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h4 className="font-semibold text-gray-900">Testing: {AVAILABLE_MINIGAMES.find(g => g.id === testingMinigame)?.name}</h4>
-                <div className="text-sm text-gray-600 mt-1">
-                  {AVAILABLE_MINIGAMES.find(g => g.id === testingMinigame)?.supportsDifficulty && (
-                    <span className="mr-3">Difficulty: <strong>{selectedDifficulty}</strong></span>
-                  )}
-                  {testingMinigame === 'pathplanner' && (
-                    <span>Variant: <strong>{selectedVariant}</strong></span>
-                  )}
-                </div>
+              <div className="text-sm text-blue-800 mt-1">
+                {selectedGame.description}
               </div>
-              <Button 
-                onClick={() => setTestingMinigame(null)}
-                variant="outline"
-                className="text-sm"
-              >
-                Close Test
-              </Button>
+              <div className="mt-2 text-xs text-blue-700">
+                <div>Estimated Duration: {Math.floor(selectedGame.estimatedDuration / 60)}m {selectedGame.estimatedDuration % 60}s</div>
+                <div>Cognitive Load: {selectedGame.cognitiveLoad}</div>
+                <div>Required Skills: {selectedGame.requiredSkills?.join(', ') || 'None specified'}</div>
+                <div>Tags: {selectedGame.tags.join(', ')}</div>
+              </div>
+              <div className="mt-2 p-2 bg-blue-100 rounded text-xs">
+                <div className="font-medium text-blue-900">Controls:</div>
+                <div className="text-blue-700">{selectedGame.controls?.join(' • ') || 'See in-game instructions'}</div>
+              </div>
             </div>
-            
-            <div className="border border-gray-200 rounded-lg p-4 bg-white min-h-[400px] relative">
-              {(() => {
-                const game = AVAILABLE_MINIGAMES.find(g => g.id === testingMinigame);
-                if (!game) {
-                  return (
-                    <div className="flex items-center justify-center h-64 text-gray-500">
-                      <div className="text-center">
-                        <div className="text-lg mb-2">⚠️ Game not found</div>
-                        <div className="text-sm">Minigame "{testingMinigame}" is not available</div>
-                      </div>
-                    </div>
-                  );
-                }
-                
-                const GameComponent = game.component;
-                try {
-                  // Build props based on game type and selected options
-                  const gameProps: any = {
-                    onGameComplete: (success: boolean, stats?: any) => {
-                      console.log('🎮 Minigame completed:', { success, stats, gameId: testingMinigame });
-                      const statsDisplay = stats ? JSON.stringify(stats, null, 2) : 'No stats';
-                      alert(`🎮 Game: ${game.name}\n✅ Success: ${success}\n📊 Stats: ${statsDisplay}`);
-                      setTestingMinigame(null);
-                    },
-                    onClose: () => {
-                      console.log('🎮 Minigame closed by user');
-                      setTestingMinigame(null);
-                    }
-                  };
+          )}
 
-                  // Add difficulty if supported
-                  if (game.supportsDifficulty) {
-                    gameProps.difficulty = selectedDifficulty;
-                  }
-
-                  // Add variant for path planner
-                  if (testingMinigame === 'pathplanner') {
-                    gameProps.variant = selectedVariant;
-                  }
-
-                  // Merge with default props, but let selected options override defaults
-                  const finalProps = { ...(game.defaultProps || {}), ...gameProps };
-
-                  // Debug logging to verify props
-                  console.log('🎮 Loading minigame with props:', {
-                    gameId: testingMinigame,
-                    selectedDifficulty,
-                    selectedVariant: testingMinigame === 'pathplanner' ? selectedVariant : 'N/A',
-                    finalProps
-                  });
-
-                  return <GameComponent key={`${testingMinigame}-${selectedDifficulty}-${selectedVariant}`} {...finalProps} />;
-                } catch (error) {
-                  console.error('Error loading minigame:', error);
-                  return (
-                    <div className="flex items-center justify-center h-64 text-red-500">
-                      <div className="text-center">
-                        <div className="text-lg mb-2">❌ Error loading game</div>
-                        <div className="text-sm">{error instanceof Error ? error.message : 'Unknown error'}</div>
-                        <Button 
-                          onClick={() => setTestingMinigame(null)}
-                          className="mt-4"
-                          variant="outline"
-                        >
-                          Close
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                }
-              })()}
-            </div>
-          </Card>
-        )}
-      </Card>
-    </div>
+          {testGameState.isActive && selectedGameId && (
+            <Card className="p-4 bg-gray-50">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h4 className="font-semibold text-gray-900">Testing: {selectedGame?.name}</h4>
+                  <div className="text-sm text-gray-600 mt-1">
+                    <span className="mr-3">Difficulty: <strong>{testGameState.difficulty}</strong></span>
+                    <span>Game ID: <strong>{selectedGameId}</strong></span>
+                  </div>
+                </div>
+                <Button 
+                  onClick={() => setTestGameState(prev => ({ ...prev, isActive: false }))}
+                  variant="outline"
+                  className="text-sm"
+                >
+                  Close Test
+                </Button>
+              </div>
+              
+              <div className="border border-gray-200 rounded-lg bg-white min-h-[400px] relative">
+                <ModernMinigameManager
+                  gameId={selectedGameId}
+                  context={{
+                    difficulty: testGameState.difficulty,
+                    practiceMode: true
+                  }}
+                  onGameComplete={(success: boolean, stats?: any) => {
+                    console.log('🎮 Modern minigame completed:', { success, stats, gameId: selectedGameId });
+                    const statsDisplay = stats ? JSON.stringify(stats, null, 2) : 'No stats';
+                    alert(`🎮 Game: ${selectedGame?.name}\n✅ Success: ${success}\n📊 Stats: ${statsDisplay}`);
+                    setTestGameState(prev => ({ ...prev, isActive: false }));
+                  }}
+                  onClose={() => {
+                    console.log('🎮 Modern minigame closed by user');
+                    setTestGameState(prev => ({ ...prev, isActive: false }));
+                  }}
+                />
+              </div>
+            </Card>
+          )}
+        </Card>
+      </div>
     );
   };
 
   const renderIntegration = () => (
     <div className="space-y-6">
       <Card className="p-6">
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Minigame Integration Guide</h3>
+        <h3 className="text-xl font-bold text-gray-900 mb-4">Modern Minigame Integration Guide</h3>
         
         <div className="space-y-6">
+          <div>
+            <h4 className="font-semibold text-gray-800 mb-3">Plugin-Based Architecture</h4>
+            <div className="bg-green-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-700 mb-3">
+                The new system uses a plugin-based architecture with these key features:
+              </p>
+              <ul className="text-sm text-green-800 space-y-1">
+                <li>• Centralized MinigameRegistry for plugin discovery</li>
+                <li>• ModernMinigameManager for unified game launching</li>
+                <li>• Adaptive difficulty based on player performance</li>
+                <li>• Comprehensive analytics and achievement tracking</li>
+                <li>• Hot-reloadable plugins for development</li>
+              </ul>
+            </div>
+          </div>
+
           <div>
             <h4 className="font-semibold text-gray-800 mb-3">Storylet Integration</h4>
             <div className="bg-gray-50 p-4 rounded-lg">
               <p className="text-sm text-gray-700 mb-3">
-                Add minigame effects to storylet choices:
+                Add minigame effects to storylet choices using the new game IDs:
               </p>
               <pre className="text-xs bg-white p-3 rounded border overflow-x-auto">
 {`{
   type: "minigame",
-  gameId: "path-planner",
+  gameId: "memory-cards",  // New plugin ID
+  difficulty: "medium",    // Optional: easy, medium, hard, expert
   onSuccess: [
     { type: "resource", key: "knowledge", delta: 10 },
     { type: "domainXp", domain: "intellectualCompetence", amount: 15 },
-    { type: "flag", key: "puzzleSolved", value: true }
+    { type: "flag", key: "memoryTestPassed", value: true }
   ],
   onFailure: [
     { type: "resource", key: "stress", delta: 5 }
@@ -389,11 +423,12 @@ const MinigameManagementPanel: React.FC = () => {
               <pre className="text-xs bg-white p-3 rounded border overflow-x-auto">
 {`{
   type: "clueDiscovery",
-  clueId: "navigation_puzzle",
-  minigameType: "path-planner",
+  clueId: "pattern_analysis",
+  minigameType: "pattern-sequence",
+  difficulty: "hard",
   onSuccess: [
     { type: "resource", key: "knowledge", delta: 8 },
-    { type: "flag", key: "navigationClueFound", value: true }
+    { type: "flag", key: "patternClueFound", value: true }
   ]
 }`}
               </pre>
@@ -401,53 +436,70 @@ const MinigameManagementPanel: React.FC = () => {
           </div>
 
           <div>
-            <h4 className="font-semibold text-gray-800 mb-3">Available Minigame IDs</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {AVAILABLE_MINIGAMES.map((game) => (
-                <div key={game.id} className="bg-blue-50 p-3 rounded text-center">
+            <h4 className="font-semibold text-gray-800 mb-3">Available Plugin Game IDs</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {availableGames.map((game) => (
+                <div key={game.id} className="bg-blue-50 p-3 rounded">
                   <div className="font-mono text-sm text-blue-800">{game.id}</div>
                   <div className="text-xs text-blue-600 mt-1">{game.name}</div>
-                  {game.variants && (
-                    <div className="text-xs text-gray-600 mt-2">
-                      Variants: {game.variants.map(v => v.id).join(', ')}
-                    </div>
-                  )}
+                  <div className="text-xs text-gray-600 mt-1">
+                    Category: {game.category}
+                  </div>
+                  <div className="text-xs text-gray-600">
+                    Load: {game.cognitiveLoad}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
 
           <div>
-            <h4 className="font-semibold text-gray-800 mb-3">Path Planner Variants</h4>
+            <h4 className="font-semibold text-gray-800 mb-3">Game Categories & Use Cases</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {AVAILABLE_MINIGAMES.find(g => g.id === 'pathplanner')?.variants?.map((variant) => (
-                <div key={variant.id} className="bg-purple-50 p-3 rounded">
-                  <div className="font-mono text-sm text-purple-800">{variant.id}</div>
-                  <div className="font-medium text-purple-900 text-sm mt-1">{variant.name}</div>
-                  <div className="text-xs text-purple-700 mt-1">{variant.description}</div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 p-3 bg-gray-50 rounded text-sm">
-              <p className="text-gray-700">
-                <strong>Usage:</strong> Add <code className="bg-gray-200 px-1 rounded">variant: "classic"</code> to minigame effect properties
-              </p>
+              {MinigameRegistry.getRegistryStats().categories.map((category) => {
+                const categoryGames = MinigameRegistry.listByCategory(category);
+                return (
+                  <div key={category} className="bg-purple-50 p-3 rounded">
+                    <div className="font-medium text-purple-900 text-sm capitalize">{category}</div>
+                    <div className="text-xs text-purple-700 mt-1">
+                      Games: {categoryGames.map(g => g.name).join(', ')}
+                    </div>
+                    <div className="text-xs text-purple-600 mt-1">
+                      Count: {categoryGames.length}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
           <div>
             <h4 className="font-semibold text-gray-800 mb-3">Difficulty Levels</h4>
-            <div className="grid grid-cols-3 gap-3">
-              {['easy', 'medium', 'hard'].map((difficulty) => (
+            <div className="grid grid-cols-4 gap-3">
+              {['easy', 'medium', 'hard', 'expert'].map((difficulty) => (
                 <div key={difficulty} className="bg-green-50 p-3 rounded text-center">
                   <div className="font-medium text-green-800 capitalize">{difficulty}</div>
                   <div className="text-xs text-green-600 mt-1">
-                    {difficulty === 'easy' && 'Forgiving timing, simple patterns'}
-                    {difficulty === 'medium' && 'Balanced challenge level'}
-                    {difficulty === 'hard' && 'Fast timing, complex patterns'}
+                    {difficulty === 'easy' && 'Forgiving, simple'}
+                    {difficulty === 'medium' && 'Balanced challenge'}
+                    {difficulty === 'hard' && 'Fast, complex'}
+                    {difficulty === 'expert' && 'Maximum challenge'}
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold text-gray-800 mb-3">Advanced Features</h4>
+            <div className="bg-yellow-50 p-4 rounded-lg">
+              <div className="text-sm text-yellow-800 space-y-2">
+                <div><strong>Adaptive Difficulty:</strong> Games automatically adjust based on player performance</div>
+                <div><strong>Analytics Integration:</strong> Comprehensive tracking of player progress and skill development</div>
+                <div><strong>Achievement System:</strong> Automatic achievement unlocking based on game performance</div>
+                <div><strong>Skill-Based Matching:</strong> Games recommended based on player skill levels</div>
+                <div><strong>Practice Mode:</strong> Special mode for testing without affecting player stats</div>
+              </div>
             </div>
           </div>
         </div>
@@ -481,6 +533,12 @@ const MinigameManagementPanel: React.FC = () => {
       {activeTab === 'overview' && renderOverview()}
       {activeTab === 'test' && renderTestGames()}
       {activeTab === 'integration' && renderIntegration()}
+      
+      {/* Settings Modal */}
+      <MinigameSettings
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
     </div>
   );
 };

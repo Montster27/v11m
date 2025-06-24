@@ -58,6 +58,11 @@ if (process.env.NODE_ENV === 'development') {
   import('./test/characterFlow/fixSaveTest'); // Import save test debugger
   import('./test/characterFlow/quickTestFix'); // Import fixed quick test
   
+  // Minigame System Integration Tests
+  import('./test/minigame/integrationTests'); // Import minigame integration tests
+  import('./utils/minigameValidationTest'); // Import minigame validation utilities
+  import('./utils/comprehensiveMinigameTest'); // Import comprehensive test suite
+  
   // Phase 2: Planner Decomposition Tests
   import('./test/plannerRefactor/decompositionTest'); // Import planner decomposition tests
   
@@ -75,7 +80,12 @@ if (process.env.NODE_ENV === 'development') {
     console.log('Type generateSuccessReport() for final success validation');
     console.log('Type testRecentFixes() to validate recent bug fixes');
     console.log('Type runDecompositionTests() to test Planner refactoring');
-    console.log('Type runContentStudioUnificationTests() to test Content Studio\n');
+    console.log('Type runContentStudioUnificationTests() to test Content Studio');
+    console.log('Type runMinigameIntegrationTests() to test minigame system');
+    console.log('Type runQuickMinigameTest() for quick minigame validation');
+    console.log('Type validateAllMinigamePlugins() for comprehensive plugin validation');
+    console.log('Type quickMinigameValidationTest() for quick plugin validation');
+    console.log('Type runComprehensiveMinigameTest() for COMPLETE system validation\n');
   }, 2000);
   import('./utils/debugClueConnections'); // Import clue connection debug utilities
   import('./utils/refactorBackup'); // Import refactor backup utilities
