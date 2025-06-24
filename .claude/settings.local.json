@@ -45,5 +45,6 @@
       "Bash(open http://localhost:5173/test-fix.html)"
     ],
     "deny": []
-  }
+  },
+  "enableAllProjectMcpServers": false
 }

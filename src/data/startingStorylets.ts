@@ -1,9 +1,10 @@
 // /Users/montysharma/V11M2/src/data/startingStorylets.ts
 
 import type { Storylet } from '../types/storylet';
+import { tutorialStorylets } from './tutorialStorylets';
 
 export const startingStorylets: Record<string, Storylet> = {
-  // All starting storylets removed
+  ...tutorialStorylets
 };
 
 // Export with logging for development

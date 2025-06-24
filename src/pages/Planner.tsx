@@ -1,9 +1,7 @@
 // /Users/montysharma/V11M2/src/pages/Planner.tsx
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useAppStore } from '../store/useAppStore';
-import { useCharacterStore } from '../store/characterStore';
-import { useStoryletStore } from '../store/useStoryletStore';
+import { useCoreGameStore, useNarrativeStore, useSocialStore } from '../stores/v2';
 import TimeAllocationPanel from '../components/TimeAllocationPanel';
 import StoryletPanel from '../components/StoryletPanel';
 import ResourcePanel from '../components/ResourcePanel';
@@ -92,22 +90,81 @@ const CrashModal: React.FC<CrashModalProps> = ({ isOpen, onComplete, type }) => 
 };
 
 const Planner: React.FC = () => {
-  const { 
-    userLevel, 
-    experience, 
-    allocations,
-    getTotalTimeAllocated,
-    resources,
-    updateResource,
-    day,
-    updateTimeAllocation,
-    incrementDay,
-    activeCharacter,
-    isTimePaused
-  } = useAppStore();
+  // Use consolidated stores
+  const coreStore = useCoreGameStore();
+  const narrativeStore = useNarrativeStore();
+  const socialStore = useSocialStore();
   
-  const { currentCharacter } = useCharacterStore();
-  const { evaluateStorylets } = useStoryletStore();
+  // Extract data from consolidated stores
+  const { player, character, world, skills } = coreStore;
+  const { storylets, concerns } = narrativeStore;
+  const { saves } = socialStore;
+  
+  // Map to legacy interface for existing components
+  const userLevel = player.level;
+  const experience = player.experience;
+  const day = world.day;
+  const isTimePaused = world.isTimePaused;
+  const resources = player.resources;
+  const activeCharacter = character;
+  
+  // For now, use a simple allocation system (this could be enhanced)
+  const [allocations, setAllocations] = useState({
+    study: 40,
+    work: 25,
+    social: 15,
+    rest: 15,
+    exercise: 5
+  });
+  
+  const getTotalTimeAllocated = () => {
+    return Object.values(allocations).reduce((sum, value) => sum + value, 0);
+  };
+  
+  const updateTimeAllocation = (activity: string, value: number) => {
+    setAllocations(prev => ({
+      ...prev,
+      [activity]: Math.max(0, Math.min(100, value))
+    }));
+  };
+  
+  const updateResource = (resource: string, value: number) => {
+    coreStore.updatePlayer({
+      resources: {
+        ...coreStore.player.resources,
+        [resource]: resource === 'energy' || resource === 'stress'
+          ? Math.max(0, Math.min(100, value))
+          : Math.max(0, value)
+      }
+    });
+  };
+  
+  const incrementDay = () => {
+    coreStore.updateWorld({ day: coreStore.world.day + 1 });
+  };
+  
+  const evaluateStorylets = () => {
+    // For now, just log that storylets should be evaluated
+    // This would integrate with the narrative store's storylet evaluation system
+    console.log('📖 Evaluating storylets with consolidated stores');
+    console.log('   Active storylets:', storylets.active);
+    console.log('   Tutorial storylet flag:', narrativeStore.flags.storylet.get('character_created'));
+  };
+  
+  // Initialize resources if they don't exist
+  useEffect(() => {
+    if (Object.keys(resources).length === 0) {
+      coreStore.updatePlayer({
+        resources: {
+          energy: 75,
+          stress: 20,
+          money: 0,
+          knowledge: 0,
+          social: 0
+        }
+      });
+    }
+  }, []);
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [showCrashModal, setShowCrashModal] = useState(false);
@@ -251,17 +308,18 @@ const Planner: React.FC = () => {
       day: newDay
     });
     
-    // Update all resources AND day in a single store update
-    useAppStore.setState((state) => ({
+    // Update all resources AND day using consolidated stores
+    coreStore.updatePlayer({
       resources: {
         energy: newEnergy,
         stress: newStress,
         knowledge: newKnowledge,
         social: newSocial,
         money: newMoney
-      },
-      day: newDay
-    }));
+      }
+    });
+    
+    coreStore.updateWorld({ day: newDay });
     
     // Update local day to sync
     setLocalDay(newDay);

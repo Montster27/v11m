@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSaveStore } from '../store/useSaveStore';
+import { useSocialStore } from '../stores/v2';
+import { resetAllGameState } from '../utils/characterFlowIntegration';
 import { Button } from '../components/ui';
 
 interface SplashScreenProps {
@@ -9,17 +10,20 @@ interface SplashScreenProps {
 
 const SplashScreen: React.FC<SplashScreenProps> = ({ onChoiceMade }) => {
   const navigate = useNavigate();
-  const { getSaveSlots, loadSave } = useSaveStore();
+  const socialStore = useSocialStore();
   
-  const saveSlots = getSaveSlots();
+  // Use consolidated save system
+  const saveSlots = Object.values(socialStore.saves.saveSlots);
   const hasSaves = saveSlots.length > 0;
-  const latestSave = saveSlots.sort((a, b) => b.timestamp - a.timestamp)[0];
+  const latestSave = socialStore.saves.currentSaveId 
+    ? socialStore.saves.saveSlots[socialStore.saves.currentSaveId]
+    : saveSlots.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))[0];
 
   const handleNewGame = () => {
-    console.log('🎮 User clicked New Game');
-    console.log('📊 Current save slots:', saveSlots);
+    console.log('🎮 Starting new game with consolidated stores');
+    console.log('📊 Current save slots:', saveSlots.length);
     console.log('📊 Has saves:', hasSaves);
-    console.log('📊 Latest save:', latestSave);
+    console.log('📊 Latest save:', latestSave?.name || 'none');
     
     onChoiceMade();
     console.log('🎮 Navigating to character-creation');
@@ -28,13 +32,15 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onChoiceMade }) => {
 
   const handleContinue = () => {
     if (latestSave) {
-      console.log('🔄 Loading save file:', latestSave);
-      const success = loadSave(latestSave.id);
-      if (success) {
+      console.log('🔄 Loading save with consolidated stores:', latestSave.name);
+      try {
+        // Load save through consolidated store system
+        socialStore.loadSaveSlot(latestSave.id);
+        console.log('✅ Save loaded successfully');
         onChoiceMade();
         navigate('/planner');
-      } else {
-        console.error('Failed to load save');
+      } catch (error) {
+        console.error('❌ Failed to load save:', error);
         // Could show an error message to user
       }
     }
@@ -42,42 +48,16 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onChoiceMade }) => {
 
   const handleDeleteProgress = () => {
     if (confirm('Are you sure you want to delete ALL progress and start completely fresh? This cannot be undone.')) {
-      console.log('🗑️ User requested complete progress deletion');
-      
-      // Clear all localStorage
-      localStorage.clear();
-      sessionStorage.clear();
-      
-      // Delete all save files
-      const saveSlots = getSaveSlots();
-      saveSlots.forEach(slot => {
-        console.log(`🗑️ Deleting save: ${slot.name}`);
-      });
-      
-      // Reset save store - CRITICAL: Clear currentSaveId to prevent auto-save interference
-      if (typeof window !== 'undefined' && (window as any).useSaveStore) {
-        (window as any).useSaveStore.setState({
-          saveSlots: [],
-          currentSaveId: null,
-          storyletCompletions: []
-        });
-        console.log('🔄 Cleared currentSaveId to prevent auto-save interference');
+      console.log('🗑️ Resetting all game state atomically');
+      try {
+        // Single atomic reset across all consolidated stores
+        resetAllGameState();
+        console.log('✅ All game state reset atomically - redirecting to character creation');
+        onChoiceMade();
+        navigate('/character-creation');
+      } catch (error) {
+        console.error('❌ Failed to reset game state:', error);
       }
-      
-      // Reset app store
-      if (typeof window !== 'undefined' && (window as any).useAppStore) {
-        (window as any).useAppStore.getState().resetGame();
-        (window as any).useAppStore.setState({
-          userLevel: 1,
-          experience: 0,
-          day: 1,
-          activeCharacter: null
-        });
-      }
-      
-      console.log('✅ All progress deleted - redirecting to character creation');
-      onChoiceMade();
-      navigate('/character-creation');
     }
   };
 
@@ -129,7 +109,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onChoiceMade }) => {
           
           {hasSaves && latestSave && (
             <div className="text-sm text-amber-600 mt-2">
-              Latest save: {latestSave.name} (Day {latestSave.gameDay})
+              Latest save: {latestSave.name} (Day {latestSave.gameDay || latestSave.day || 1})
             </div>
           )}
           

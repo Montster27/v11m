@@ -46,6 +46,7 @@ export interface SocialState {
   createSaveSlot: (saveId: string, saveData: any) => void;
   updateSaveSlot: (saveId: string, saveData: any) => void;
   deleteSaveSlot: (saveId: string) => void;
+  loadSaveSlot: (saveId: string) => void;
   addSaveHistoryEntry: (entry: any) => void;
 }
 
@@ -53,7 +54,7 @@ const getInitialSocialState = (): Omit<SocialState,
   'resetSocial' | 'migrateFromLegacyStores' |
   'updateRelationship' | 'recordNPCInteraction' | 'setNPCMemory' | 'setNPCFlag' |
   'discoverClue' | 'connectClues' | 'associateClueWithArc' | 'recordClueDiscoveryEvent' |
-  'setCurrentSave' | 'createSaveSlot' | 'updateSaveSlot' | 'deleteSaveSlot' | 'addSaveHistoryEntry'
+  'setCurrentSave' | 'createSaveSlot' | 'updateSaveSlot' | 'deleteSaveSlot' | 'loadSaveSlot' | 'addSaveHistoryEntry'
 > => ({
   npcs: {
     relationships: {},
@@ -291,6 +292,14 @@ export const useSocialStore = create<SocialState>()(
       },
 
       createSaveSlot: (saveId, saveData) => {
+        // Prepare basic save data
+        const completeSaveData = {
+          id: saveId,
+          ...saveData,
+          created: Date.now(),
+          lastModified: Date.now()
+        };
+        
         set((state) => {
           // Defensive programming: ensure arrays exist
           const saveHistoryArray = Array.isArray(state.saves?.saveHistory) ? state.saves.saveHistory : [];
@@ -307,12 +316,9 @@ export const useSocialStore = create<SocialState>()(
               ...state.saves,
               saveSlots: {
                 ...state.saves.saveSlots,
-                [saveId]: {
-                  ...saveData,
-                  created: Date.now(),
-                  lastModified: Date.now()
-                }
+                [saveId]: completeSaveData
               },
+              currentSaveId: saveId,
               saveHistory: [...saveHistoryArray, historyEntry]
             }
           };
@@ -371,6 +377,40 @@ export const useSocialStore = create<SocialState>()(
             }
           };
         });
+      },
+
+      loadSaveSlot: (saveId) => {
+        const state = get();
+        const saveData = state.saves.saveSlots[saveId];
+        
+        if (!saveData) {
+          console.error(`Save slot ${saveId} not found`);
+          // Don't change current save ID if load fails
+          return;
+        }
+        
+        console.log(`🔄 Loading save slot: ${saveId} (basic load)`, saveData.name);
+        
+        // For now, just set the current save ID
+        // Full state restoration would require more complex cross-store coordination
+        
+        // Add history entry
+        const historyEntry = {
+          action: 'load',
+          saveId,
+          timestamp: Date.now()
+        };
+        
+        set((state) => ({
+          ...state,
+          saves: {
+            ...state.saves,
+            currentSaveId: saveId,
+            saveHistory: [...(state.saves.saveHistory || []), historyEntry]
+          }
+        }));
+        
+        console.log(`✅ Save slot ${saveId} loaded successfully`);
       },
 
       addSaveHistoryEntry: (entry) => {

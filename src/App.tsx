@@ -28,6 +28,47 @@ if (process.env.NODE_ENV === 'development') {
   import('./utils/testConcernFlags'); // Import character concerns test utilities
   import('./utils/testPathPlanner'); // Import path planner test utilities
   import('./utils/testClueOutcomes'); // Import clue outcome test utilities
+  
+  // Character Flow Refactoring Test Suite
+  import('./test/characterFlow/flowTestUtils'); // Import character flow test utilities
+  import('./test/characterFlow/splashScreenTests'); // Import splash screen tests
+  import('./test/characterFlow/characterCreationTests'); // Import character creation tests
+  import('./test/characterFlow/plannerIntegrationTests'); // Import planner integration tests
+  import('./test/characterFlow/saveLoadTest'); // Import save/load tests
+  import('./test/characterFlow/runPhase1and2Tests'); // Import Phase 1 & 2 test runner
+  import('./test/characterFlow/runPhase3and4Tests'); // Import Phase 3 & 4 test runner
+  import('./test/characterFlow/runPhase5Tests'); // Import Phase 5 test runner
+  import('./test/characterFlow/listTests'); // Import test listing helper
+  import('./test/characterFlow/quickTests'); // Import quick tests with immediate results
+  
+  // Phase 6: Integration Testing imports
+  import('./test/characterFlow/comprehensiveFlowTests'); // Import comprehensive flow tests
+  import('./test/characterFlow/performanceTests'); // Import performance tests
+  import('./test/characterFlow/edgeCaseTests'); // Import edge case tests
+  
+  // Phase 7: Success Validation imports
+  import('./test/characterFlow/successValidation'); // Import success validation suite
+  import('./test/characterFlow/quickFixValidation'); // Import quick fix validation
+  import('./test/characterFlow/finalValidationRunner'); // Import complete validation runner
+  import('./test/characterFlow/debugValidation'); // Import debug validation tools
+  import('./test/characterFlow/cleanValidationRunner'); // Import clean validation runner
+  import('./test/characterFlow/instantValidation'); // Import instant validation
+  import('./test/characterFlow/testResultAnalyzer'); // Import test result analyzer
+  import('./test/characterFlow/fixQuickTest'); // Import quick test debugger
+  import('./test/characterFlow/fixSaveTest'); // Import save test debugger
+  import('./test/characterFlow/quickTestFix'); // Import fixed quick test
+  
+  // Show test availability banner
+  setTimeout(() => {
+    console.log('\n🧪 CHARACTER FLOW TESTS LOADED!');
+    console.log('================================');
+    console.log('Type listAllCharacterFlowTests() to see all available tests');
+    console.log('Type showTestStatus() to see refactoring status');
+    console.log('Type quickStatusCheck() for quick validation overview');
+    console.log('Type runCompleteValidation() for COMPLETE validation suite');
+    console.log('Type generateSuccessReport() for final success validation');
+    console.log('Type testRecentFixes() to validate recent bug fixes\n');
+  }, 2000);
   import('./utils/debugClueConnections'); // Import clue connection debug utilities
   import('./utils/refactorBackup'); // Import refactor backup utilities
   import('./utils/storeMigration'); // Import store migration utilities

@@ -1,54 +1,44 @@
 // /Users/montysharma/V11M2/src/pages/CharacterCreation.tsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCharacterStore } from '../store/characterStore';
-import { useAppStore } from '../store/useAppStore';
+import { useCoreGameStore } from '../stores/v2';
 import { Card, Button } from '../components/ui';
-import CharacterCreationFlow from '../components/CharacterCreation';
+import ConsolidatedCharacterCreationFlow from '../components/CharacterCreation/ConsolidatedCharacterCreationFlow';
 
 const CharacterCreationPage: React.FC = () => {
   const navigate = useNavigate();
-  const { 
-    savedCharacters, 
-    createNewCharacter, 
-    loadCharacter, 
-    deleteCharacter,
-    currentCharacter 
-  } = useCharacterStore();
-  const { setActiveCharacter } = useAppStore();
+  const coreStore = useCoreGameStore();
+  
+  // Use consolidated character system
+  const savedCharacters = coreStore.character && coreStore.character.name ? [coreStore.character] : [];
   
   const [mode, setMode] = useState<'menu' | 'create' | 'edit'>('menu');
-  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
 
   const handleNewCharacter = () => {
-    createNewCharacter();
     setMode('create');
   };
 
-  const handleEditCharacter = (id: string) => {
-    loadCharacter(id);
-    setSelectedCharacterId(id);
+  const handleEditCharacter = () => {
+    // In consolidated system, we only have one active character
     setMode('edit');
   };
 
   const handleBackToMenu = () => {
     setMode('menu');
-    setSelectedCharacterId(null);
   };
 
-  const handleDeleteCharacter = (id: string) => {
-    deleteCharacter(id);
-    // Also remove from localStorage
-    try {
-      const updated = savedCharacters.filter(c => c.id !== id);
-      localStorage.setItem('lifeSimulator_characters', JSON.stringify(updated));
-    } catch (error) {
-      console.warn('Failed to update localStorage:', error);
+  const handleDeleteCharacter = () => {
+    // Use atomic reset from consolidated stores
+    const { resetAllGameState } = require('../utils/characterFlowIntegration');
+    if (confirm('Delete character and all progress? This cannot be undone.')) {
+      resetAllGameState();
+      window.location.reload(); // Refresh to clear UI state
     }
   };
 
-  const handleSelectCharacter = (character: any) => {
-    setActiveCharacter(character);
+  const handleSelectCharacter = () => {
+    // Character is already in consolidated store
+    console.log('✅ Character selected from consolidated store');
     navigate('/planner');
   };
 
@@ -60,7 +50,7 @@ const CharacterCreationPage: React.FC = () => {
             ← Back to Character Menu
           </Button>
         </div>
-        <CharacterCreationFlow />
+        <ConsolidatedCharacterCreationFlow />
       </div>
     );
   }
@@ -98,31 +88,31 @@ const CharacterCreationPage: React.FC = () => {
                 </p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {savedCharacters.map((character) => (
+                  {savedCharacters.map((character, index) => (
                     <div 
-                      key={character.id} 
+                      key={index} 
                       className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
                     >
                       <div className="space-y-3">
                         <div>
                           <h3 className="font-semibold text-gray-900">{character.name}</h3>
                           <p className="text-xs text-gray-500">
-                            Created: {new Date(character.createdAt).toLocaleDateString()}
+                            Background: {character.background || 'Not set'}
                           </p>
                         </div>
                         
                         <div className="text-xs text-gray-600">
                           <div className="grid grid-cols-2 gap-1">
-                            <div>Intelligence: {character.attributes.intelligence}</div>
-                            <div>Charisma: {character.attributes.charisma}</div>
-                            <div>Strength: {character.attributes.strength}</div>
-                            <div>Creativity: {character.attributes.creativity}</div>
+                            <div>Intelligence: {character.attributes?.intelligence || 'N/A'}</div>
+                            <div>Charisma: {character.attributes?.charisma || 'N/A'}</div>
+                            <div>Strength: {character.attributes?.strength || 'N/A'}</div>
+                            <div>Creativity: {character.attributes?.creativity || 'N/A'}</div>
                           </div>
                         </div>
                         
                         <div className="space-y-2">
                           <Button
-                            onClick={() => handleSelectCharacter(character)}
+                            onClick={handleSelectCharacter}
                             variant="primary"
                             size="sm"
                             className="w-full"
@@ -131,7 +121,7 @@ const CharacterCreationPage: React.FC = () => {
                           </Button>
                           <div className="flex space-x-2">
                             <Button
-                              onClick={() => handleEditCharacter(character.id)}
+                              onClick={handleEditCharacter}
                               variant="outline"
                               size="sm"
                               className="flex-1"
@@ -139,7 +129,7 @@ const CharacterCreationPage: React.FC = () => {
                               Edit
                             </Button>
                             <Button
-                              onClick={() => handleDeleteCharacter(character.id)}
+                              onClick={handleDeleteCharacter}
                               variant="outline"
                               size="sm"
                               className="text-red-600 border-red-200 hover:bg-red-50"
