@@ -148,7 +148,7 @@ const Planner: React.FC = () => {
     // This would integrate with the narrative store's storylet evaluation system
     console.log('📖 Evaluating storylets with consolidated stores');
     console.log('   Active storylets:', storylets.active);
-    console.log('   Tutorial storylet flag:', narrativeStore.flags.storylet.get('character_created'));
+    console.log('   Tutorial storylet flag:', narrativeStore.getStoryletFlag('character_created'));
   };
   
   // Initialize resources if they don't exist

@@ -1,4 +1,5 @@
 // /Users/montysharma/V11M2/src/components/contentStudio/ArcManager.tsx
+// Migrated to use shared Content Studio foundation with preserved arc functionality
 
 import React, { useState, useMemo } from 'react';
 import { useStoryletStore } from '../../store/useStoryletStore';
@@ -7,6 +8,12 @@ import type { Storylet } from '../../types/storylet';
 import HelpTooltip from '../ui/HelpTooltip';
 import StoryArcVisualizer from '../StoryArcVisualizer';
 import ArcTestingInterface from '../dev/ArcTestingInterface';
+
+// Shared foundation imports
+import BaseStudioComponent from './shared/BaseStudioComponent';
+import { useCRUDOperations } from './shared/useCRUDOperations';
+import { useStudioValidation } from './shared/useStudioValidation';
+import { useStudioPersistence } from './shared/useStudioPersistence';
 
 interface UndoRedoSystem {
   executeAction: (action: any) => void;
@@ -42,6 +49,27 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
     return getStoryletsForArc(arcName);
   };
 
+  // Shared foundation hooks
+  const { handleCreate, handleUpdate, handleDelete } = useCRUDOperations({
+    entityType: 'Arc',
+    getAllItems: () => storyArcs.map(name => ({ id: name, name })),
+    createItem: (arcData: { name: string }) => {
+      console.log('Creating arc:', arcData.name);
+      addStoryArc(arcData.name);
+      return { id: arcData.name, ...arcData };
+    },
+    updateItem: (arc: { id: string; name: string }) => {
+      console.log('Updating arc:', arc.id);
+      // Arc updates would be handled here if needed
+    },
+    deleteItem: (id: string) => {
+      console.log('Deleting arc:', id);
+      removeStoryArc(id);
+    },
+    undoRedoSystem
+  });
+
+  // State declarations - must come before hooks that use them
   const [activeTab, setActiveTab] = useState<ArcManagerTab>('overview');
   const [selectedArc, setSelectedArc] = useState<string>('');
   const [visualizingArc, setVisualizingArc] = useState<string | null>(null);
@@ -51,6 +79,22 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
   const [testingFlags, setTestingFlags] = useState<Record<string, boolean>>({});
   const [showArcTesting, setShowArcTesting] = useState(false);
   const [arcSortBy, setArcSortBy] = useState<'alphabetical' | 'lastWorked'>('alphabetical');
+
+  const { validateRequired, validateUnique } = useStudioValidation({
+    entityName: 'Arc',
+    existingItems: storyArcs.map(name => ({ id: name, name }))
+  });
+
+  const persistence = useStudioPersistence(
+    { selectedArc, visualizingArc, testingArc, arcSortBy },
+    {
+      storageKey: 'arc_manager_state',
+      autoSaveEnabled: true,
+      onAutoSave: (data) => {
+        console.log('Auto-saved arc manager state');
+      }
+    }
+  );
 
   // Get arc statistics with sorting
   const arcStats = useMemo(() => {
@@ -107,20 +151,39 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
     return Object.values(allStorylets).filter(storylet => !storylet.storyArc);
   }, [allStorylets]);
 
-  const handleCreateArc = () => {
-    if (newArcName.trim() && !storyArcs.includes(newArcName.trim())) {
-      addStoryArc(newArcName.trim());
+  const handleCreateArc = async () => {
+    const trimmedName = newArcName.trim();
+    
+    // Validate using shared validation
+    const nameValidation = validateRequired(trimmedName, 'Arc name is required');
+    if (!nameValidation.isValid) {
+      alert(nameValidation.error);
+      return;
+    }
+    
+    const uniqueValidation = validateUnique(trimmedName, 'Arc name must be unique');
+    if (!uniqueValidation.isValid) {
+      alert(uniqueValidation.error);
+      return;
+    }
+    
+    // Use CRUD operations for creation
+    const success = await handleCreate({ name: trimmedName });
+    if (success) {
       setNewArcName('');
       setShowCreateArcModal(false);
-      setSelectedArc(newArcName.trim());
+      setSelectedArc(trimmedName);
+      persistence.markDirty();
     }
   };
 
-  const handleDeleteArc = (arcName: string) => {
+  const handleDeleteArc = async (arcName: string) => {
     if (confirm(`Are you sure you want to delete the "${arcName}" story arc? This will unassign all storylets from this arc.`)) {
-      removeStoryArc(arcName);
-      if (selectedArc === arcName) {
+      // Use CRUD operations for deletion
+      const success = await handleDelete(arcName);
+      if (success && selectedArc === arcName) {
         setSelectedArc('');
+        persistence.markDirty();
       }
     }
   };
@@ -148,27 +211,24 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
   ];
 
   return (
-    <div className="h-full flex flex-col bg-white">
-      {/* Header */}
-      <div className="border-b border-gray-200 p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800">Story Arc Manager</h3>
-            <p className="text-sm text-gray-600">
-              Manage, visualize, and test story arc connections and flow
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <HelpTooltip content="Manage story arcs, visualize connections between storylets, and test arc flows. Use the tabs to access different management tools." />
-            <button
-              onClick={() => setShowCreateArcModal(true)}
-              className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-            >
-              + New Arc
-            </button>
-          </div>
+    <BaseStudioComponent
+      title="Story Arc Manager"
+      helpText="Manage, visualize, and test story arc connections and flow. Use tabs to access different arc management tools."
+      undoRedoSystem={undoRedoSystem}
+      headerActions={
+        <div className="flex items-center space-x-3">
+          {persistence.isDirty && (
+            <span className="text-xs text-orange-600">Unsaved changes</span>
+          )}
+          <button
+            onClick={() => setShowCreateArcModal(true)}
+            className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+          >
+            + New Arc
+          </button>
         </div>
-      </div>
+      }
+    >
 
       {/* Tab Navigation */}
       <div className="border-b border-gray-200 bg-gray-50">
@@ -176,7 +236,10 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as ArcManagerTab)}
+              onClick={() => {
+                setActiveTab(tab.id as ArcManagerTab);
+                persistence.markDirty();
+              }}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab.id
                   ? 'text-blue-600 border-blue-600 bg-white'
@@ -535,7 +598,7 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
       {showArcTesting && (
         <ArcTestingInterface onClose={() => setShowArcTesting(false)} />
       )}
-    </div>
+    </BaseStudioComponent>
   );
 };
 

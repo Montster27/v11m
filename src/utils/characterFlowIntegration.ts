@@ -243,7 +243,7 @@ export const createCharacterAtomically = (data: CharacterCreationData): void => 
     console.log('📊 Final character state:', {
       character: coreStore.character,
       concerns: narrativeStore.concerns,
-      flags: narrativeStore.flags.storylet.get('character_created')
+      flags: narrativeStore.getStoryletFlag('character_created')
     });
     
   } catch (error) {
@@ -334,8 +334,8 @@ export const getCharacterCreationSummary = (): any => {
     world: coreStore.world,
     concerns: narrativeStore.concerns,
     flags: {
-      characterCreated: narrativeStore.flags.storylet.get('character_created'),
-      totalFlags: narrativeStore.flags.storylet.size
+      characterCreated: narrativeStore.getStoryletFlag('character_created'),
+      totalFlags: narrativeStore.flags.storylet instanceof Map ? narrativeStore.flags.storylet.size : 0
     },
     storylets: {
       active: narrativeStore.storylets.active,

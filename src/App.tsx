@@ -61,6 +61,9 @@ if (process.env.NODE_ENV === 'development') {
   // Phase 2: Planner Decomposition Tests
   import('./test/plannerRefactor/decompositionTest'); // Import planner decomposition tests
   
+  // Phase 3: Content Studio Unification Tests
+  import('./test/contentStudioRefactor/unificationTest'); // Import content studio unification tests
+  
   // Show test availability banner
   setTimeout(() => {
     console.log('\n🧪 CHARACTER FLOW TESTS LOADED!');
@@ -71,7 +74,8 @@ if (process.env.NODE_ENV === 'development') {
     console.log('Type runCompleteValidation() for COMPLETE validation suite');
     console.log('Type generateSuccessReport() for final success validation');
     console.log('Type testRecentFixes() to validate recent bug fixes');
-    console.log('Type runDecompositionTests() to test Planner refactoring\n');
+    console.log('Type runDecompositionTests() to test Planner refactoring');
+    console.log('Type runContentStudioUnificationTests() to test Content Studio\n');
   }, 2000);
   import('./utils/debugClueConnections'); // Import clue connection debug utilities
   import('./utils/refactorBackup'); // Import refactor backup utilities

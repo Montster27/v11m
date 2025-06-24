@@ -1,4 +1,5 @@
 // /Users/montysharma/V11M2/src/components/contentStudio/ClueManager.tsx
+// Migrated to use shared Content Studio foundation with preserved clue functionality
 
 import React, { useState, useMemo } from 'react';
 import { useClueStore } from '../../store/useClueStore';
@@ -7,6 +8,12 @@ import { useStoryletCatalogStore } from '../../store/useStoryletCatalogStore';
 import type { Clue } from '../../types/clue';
 import HelpTooltip from '../ui/HelpTooltip';
 import MinigameManagementPanel from '../MinigameManagementPanel';
+
+// Shared foundation imports
+import BaseStudioComponent from './shared/BaseStudioComponent';
+import { useCRUDOperations } from './shared/useCRUDOperations';
+import { useStudioValidation } from './shared/useStudioValidation';
+import { useStudioPersistence } from './shared/useStudioPersistence';
 
 interface UndoRedoSystem {
   executeAction: (action: any) => void;
@@ -34,8 +41,28 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
   } = useClueStore();
 
   const { storyArcs } = useStoryletStore();
-  const { getStoryletsForArc } = useStoryletCatalogStore();
+  const { getStoryletsForArc, allStorylets } = useStoryletCatalogStore();
 
+  // Shared foundation hooks
+  const { handleCreate, handleUpdate, handleDelete } = useCRUDOperations({
+    entityType: 'Clue',
+    getAllItems: () => clues,
+    createItem: (clueData: any) => {
+      console.log('Creating clue:', clueData.title);
+      return createClue(clueData);
+    },
+    updateItem: (clue: any) => {
+      console.log('Updating clue:', clue.id);
+      updateClue(clue.id, clue);
+    },
+    deleteItem: (id: string) => {
+      console.log('Deleting clue:', id);
+      deleteClue(id);
+    },
+    undoRedoSystem
+  });
+
+  // State declarations - must come before hooks that use them
   const [activeTab, setActiveTab] = useState<ClueManagerTab>('clues');
   const [selectedClue, setSelectedClue] = useState<string>('');
   const [showCreateClueForm, setShowCreateClueForm] = useState(false);
@@ -55,6 +82,22 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
     tags: '',
     rarity: 'common' as const
   });
+
+  const { validateRequired } = useStudioValidation({
+    entityName: 'Clue',
+    existingItems: clues
+  });
+
+  const persistence = useStudioPersistence(
+    { activeTab, selectedClue, clueFormData, editingClue },
+    {
+      storageKey: 'clue_manager_state',
+      autoSaveEnabled: true,
+      onAutoSave: (data) => {
+        console.log('Auto-saved clue manager state');
+      }
+    }
+  );
 
   const minigameTypes = [
     { value: 'path_planner', label: 'Path Planner', description: 'Navigation challenge' },
@@ -107,17 +150,39 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
     setEditingClue(null);
   };
 
-  const handleCreateClue = () => {
-    if (!clueFormData.title.trim()) return;
+  const handleCreateClue = async () => {
+    // Validate using shared validation
+    const titleValidation = validateRequired(clueFormData.title.trim(), 'Clue title is required');
+    if (!titleValidation.isValid) {
+      alert(titleValidation.error);
+      return;
+    }
+    
+    const descValidation = validateRequired(clueFormData.description.trim(), 'Clue description is required');
+    if (!descValidation.isValid) {
+      alert(descValidation.error);
+      return;
+    }
+    
+    const contentValidation = validateRequired(clueFormData.content.trim(), 'Clue content is required');
+    if (!contentValidation.isValid) {
+      alert(contentValidation.error);
+      return;
+    }
 
-    const clue = createClue({
+    // Use CRUD operations for creation
+    const success = await handleCreate({
       ...clueFormData,
       tags: clueFormData.tags.split(',').map(tag => tag.trim()).filter(Boolean)
     });
 
-    resetClueForm();
-    setShowCreateClueForm(false);
-    setSelectedClue(clue.id);
+    if (success) {
+      resetClueForm();
+      setShowCreateClueForm(false);
+      // We can't easily get the new clue ID from the success response
+      setSelectedClue('');
+      persistence.markDirty();
+    }
   };
 
   const handleEditClue = (clue: Clue) => {
@@ -140,23 +205,40 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
     setShowCreateClueForm(true);
   };
 
-  const handleUpdateClue = () => {
-    if (!editingClue || !clueFormData.title.trim()) return;
+  const handleUpdateClue = async () => {
+    if (!editingClue) return;
+    
+    // Validate using shared validation
+    const titleValidation = validateRequired(clueFormData.title.trim(), 'Clue title is required');
+    if (!titleValidation.isValid) {
+      alert(titleValidation.error);
+      return;
+    }
 
-    updateClue(editingClue.id, {
+    // Use CRUD operations for update
+    const success = await handleUpdate({
+      ...editingClue,
       ...clueFormData,
       tags: clueFormData.tags.split(',').map(tag => tag.trim()).filter(Boolean)
     });
 
-    resetClueForm();
-    setShowCreateClueForm(false);
+    if (success) {
+      resetClueForm();
+      setShowCreateClueForm(false);
+      persistence.markDirty();
+    }
   };
 
-  const handleDeleteClue = (clueId: string) => {
+  const handleDeleteClue = async (clueId: string) => {
+    const clue = clues.find(c => c.id === clueId);
+    const clueName = clue?.title || 'Unknown clue';
+    
     if (confirm('Are you sure you want to delete this clue?')) {
-      deleteClue(clueId);
-      if (selectedClue === clueId) {
+      // Use CRUD operations for deletion
+      const success = await handleDelete(clueId);
+      if (success && selectedClue === clueId) {
         setSelectedClue('');
+        persistence.markDirty();
       }
     }
   };
@@ -168,45 +250,41 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
   ];
 
   return (
-    <div className="h-full flex flex-col bg-white">
-      {/* Header */}
-      <div className="border-b border-gray-200 p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800">Clue & Minigame Manager</h3>
-            <p className="text-sm text-gray-600">
-              Create and manage clues, configure discovery methods, and test minigames
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <HelpTooltip content="Manage clues that players can discover through gameplay, configure minigame challenges, and view connections between clues and storylets." />
-            <button
-              onClick={() => setShowCreateClueForm(true)}
-              className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-            >
-              + New Clue
-            </button>
-          </div>
+    <BaseStudioComponent
+      title="Clue & Minigame Manager"
+      helpText="Create and manage clues, configure discovery methods, and test minigames. Integrate clues with storylets and story arcs."
+      undoRedoSystem={undoRedoSystem}
+      headerActions={
+        <div className="flex items-center space-x-3">
+          {persistence.isDirty && (
+            <span className="text-xs text-orange-600">Unsaved changes</span>
+          )}
+          <button
+            onClick={() => setShowCreateClueForm(true)}
+            className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+          >
+            + New Clue
+          </button>
         </div>
-        
-        {/* Quick Stats */}
-        <div className="mt-4 grid grid-cols-4 gap-4">
-          <div className="bg-blue-50 p-3 rounded-lg">
-            <div className="text-2xl font-bold text-blue-600">{clueStats.total}</div>
-            <div className="text-sm text-blue-800">Total Clues</div>
-          </div>
-          <div className="bg-green-50 p-3 rounded-lg">
-            <div className="text-2xl font-bold text-green-600">{clueStats.discovered}</div>
-            <div className="text-sm text-green-800">Discovered</div>
-          </div>
-          <div className="bg-purple-50 p-3 rounded-lg">
-            <div className="text-2xl font-bold text-purple-600">{Object.keys(clueStats.byCategory).length}</div>
-            <div className="text-sm text-purple-800">Categories</div>
-          </div>
-          <div className="bg-orange-50 p-3 rounded-lg">
-            <div className="text-2xl font-bold text-orange-600">{minigameTypes.length}</div>
-            <div className="text-sm text-orange-800">Minigame Types</div>
-          </div>
+      }
+    >
+      {/* Quick Stats */}
+      <div className="mb-6 grid grid-cols-4 gap-4">
+        <div className="bg-blue-50 p-3 rounded-lg">
+          <div className="text-2xl font-bold text-blue-600">{clueStats.total}</div>
+          <div className="text-sm text-blue-800">Total Clues</div>
+        </div>
+        <div className="bg-green-50 p-3 rounded-lg">
+          <div className="text-2xl font-bold text-green-600">{clueStats.discovered}</div>
+          <div className="text-sm text-green-800">Discovered</div>
+        </div>
+        <div className="bg-purple-50 p-3 rounded-lg">
+          <div className="text-2xl font-bold text-purple-600">{Object.keys(clueStats.byCategory).length}</div>
+          <div className="text-sm text-purple-800">Categories</div>
+        </div>
+        <div className="bg-orange-50 p-3 rounded-lg">
+          <div className="text-2xl font-bold text-orange-600">{minigameTypes.length}</div>
+          <div className="text-sm text-orange-800">Minigame Types</div>
         </div>
       </div>
 
@@ -216,7 +294,10 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as ClueManagerTab)}
+              onClick={() => {
+                setActiveTab(tab.id as ClueManagerTab);
+                persistence.markDirty();
+              }}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab.id
                   ? 'text-blue-600 border-blue-600 bg-white'
@@ -658,7 +739,7 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
           </div>
         </div>
       )}
-    </div>
+    </BaseStudioComponent>
   );
 };
 

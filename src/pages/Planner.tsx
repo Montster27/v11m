@@ -57,7 +57,7 @@ const Planner: React.FC = () => {
   const evaluateStorylets = () => {
     console.log('📖 Evaluating storylets with consolidated stores');
     console.log('   Active storylets:', storylets.active);
-    console.log('   Tutorial storylet flag:', narrativeStore.flags.storylet.get('character_created'));
+    console.log('   Tutorial storylet flag:', narrativeStore.getStoryletFlag('character_created'));
   };
 
   // Time simulation hook
