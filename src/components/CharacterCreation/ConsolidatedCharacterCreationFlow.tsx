@@ -220,8 +220,8 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
                       min={0}
                       max={100}
                       step={5}
-                      value={[value]}
-                      onValueChange={(values) => handleAttributeChange(key as keyof AttributeValues, values[0])}
+                      value={value}
+                      onChange={(newValue) => handleAttributeChange(key as keyof AttributeValues, newValue)}
                       className="w-full"
                     />
                   </div>
@@ -274,8 +274,8 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
                       min={-20}
                       max={20}
                       step={5}
-                      value={[value]}
-                      onValueChange={(values) => handleDomainAdjustment(key as keyof DomainAdjustments, values[0])}
+                      value={value}
+                      onChange={(newValue) => handleDomainAdjustment(key as keyof DomainAdjustments, newValue)}
                       className="w-full"
                     />
                   </div>

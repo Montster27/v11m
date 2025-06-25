@@ -1,16 +1,23 @@
 // /Users/montysharma/V11M2/src/components/Navigation.tsx
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useAppStore } from '../store/useAppStore';
-import { useCharacterStore } from '../store/characterStore';
+import { useCoreGameStore } from '../stores/v2';
+// REMOVED: import { useCharacterStore } from '../store/characterStore';
 import { ProgressBadge } from './ui';
 import SaveManager from './SaveManager';
 import StoryletProgress from './StoryletProgress';
 
 const Navigation: React.FC = () => {
   const location = useLocation();
-  const { userLevel, experience, day, activeCharacter, isTimePaused } = useAppStore();
-  const { currentCharacter } = useCharacterStore();
+  
+  // Fix: Read ALL data from the NEW consolidated store only
+  const userLevel = useCoreGameStore((state) => state.player.level);
+  const experience = useCoreGameStore((state) => state.player.experience);
+  const day = useCoreGameStore((state) => state.world.day);
+  const activeCharacter = useCoreGameStore((state) => state.character);
+  const isTimePaused = useCoreGameStore((state) => state.world.isTimePaused);
+  
+  // REMOVED: const { currentCharacter } = useCharacterStore();
   const [showSaveManager, setShowSaveManager] = useState(false);
   const [showStoryletProgress, setShowStoryletProgress] = useState(false);
   
@@ -35,12 +42,12 @@ const Navigation: React.FC = () => {
                 <span className="text-xl font-bold text-gray-900">MMV</span>
               </Link>
               
-              {/* Active Character */}
-              {(activeCharacter || currentCharacter) && (
+              {/* Active Character - FIXED: Only read from new store */}
+              {activeCharacter?.name && (
                 <div className="flex items-center space-x-2 text-lg">
                   <div className="text-xl">👤</div>
                   <span className="font-medium text-gray-700">
-                    Character: {activeCharacter ? activeCharacter.name : currentCharacter.name}
+                    Character: {activeCharacter.name}
                   </span>
                 </div>
               )}
@@ -91,9 +98,9 @@ const Navigation: React.FC = () => {
             
             {/* Status Indicators */}
             <div className="flex items-center space-x-3">
-              <ProgressBadge title="Level" value={userLevel} color="purple" />
-              <ProgressBadge title="XP" value={experience} color="blue" />
-              <ProgressBadge title="Day" value={day} color="teal" />
+              <ProgressBadge title="Level" value={userLevel || 1} color="purple" />
+              <ProgressBadge title="XP" value={experience || 0} color="blue" />
+              <ProgressBadge title="Day" value={day || 1} color="teal" />
               
               {/* Time Pause Indicator */}
               {isTimePaused && (

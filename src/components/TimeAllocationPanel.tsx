@@ -2,8 +2,7 @@
 
 import React from 'react';
 import { Card, Slider } from './ui';
-import { useAppStore } from '../store/useAppStore';
-import { useCharacterStore } from '../store/characterStore';
+import { useCoreGameStore } from '../stores/v2';
 import { getActivityStats, percentToHoursPerWeek, percentToHoursPerDay } from '../utils/resourceCalculations';
 import { validateSleepHours } from '../utils/validation';
 
@@ -12,13 +11,31 @@ interface TimeAllocationPanelProps {
 }
 
 const TimeAllocationPanel: React.FC<TimeAllocationPanelProps> = ({ disabled = false }) => {
-  const { 
-    allocations, 
-    updateTimeAllocation, 
-    getTotalTimeAllocated 
-  } = useAppStore();
+  const allocations = useCoreGameStore((state) => state.world.timeAllocation);
+  const character = useCoreGameStore((state) => state.character);
+  const updateWorld = useCoreGameStore((state) => state.updateWorld);
   
-  const { currentCharacter } = useCharacterStore();
+  // Ensure allocations have default values
+  const normalizedAllocations = {
+    study: allocations?.study ?? 40,
+    work: allocations?.work ?? 25,
+    social: allocations?.social ?? 15,
+    rest: allocations?.rest ?? 15,
+    exercise: allocations?.exercise ?? 5
+  };
+  
+  const updateTimeAllocation = (activity: string, value: number) => {
+    updateWorld({
+      timeAllocation: {
+        ...normalizedAllocations,
+        [activity]: Math.max(0, Math.min(100, value))
+      }
+    });
+  };
+  
+  const getTotalTimeAllocated = () => {
+    return Object.values(normalizedAllocations).reduce((sum, value) => sum + value, 0);
+  };
   
   const totalAllocated = getTotalTimeAllocated();
   const isBalanced = totalAllocated === 100;
@@ -66,9 +83,9 @@ const TimeAllocationPanel: React.FC<TimeAllocationPanelProps> = ({ disabled = fa
         {/* Activity Sliders */}
         <div className="space-y-6">
           {activities.map(({ key, label }) => {
-            const value = allocations[key];
+            const value = normalizedAllocations[key];
             const hoursPerWeek = percentToHoursPerWeek(value);
-            const stats = getActivityStats(key, currentCharacter);
+            const stats = getActivityStats(key, character);
             const sleepValidation = key === 'rest' ? validateSleepHours(value) : null;
             
             return (

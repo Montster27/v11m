@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Card, ProgressBar } from './ui';
-import { useAppStore } from '../store/useAppStore';
+import { useCoreGameStore } from '../stores/v2';
 
 // Helper functions to reduce cognitive complexity
 const getResourceConfig = (resources: any) => [
@@ -143,16 +143,26 @@ const ResourceItem: React.FC<ResourceItemProps> = ({ config, value, displayValue
 );
 
 const ResourcePanel: React.FC = () => {
-  const { resources } = useAppStore();
-  const resourceConfig = getResourceConfig(resources);
-  const overallStatus = getOverallStatus(resources);
+  const resources = useCoreGameStore((state) => state.player.resources);
+  
+  // Ensure resources have default values if empty
+  const normalizedResources = {
+    energy: resources.energy ?? 75,
+    stress: resources.stress ?? 25,
+    money: resources.money ?? 20,
+    knowledge: resources.knowledge ?? 100,
+    social: resources.social ?? 200
+  };
+  
+  const resourceConfig = getResourceConfig(normalizedResources);
+  const overallStatus = getOverallStatus(normalizedResources);
 
   return (
     <div id="resources">
       <Card title="Resources" className="h-fit">
         <div className="space-y-4">
           {resourceConfig.map((config) => {
-            const value = resources[config.key as keyof typeof resources];
+            const value = normalizedResources[config.key as keyof typeof normalizedResources];
             const displayValue = config.prefix ? `${config.prefix}${value.toFixed(1)}` : value.toFixed(1);
             
             return (

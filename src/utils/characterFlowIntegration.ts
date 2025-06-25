@@ -216,7 +216,22 @@ export const createCharacterAtomically = (data: CharacterCreationData): void => 
       characterClasses: {}
     });
     
-    // Step 5: Initialize world state
+    // Step 5: Reset player stats to fresh start
+    console.log('🎮 Resetting player stats to Level 1...');
+    coreStore.updatePlayer({
+      level: 1,
+      experience: 0,
+      skillPoints: 0,
+      resources: {
+        energy: 75,
+        stress: 25,
+        money: 20,
+        knowledge: 100,
+        social: 200
+      }
+    });
+    
+    // Step 6: Initialize world state
     console.log('🌍 Initializing world state...');
     coreStore.updateWorld({
       day: 1,
@@ -224,7 +239,7 @@ export const createCharacterAtomically = (data: CharacterCreationData): void => 
       isTimePaused: false
     });
     
-    // Step 6: Set up narrative concerns and flags
+    // Step 7: Set up narrative concerns and flags
     console.log('📖 Setting up narrative concerns and flags...');
     const initialConcerns = getInitialConcerns(data.background);
     narrativeStore.updateConcerns(initialConcerns);
@@ -232,7 +247,7 @@ export const createCharacterAtomically = (data: CharacterCreationData): void => 
     // Set character created flag to trigger tutorial storylet
     narrativeStore.setStoryletFlag('character_created', true);
     
-    // Step 7: Initialize social store with empty state
+    // Step 8: Initialize social store with empty state
     console.log('👥 Initializing social store...');
     // Social store is already reset, just ensure it's ready
     
@@ -241,7 +256,9 @@ export const createCharacterAtomically = (data: CharacterCreationData): void => 
     
     // Log final state for debugging
     console.log('📊 Final character state:', {
+      player: coreStore.player,
       character: coreStore.character,
+      world: coreStore.world,
       concerns: narrativeStore.concerns,
       flags: narrativeStore.getStoryletFlag('character_created')
     });

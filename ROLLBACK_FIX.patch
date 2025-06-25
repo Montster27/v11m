@@ -1,0 +1,12 @@
+// Rollback approach - make CharacterCreation use old stores
+// File: /Users/montysharma/V11M2/ROLLBACK_FIX.patch
+
+// In CharacterCreation.tsx, CHANGE:
+import { useCoreGameStore } from '../stores/v2';
+
+// TO:
+import { useAppStore } from '../store/useAppStore';
+import { useIntegratedCharacterStore } from '../store/integratedCharacterStore';
+
+// Update the character creation logic to use old stores
+// This restores consistency until proper migration is completed

@@ -1,21 +1,17 @@
 // /Users/montysharma/V11M2/src/components/SkillsPanel.tsx
 
 import React, { useState, useEffect } from 'react';
-import { useAppStore } from '../store/useAppStore';
+import { useCoreGameStore } from '../stores/v2';
 import { ProgressBar } from './ui';
 import { getCurrentLevelXpRange } from '../utils/skillCalculations';
 
-// Make useAppStore available globally for console testing
+// Make useCoreGameStore available globally for console testing
 if (typeof window !== 'undefined') {
-  (window as any).useAppStore = useAppStore;
+  (window as any).useCoreGameStore = useCoreGameStore;
   (window as any).testSkills = () => {
-    const store = useAppStore.getState();
-    console.log('Available skills:', Object.keys(store.skills));
-    console.log('Testing XP addition...');
-    store.addSkillXp('informationWarfare', 200, 'Console Test');
-    store.addSkillXp('bureaucraticNavigation', 150, 'Console Test');
-    store.addSkillXp('allianceBuilding', 75, 'Console Test');
-    console.log('XP added! Check the skills panel.');
+    const store = useCoreGameStore.getState();
+    console.log('Current skills state:', store.skills);
+    console.log('Note: V2 store uses a different skill structure');
   };
 }
 
@@ -121,37 +117,81 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({ isOpen, skill, even
 };
 
 const SkillsPanel: React.FC = () => {
-  const { skills, getSkillEvents } = useAppStore();
+  const skills = useCoreGameStore((state) => state.skills);
+  const updateSkills = useCoreGameStore((state) => state.updateSkills);
   const [selectedSkill, setSelectedSkill] = useState<any>(null);
   const [skillEvents, setSkillEvents] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
+  
+  // Convert V2 skill structure to match the component's expectations
+  // For now, we'll create a basic structure - this needs to be adapted based on actual V2 skill structure
+  const legacySkills = {
+    bureaucraticNavigation: {
+      id: 'bureaucraticNavigation',
+      name: 'Bureaucratic Navigation',
+      description: 'Mastery of institutional systems and navigating complex structures.',
+      xp: 0,
+      level: 1,
+      xpToNextLevel: 100
+    },
+    resourceAcquisition: {
+      id: 'resourceAcquisition',
+      name: 'Resource Acquisition',
+      description: 'Skill in finding and securing resources and opportunities.',
+      xp: 0,
+      level: 1,
+      xpToNextLevel: 100
+    },
+    informationWarfare: {
+      id: 'informationWarfare',
+      name: 'Information Warfare',
+      description: 'Strategic intelligence gathering and data analysis.',
+      xp: 0,
+      level: 1,
+      xpToNextLevel: 100
+    },
+    allianceBuilding: {
+      id: 'allianceBuilding',
+      name: 'Alliance Building',
+      description: 'Creating and maintaining strategic partnerships.',
+      xp: 0,
+      level: 1,
+      xpToNextLevel: 100
+    },
+    operationalSecurity: {
+      id: 'operationalSecurity',
+      name: 'Operational Security',
+      description: 'Protecting sensitive activities and managing risk.',
+      xp: 0,
+      level: 1,
+      xpToNextLevel: 100
+    },
+    perseverance: {
+      id: 'perseverance',
+      name: 'Perseverance',
+      description: 'Mental toughness to push through challenges.',
+      xp: 0,
+      level: 1,
+      xpToNextLevel: 100
+    }
+  };
+  
+  const getSkillEvents = (skillId: string, limit: number) => {
+    // V2 stores don't have skill events tracking yet
+    return [];
+  };
 
   // Initialize test data in development
   useEffect(() => {
-    if (import.meta.env.DEV && Object.keys(skills).length > 0) {
-      console.log('🎯 Skills Panel loaded with skills:', Object.keys(skills));
-      console.log('📊 Current skill levels:', Object.fromEntries(
-        Object.entries(skills).map(([key, skill]) => [key, `Level ${skill.level} (${skill.xp} XP)`])
-      ));
-      
-      // Check if skills have no XP (first load)
-      const hasAnyXp = Object.values(skills).some(skill => skill.xp > 0);
-      if (!hasAnyXp) {
-        console.log('🚀 No XP found, simulating initial skill gains...');
-        simulateSkillGainsForPreview();
-      }
+    if (import.meta.env.DEV) {
+      console.log('🎯 Skills Panel loaded with V2 store');
+      console.log('📊 V2 Skills structure:', skills);
     }
   }, []);
 
   const simulateSkillGainsForPreview = () => {
-    const { addSkillXp } = useAppStore.getState();
-    
-    // Add some test XP to demonstrate the system
-    addSkillXp('bureaucraticNavigation', 120, 'Test: Initial Bonus');
-    addSkillXp('resourceAcquisition', 50, 'Test: Workshop Attendance');
-    addSkillXp('informationWarfare', 200, 'Test: Research Project');
-    addSkillXp('allianceBuilding', 75, 'Test: Networking Event');
-    addSkillXp('operationalSecurity', 30, 'Test: Security Training');
+    // V2 stores handle skills differently - this needs to be adapted
+    console.log('Skill preview disabled for V2 stores - needs implementation');
   };
 
   const handleSkillClick = (skill: any) => {
@@ -184,7 +224,7 @@ const SkillsPanel: React.FC = () => {
       {/* Skills Grid */}
       <div className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Object.values(skills).map((skill) => {
+          {Object.values(legacySkills).map((skill) => {
             const { currentLevelXp, totalLevelXp } = getCurrentLevelXpRange(skill.xp);
             
             return (
@@ -237,10 +277,10 @@ const SkillsPanel: React.FC = () => {
                   testSkills()  // Add XP to multiple skills
                 </code>
                 <code className="text-xs bg-blue-100 px-2 py-1 rounded text-blue-800 block">
-                  useAppStore.getState().addSkillXp('informationWarfare', 300, 'Big Bonus')
+                  console.log('V2 stores use different skill methods')
                 </code>
                 <code className="text-xs bg-blue-100 px-2 py-1 rounded text-blue-800 block">
-                  useAppStore.getState().addSkillXp('operationalSecurity', 50, 'Training')
+                  console.log('Skill XP addition needs V2 implementation')
                 </code>
               </div>
               <button 

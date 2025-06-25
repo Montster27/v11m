@@ -10,13 +10,41 @@ export const migrateFromLegacyStores = () => {
     // Migrate from useAppStore to useCoreGameStore
     const legacyAppStore = (window as any).useAppStore?.getState();
     if (legacyAppStore) {
-      useCoreGameStore.getState().updatePlayerStats({
-        userLevel: legacyAppStore.userLevel || 1,
+      // Update player data
+      useCoreGameStore.getState().updatePlayer({
+        level: legacyAppStore.userLevel || 1,
         experience: legacyAppStore.experience || 0,
+        skillPoints: 0,
+        resources: legacyAppStore.resources || {
+          energy: 75,
+          stress: 25,
+          money: 20,
+          knowledge: 100,
+          social: 200
+        }
+      });
+      
+      // Update character data
+      if (legacyAppStore.activeCharacter) {
+        useCoreGameStore.getState().updateCharacter({
+          name: legacyAppStore.activeCharacter.name || '',
+          background: legacyAppStore.activeCharacter.background || '',
+          attributes: legacyAppStore.activeCharacter.attributes || {},
+          developmentStats: legacyAppStore.activeCharacter.developmentStats || {}
+        });
+      }
+      
+      // Update world data
+      useCoreGameStore.getState().updateWorld({
         day: legacyAppStore.day || 1,
-        activeCharacter: legacyAppStore.activeCharacter || null,
-        skills: legacyAppStore.skills || {},
-        resources: legacyAppStore.resources || {}
+        timeAllocation: legacyAppStore.allocations || {
+          study: 40,
+          work: 25,
+          social: 15,
+          rest: 15,
+          exercise: 5
+        },
+        isTimePaused: legacyAppStore.isTimePaused || false
       });
       console.log('✅ Migrated app store data to core game store');
     }
@@ -25,15 +53,25 @@ export const migrateFromLegacyStores = () => {
     const legacyStoryletStore = (window as any).useStoryletStore?.getState();
     if (legacyStoryletStore) {
       const narrativeStore = useNarrativeStore.getState();
-      if (legacyStoryletStore.allStorylets && Array.isArray(legacyStoryletStore.allStorylets)) {
-        legacyStoryletStore.allStorylets.forEach((storylet: any) => {
-          narrativeStore.addStorylet(storylet);
+      
+      // Migrate completed storylets
+      if (legacyStoryletStore.completedStorylets && Array.isArray(legacyStoryletStore.completedStorylets)) {
+        legacyStoryletStore.completedStorylets.forEach((storyletId: string) => {
+          narrativeStore.completeStorylet(storyletId);
         });
       }
+      
+      // Migrate active storylets
+      if (legacyStoryletStore.activeStoryletIds && Array.isArray(legacyStoryletStore.activeStoryletIds)) {
+        legacyStoryletStore.activeStoryletIds.forEach((storyletId: string) => {
+          narrativeStore.addActiveStorylet(storyletId);
+        });
+      }
+      
       // Migrate storylet flags if they exist
       if (legacyStoryletStore.flags) {
         Object.entries(legacyStoryletStore.flags).forEach(([key, value]) => {
-          narrativeStore.setStoryFlag(key, value);
+          narrativeStore.setStoryletFlag(key, value as any);
         });
       }
       console.log('✅ Migrated storylet data to narrative store');
@@ -79,17 +117,18 @@ export const validateMigration = () => {
   
   const validation = {
     coreGame: {
-      hasCharacter: !!coreGame.activeCharacter,
-      hasStats: coreGame.userLevel > 0,
-      hasDay: coreGame.day > 0
+      hasCharacter: !!coreGame.character?.name,
+      hasStats: coreGame.player.level > 0,
+      hasDay: coreGame.world.day > 0,
+      hasResources: Object.keys(coreGame.player.resources || {}).length > 0
     },
     narrative: {
-      hasStorylets: narrative.allStorylets.length > 0,
-      hasFlags: Object.keys(narrative.storyFlags).length > 0
+      hasStorylets: narrative.storylets?.active?.length > 0 || false,
+      hasFlags: Object.keys(narrative.storyFlags || {}).length > 0
     },
     social: {
-      hasClues: social.discoveredClues.length > 0,
-      hasRelationships: Object.keys(social.npcRelationships).length > 0
+      hasClues: social.clues?.discovered?.length > 0 || false,
+      hasRelationships: Object.keys(social.relationships || {}).length > 0
     }
   };
   

@@ -1,0 +1,22 @@
+// Quick fix for Navigation.tsx to connect to new store system
+// File: /Users/montysharma/V11M2/src/components/Navigation.tsx
+
+// CHANGE LINE 3 FROM:
+import { useAppStore } from '../store/useAppStore';
+
+// TO:
+import { useCoreGameStore } from '../stores/v2';
+
+// CHANGE LINE 10 FROM:
+const { userLevel, experience, day, activeCharacter, isTimePaused } = useAppStore();
+
+// TO:
+const { userLevel, experience, day, activeCharacter, isTimePaused } = useCoreGameStore(
+  (state) => ({
+    userLevel: state.player.level,
+    experience: state.player.experience,
+    day: state.world.day,
+    activeCharacter: state.character,
+    isTimePaused: state.world.isTimePaused
+  })
+);

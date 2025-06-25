@@ -7,7 +7,6 @@ import ClueNotification from './components/ClueNotification';
 import ClueDiscoveryManager from './components/ClueDiscoveryManager';
 import RefactorNotificationBanner from './components/RefactorNotificationBanner';
 import { CharacterCreation, Planner, Quests, Skills, StoryletDeveloper, ContentCreator, SplashScreen } from './pages';
-import { useAppStore } from './store/useAppStore';
 import { useStoryletStore } from './store/useStoryletStore';
 import { useGameOrchestrator, useStoryletNotifications } from './hooks/useGameOrchestrator';
 import { useAutoSave } from './hooks/useAutoSave';
@@ -15,6 +14,7 @@ import { useCoreGameStore, useNarrativeStore, useSocialStore } from './stores/v2
 import { Clue } from './types/clue';
 // Development-only imports for testing utilities
 if (process.env.NODE_ENV === 'development') {
+  import('./utils/versionCheck'); // Import version check FIRST
   import('./utils/clueSystemTest'); // Import clue system test functions
   import('./utils/balanceSimulator'); // Import balance testing utilities
   import('./utils/quickBalanceTools'); // Import quick balance analysis tools
@@ -90,6 +90,13 @@ if (process.env.NODE_ENV === 'development') {
   import('./utils/debugClueConnections'); // Import clue connection debug utilities
   import('./utils/refactorBackup'); // Import refactor backup utilities
   import('./utils/storeMigration'); // Import store migration utilities
+  import('./utils/fixV2StoreMigration'); // Import V2 store migration fix
+  import('./utils/testV2Migration'); // Import V2 migration test utilities
+  import('./utils/diagnoseStoreIssue'); // Import deep diagnostic tool
+  import('./utils/forceStoreUpdate'); // Import force update tools
+  import('./utils/ultimateDiagnostic'); // Import ultimate diagnostic
+  import('./utils/safeStoreDiagnostic'); // Import safe diagnostic
+  import('./utils/importResolutionCheck'); // Import resolution check
   import('./utils/preRefactorBackup'); // Import pre-refactor backup utilities
   import('./utils/atomicResetValidation'); // Import atomic reset validation utilities
   import('./utils/legacyCleanup'); // Import legacy cleanup utilities
@@ -116,41 +123,32 @@ if (process.env.NODE_ENV === 'development') {
 function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [clueNotification, setClueNotification] = useState<{clue: Clue; isVisible: boolean} | null>(null);
-  const [orphanedStateChecked, setOrphanedStateChecked] = useState(false);
   
-  // Core store hooks
-  const { activeCharacter, day, userLevel, experience } = useAppStore();
+  // Core store hooks - UPDATED TO USE NEW CONSOLIDATED STORES
+  const activeCharacter = useCoreGameStore((state) => state.character);
+  const day = useCoreGameStore((state) => state.world.day);
+  const userLevel = useCoreGameStore((state) => state.player.level);
+  const experience = useCoreGameStore((state) => state.player.experience);
   const { activeMinigame, completeMinigame, closeMinigame } = useStoryletStore();
   
-  // Debug: Log app state on startup
-  console.log('🚀 App startup - Current state:', { day, userLevel, experience, activeCharacter });
-  
-  // CRITICAL FIX: Check if we have unexpected state on startup (only once)
+  // Execute migration on app startup to sync legacy stores to V2 stores
   useEffect(() => {
-    if (!showSplash && !orphanedStateChecked && (day > 1 || userLevel > 1 || experience > 0)) {
-      console.log('⚠️ Detected unexpected persisted state on startup');
-      console.log('📦 localStorage keys:', Object.keys(localStorage));
-      
-      // Check if we have a valid currentSaveId that justifies this state
-      const saveStore = (window as any).useSaveStore?.getState();
-      const currentSaveId = saveStore?.currentSaveId;
-      
-      if (!currentSaveId && !activeCharacter) {
-        console.log('🚨 No currentSaveId and no active character - forcing reset');
-        // Force reset to initial state if no active save justifies the persisted data
-        (window as any).useAppStore.setState({
-          userLevel: 1,
-          experience: 0,
-          day: 1,
-          activeCharacter: null
-        });
-      } else {
-        console.log('ℹ️ State justified by:', { currentSaveId, activeCharacter: activeCharacter?.name });
+    if (typeof window !== 'undefined' && window.migrateStores) {
+      console.log('🔄 Auto-executing store migration...');
+      try {
+        window.migrateStores();
+        console.log('✅ Store migration completed');
+      } catch (error) {
+        console.warn('⚠️ Store migration failed:', error);
       }
-      
-      setOrphanedStateChecked(true);
     }
-  }, [showSplash, orphanedStateChecked, day, userLevel, experience, activeCharacter]);
+  }, []);
+  
+  // Debug: Log app state on startup from NEW stores
+  console.log('🚀 App startup - Current state from NEW stores:', { day, userLevel, experience, activeCharacter });
+  
+  // REMOVED: Orphaned state detection that was interfering with new store system
+  // The new consolidated stores handle their own state management
   
   // Set up reactive orchestration (replaces setTimeout patterns)
   useGameOrchestrator();

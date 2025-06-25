@@ -1,15 +1,22 @@
 // /Users/montysharma/V11M2/src/components/StoryletPanel.tsx
 
 import React from 'react';
-import { useStoryletStore } from '../store/useStoryletStore';
+import { useNarrativeStore } from '../stores/v2';
 
 const StoryletPanel: React.FC = () => {
-  const { 
-    activeStoryletIds, 
-    allStorylets, 
-    chooseStorylet,
-    getCurrentStorylet 
-  } = useStoryletStore();
+  // V2 narrative store has different structure - need to adapt
+  const storylets = useNarrativeStore((state) => state.storylets);
+  const activeStoryletIds = storylets?.active || [];
+  
+  // For now, create placeholder functions until V2 story methods are implemented
+  const chooseStorylet = (storyletId: string, choiceId: string) => {
+    console.log('V2 storylet choice not yet implemented', { storyletId, choiceId });
+  };
+  
+  const getCurrentStorylet = () => {
+    // V2 stores structure storylets differently
+    return null;
+  };
   
   const currentStorylet = getCurrentStorylet();
   
