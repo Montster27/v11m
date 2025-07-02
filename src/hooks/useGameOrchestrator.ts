@@ -1,40 +1,39 @@
 // /Users/montysharma/V11M2/src/hooks/useGameOrchestrator.ts
 import { useEffect, useRef } from 'react';
-import { useAppStore } from '../store/useAppStore';
-import { useStoryletStore } from '../store/useStoryletStore';
+import { useCoreGameStore, useNarrativeStore } from '../stores/v2';
 
 /**
- * Orchestrator hook that coordinates reactive updates between stores
+ * Orchestrator hook that coordinates reactive updates between consolidated v2 stores
  * This replaces the setTimeout pattern that was causing race conditions
  */
 export function useGameOrchestrator() {
-  const evaluateStorylets = useStoryletStore(state => state.evaluateStorylets);
+  // For now, we'll temporarily disable evaluation until v2 stores have full evaluation logic
+  // TODO: Implement evaluateStorylets in useNarrativeStore
+  const evaluateStorylets = () => {
+    console.log('📖 Storylet evaluation temporarily disabled during v2 migration');
+  };
   
-  // Track values that should trigger storylet evaluation
-  const resources = useAppStore(state => state.resources);
-  const day = useAppStore(state => state.day);
-  const storyletFlags = useAppStore(state => state.storyletFlags);
-  const skills = useAppStore(state => state.skills);
+  // Track values from v2 consolidated stores that should trigger storylet evaluation
+  const resources = useCoreGameStore(state => state.player.resources);
+  const day = useCoreGameStore(state => state.world.day);
+  const skills = useCoreGameStore(state => state.skills);
   
-  // Also track storylet store internal state changes that should trigger re-evaluation
-  const activeStoryletIds = useStoryletStore(state => state.activeStoryletIds);
-  const completedStoryletIds = useStoryletStore(state => state.completedStoryletIds);
-  const activeFlags = useStoryletStore(state => state.activeFlags);
-  const deploymentFilter = useStoryletStore(state => state.deploymentFilter);
+  // Track narrative state changes from v2 store
+  const activeStoryletIds = useNarrativeStore(state => state.storylets.active);
+  const completedStoryletIds = useNarrativeStore(state => state.storylets.completed);
+  const storyletFlags = useNarrativeStore(state => state.flags.storylet);
   
-  // Use refs to track previous values and prevent unnecessary evaluations
+  // Use refs to track previous values and prevent unnecessary evaluations  
   const previousValuesRef = useRef({
     resources: resources,
     day: day,
     storyletFlags: storyletFlags,
     skills: skills,
     activeStoryletIds: activeStoryletIds,
-    completedStoryletIds: completedStoryletIds,
-    activeFlags: activeFlags,
-    deploymentFilter: deploymentFilter
+    completedStoryletIds: completedStoryletIds
   });
 
-  // Reactive evaluation when relevant state changes
+  // Reactive evaluation when relevant state changes (using v2 stores)
   useEffect(() => {
     const hasChanged = (
       JSON.stringify(previousValuesRef.current.resources) !== JSON.stringify(resources) ||
@@ -42,35 +41,30 @@ export function useGameOrchestrator() {
       JSON.stringify(previousValuesRef.current.storyletFlags) !== JSON.stringify(storyletFlags) ||
       JSON.stringify(previousValuesRef.current.skills) !== JSON.stringify(skills) ||
       JSON.stringify(previousValuesRef.current.activeStoryletIds) !== JSON.stringify(activeStoryletIds) ||
-      JSON.stringify(previousValuesRef.current.completedStoryletIds) !== JSON.stringify(completedStoryletIds) ||
-      JSON.stringify(previousValuesRef.current.activeFlags) !== JSON.stringify(activeFlags) ||
-      JSON.stringify(Array.from(previousValuesRef.current.deploymentFilter)) !== JSON.stringify(Array.from(deploymentFilter))
+      JSON.stringify(previousValuesRef.current.completedStoryletIds) !== JSON.stringify(completedStoryletIds)
     );
 
     if (hasChanged) {
-      console.log('🎯 Game state changed, evaluating storylets reactively');
+      console.log('🎯 Game state changed (v2 stores), storylet evaluation temporarily disabled during migration');
       
       // Update previous values
       previousValuesRef.current = {
         resources: { ...resources },
         day,
-        storyletFlags: { ...storyletFlags },
+        storyletFlags: new Map(storyletFlags), // Handle Map serialization
         skills: { ...skills },
         activeStoryletIds: [...activeStoryletIds],
-        completedStoryletIds: [...completedStoryletIds],
-        activeFlags: { ...activeFlags },
-        deploymentFilter: new Set(deploymentFilter)
+        completedStoryletIds: [...completedStoryletIds]
       };
 
-      // Evaluate storylets reactively instead of with setTimeout
-      // Use a small delay to allow for batched state updates
-      const timeoutId = setTimeout(() => {
-        evaluateStorylets();
-      }, 10);
-
-      return () => clearTimeout(timeoutId);
+      // Temporarily disable evaluation during migration
+      // TODO: Re-enable once evaluateStorylets is implemented in useNarrativeStore
+      // const timeoutId = setTimeout(() => {
+      //   evaluateStorylets();
+      // }, 10);
+      // return () => clearTimeout(timeoutId);
     }
-  }, [resources, day, storyletFlags, skills, activeStoryletIds, completedStoryletIds, activeFlags, deploymentFilter, evaluateStorylets]);
+  }, [resources, day, storyletFlags, skills, activeStoryletIds, completedStoryletIds, evaluateStorylets]);
 
   return null; // This hook manages side effects only
 }
@@ -78,17 +72,16 @@ export function useGameOrchestrator() {
 /**
  * Hook for managing storylet-triggered notifications reactively
  * This replaces the window-based notification system
+ * TODO: Migrate notification system to v2 stores
  */
 export function useStoryletNotifications() {
-  const newlyDiscoveredClue = useStoryletStore(state => state.newlyDiscoveredClue);
-  const clueDiscoveryRequest = useStoryletStore(state => state.clueDiscoveryRequest);
-  const clearDiscoveredClue = useStoryletStore(state => state.clearDiscoveredClue);
-  const clearClueDiscoveryRequest = useStoryletStore(state => state.clearClueDiscoveryRequest);
-
+  // Temporarily return null values during v2 migration
+  // TODO: Implement notification system in useSocialStore
+  
   return {
-    newlyDiscoveredClue,
-    clueDiscoveryRequest,
-    clearDiscoveredClue,
-    clearClueDiscoveryRequest
+    newlyDiscoveredClue: null,
+    clueDiscoveryRequest: null,
+    clearDiscoveredClue: () => console.log('Clue notifications temporarily disabled during v2 migration'),
+    clearClueDiscoveryRequest: () => console.log('Clue discovery requests temporarily disabled during v2 migration')
   };
 }
