@@ -59,8 +59,7 @@ export const testPhase3CharacterPage = async (): Promise<FlowTestResult[]> => {
   
   // Test 3: Verify no legacy store imports
   try {
-    const characterPagePath = '../../pages/CharacterCreation';
-    const { default: CharacterPage } = await import(characterPagePath);
+    const { default: CharacterPage } = await import('../../pages/CharacterCreation');
     
     // Check that the page doesn't use legacy stores
     // (This is a simple check - in a real test we'd parse the file)
