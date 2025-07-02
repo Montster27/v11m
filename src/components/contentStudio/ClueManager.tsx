@@ -215,17 +215,42 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
       return;
     }
 
-    // Use CRUD operations for update
-    const success = await handleUpdate({
+    // Prepare the updated clue data
+    const updatedClue = {
       ...editingClue,
-      ...clueFormData,
-      tags: clueFormData.tags.split(',').map(tag => tag.trim()).filter(Boolean)
-    });
+      title: clueFormData.title.trim(),
+      description: clueFormData.description.trim(),
+      content: clueFormData.content.trim(),
+      category: clueFormData.category,
+      difficulty: clueFormData.difficulty,
+      storyArc: clueFormData.storyArc,
+      arcOrder: clueFormData.arcOrder,
+      minigameTypes: clueFormData.minigameTypes,
+      associatedStorylets: clueFormData.associatedStorylets,
+      positiveOutcomeStorylet: clueFormData.positiveOutcomeStorylet,
+      negativeOutcomeStorylet: clueFormData.negativeOutcomeStorylet,
+      tags: clueFormData.tags.split(',').map(tag => tag.trim()).filter(Boolean),
+      rarity: clueFormData.rarity,
+      updatedAt: new Date()
+    };
 
-    if (success) {
-      resetClueForm();
-      setShowCreateClueForm(false);
-      persistence.markDirty();
+    try {
+      // Use CRUD operations for update
+      const success = await handleUpdate(updatedClue);
+      
+      if (success) {
+        setShowCreateClueForm(false);
+        setEditingClue(null);
+        resetClueForm();
+        persistence.markDirty();
+        console.log('✅ Clue updated successfully');
+      } else {
+        console.error('❌ Failed to update clue');
+        alert('Failed to update clue. Please try again.');
+      }
+    } catch (error) {
+      console.error('❌ Error updating clue:', error);
+      alert('Error updating clue. Please try again.');
     }
   };
 
@@ -447,17 +472,47 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                         
                         {clue.minigameTypes.length > 0 && (
                           <div>
-                            <h5 className="font-medium text-gray-800 mb-2">Discovery Methods</h5>
+                            <h5 className="font-medium text-gray-800 mb-2">🎮 Discovery Minigames</h5>
                             <div className="space-y-1">
                               {clue.minigameTypes.map(type => {
                                 const minigame = minigameTypes.find(m => m.value === type);
                                 return (
-                                  <div key={type} className="flex items-center justify-between p-2 bg-green-50 rounded">
-                                    <span className="text-sm font-medium text-green-800">{minigame?.label || type}</span>
-                                    <span className="text-xs text-green-600">{minigame?.description}</span>
+                                  <div key={type} className="flex items-center justify-between p-2 bg-blue-50 rounded border border-blue-200">
+                                    <span className="text-sm font-medium text-blue-800">{minigame?.label || type}</span>
+                                    <span className="text-xs text-blue-600">{minigame?.description}</span>
                                   </div>
                                 );
                               })}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {(clue.positiveOutcomeStorylet || clue.negativeOutcomeStorylet) && (
+                          <div>
+                            <h5 className="font-medium text-gray-800 mb-2">🎯 Minigame Outcome Paths</h5>
+                            <div className="space-y-2">
+                              {clue.positiveOutcomeStorylet && (
+                                <div className="p-2 bg-green-50 rounded border border-green-200">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-green-600">✅</span>
+                                    <span className="text-sm font-medium text-green-800">Success Path:</span>
+                                  </div>
+                                  <div className="text-sm text-green-700 ml-6">
+                                    {allStorylets[clue.positiveOutcomeStorylet]?.name || clue.positiveOutcomeStorylet}
+                                  </div>
+                                </div>
+                              )}
+                              {clue.negativeOutcomeStorylet && (
+                                <div className="p-2 bg-red-50 rounded border border-red-200">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-red-600">❌</span>
+                                    <span className="text-sm font-medium text-red-800">Failure Path:</span>
+                                  </div>
+                                  <div className="text-sm text-red-700 ml-6">
+                                    {allStorylets[clue.negativeOutcomeStorylet]?.name || clue.negativeOutcomeStorylet}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
@@ -650,15 +705,57 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                   ))}
                 </select>
               </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Discovery Minigames
+                  <HelpTooltip content="Select minigames that can trigger this clue discovery. Multiple selections allowed." />
+                </label>
+                <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-300 rounded p-2">
+                  {minigameTypes.map(minigame => (
+                    <label key={minigame.value} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={clueFormData.minigameTypes.includes(minigame.value)}
+                        onChange={(e) => {
+                          setClueFormData(prev => ({
+                            ...prev,
+                            minigameTypes: e.target.checked
+                              ? [...prev.minigameTypes, minigame.value]
+                              : prev.minigameTypes.filter(type => type !== minigame.value)
+                          }));
+                        }}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium text-gray-700">{minigame.label}</span>
+                        <div className="text-xs text-gray-500">{minigame.description}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                {clueFormData.minigameTypes.length > 0 && (
+                  <div className="text-sm text-blue-600 mt-1">
+                    Selected: {clueFormData.minigameTypes.map(type => 
+                      minigameTypes.find(m => m.value === type)?.label
+                    ).join(', ')}
+                  </div>
+                )}
+              </div>
 
               {/* Outcome Storylets - only show if story arc is selected */}
               {clueFormData.storyArc && (
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-green-700 mb-1">
-                      ✅ Positive Outcome Storylet
-                      <HelpTooltip content="Storylet to trigger when clue discovery succeeds" />
-                    </label>
+                <div className="bg-gradient-to-r from-green-50 to-red-50 p-4 rounded-lg border">
+                  <h4 className="text-sm font-semibold text-gray-800 mb-3">
+                    🎮 Minigame Outcome Paths
+                    <HelpTooltip content="These storylets are triggered based on whether the player succeeds or fails the selected minigames above" />
+                  </h4>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-green-700 mb-1">
+                        ✅ Success Path (Minigame Won)
+                        <HelpTooltip content="Storylet to trigger when player successfully completes the minigame and discovers the clue" />
+                      </label>
                     <select
                       value={clueFormData.positiveOutcomeStorylet}
                       onChange={(e) => setClueFormData(prev => ({ ...prev, positiveOutcomeStorylet: e.target.value }))}
@@ -672,12 +769,12 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                       ))}
                     </select>
                   </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-red-700 mb-1">
-                      ❌ Negative Outcome Storylet
-                      <HelpTooltip content="Storylet to trigger when clue discovery fails" />
-                    </label>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-red-700 mb-1">
+                        ❌ Failure Path (Minigame Lost)
+                        <HelpTooltip content="Storylet to trigger when player fails the minigame and doesn't discover the clue" />
+                      </label>
                     <select
                       value={clueFormData.negativeOutcomeStorylet}
                       onChange={(e) => setClueFormData(prev => ({ ...prev, negativeOutcomeStorylet: e.target.value }))}
@@ -692,17 +789,30 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                     </select>
                   </div>
                   
-                  {arcStorylets.length === 0 && (
-                    <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded">
-                      No storylets found in the "{clueFormData.storyArc}" arc. Create storylets for this arc to enable outcome triggers.
-                    </div>
-                  )}
-                  
-                  {arcStorylets.length > 0 && (
-                    <div className="text-sm text-blue-600 bg-blue-50 p-3 rounded">
-                      Found {arcStorylets.length} storylet{arcStorylets.length !== 1 ? 's' : ''} in "{clueFormData.storyArc}" arc
-                    </div>
-                  )}
+                    {arcStorylets.length === 0 && (
+                      <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded">
+                        No storylets found in the "{clueFormData.storyArc}" arc. Create storylets for this arc to enable outcome triggers.
+                      </div>
+                    )}
+                    
+                    {arcStorylets.length > 0 && (
+                      <div className="text-sm text-blue-600 bg-blue-50 p-3 rounded">
+                        Found {arcStorylets.length} storylet{arcStorylets.length !== 1 ? 's' : ''} in "{clueFormData.storyArc}" arc
+                      </div>
+                    )}
+                    
+                    {clueFormData.minigameTypes.length > 0 && (clueFormData.positiveOutcomeStorylet || clueFormData.negativeOutcomeStorylet) && (
+                      <div className="text-sm text-purple-600 bg-purple-50 p-3 rounded border border-purple-200">
+                        💡 <strong>How it works:</strong> When players attempt the selected minigame(s), 
+                        {clueFormData.positiveOutcomeStorylet && clueFormData.negativeOutcomeStorylet 
+                          ? ' they\'ll follow the success path if they win or the failure path if they lose.'
+                          : clueFormData.positiveOutcomeStorylet 
+                            ? ' they\'ll follow the success path if they win (no specific failure path set).'
+                            : ' they\'ll follow the failure path if they lose (no specific success path set).'
+                        }
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               
@@ -722,6 +832,7 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
               <button
                 onClick={() => {
                   setShowCreateClueForm(false);
+                  setEditingClue(null);
                   resetClueForm();
                 }}
                 className="px-4 py-2 text-gray-600 hover:text-gray-800"

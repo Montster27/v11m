@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSocialStore } from '../stores/v2';
+import { useCoreGameStore, useSocialStore } from '../stores/v2';
 import { resetAllGameState } from '../utils/characterFlowIntegration';
 import { Button } from '../components/ui';
 
@@ -10,6 +10,7 @@ interface SplashScreenProps {
 
 const SplashScreen: React.FC<SplashScreenProps> = ({ onChoiceMade }) => {
   const navigate = useNavigate();
+  const coreStore = useCoreGameStore();
   const socialStore = useSocialStore();
   
   // Use consolidated save system
@@ -18,12 +19,34 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onChoiceMade }) => {
   const latestSave = socialStore.saves.currentSaveId 
     ? socialStore.saves.saveSlots[socialStore.saves.currentSaveId]
     : saveSlots.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))[0];
+  
+  // Check for character existence in core store
+  const hasCharacter = !!(
+    coreStore.character &&
+    coreStore.character.name &&
+    coreStore.character.name.trim().length > 0 &&
+    coreStore.character.background
+  );
+  
+  // Combined check - can continue if either has saves OR has character
+  const canContinue = hasSaves || hasCharacter;
 
   const handleNewGame = () => {
     console.log('🎮 Starting new game with consolidated stores');
     console.log('📊 Current save slots:', saveSlots.length);
     console.log('📊 Has saves:', hasSaves);
+    console.log('📊 Has character:', hasCharacter);
+    console.log('📊 Character name:', coreStore.character?.name || 'none');
     console.log('📊 Latest save:', latestSave?.name || 'none');
+    
+    // Reset all game state for a truly new game
+    try {
+      const { resetAllGameState } = require('../utils/characterFlowIntegration');
+      resetAllGameState();
+      console.log('✅ Game state reset for new game');
+    } catch (error) {
+      console.error('❌ Failed to reset game state:', error);
+    }
     
     onChoiceMade();
     console.log('🎮 Navigating to character-creation');
@@ -31,7 +54,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onChoiceMade }) => {
   };
 
   const handleContinue = () => {
-    if (latestSave) {
+    if (hasSaves && latestSave) {
       console.log('🔄 Loading save with consolidated stores:', latestSave.name);
       try {
         // Load save through consolidated store system
@@ -43,6 +66,11 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onChoiceMade }) => {
         console.error('❌ Failed to load save:', error);
         // Could show an error message to user
       }
+    } else if (hasCharacter) {
+      console.log('🔄 Continuing with existing character:', coreStore.character.name);
+      // Continue with existing character (no save loading needed)
+      onChoiceMade();
+      navigate('/character-creation');
     }
   };
 
@@ -88,9 +116,9 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onChoiceMade }) => {
           
           <Button
             onClick={handleContinue}
-            disabled={!hasSaves}
+            disabled={!canContinue}
             className={`w-full py-4 text-lg font-semibold rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105 ${
-              hasSaves
+              canContinue
                 ? 'bg-green-600 hover:bg-green-700 text-white'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
@@ -98,7 +126,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onChoiceMade }) => {
             Continue
           </Button>
           
-          {hasSaves && (
+          {canContinue && (
             <Button
               onClick={handleDeleteProgress}
               className="w-full py-2 text-sm font-medium bg-red-500 hover:bg-red-600 text-white rounded-lg shadow transition-all duration-200"
@@ -113,9 +141,15 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onChoiceMade }) => {
             </div>
           )}
           
-          {!hasSaves && (
+          {!hasSaves && hasCharacter && (
             <div className="text-sm text-amber-600 mt-2">
-              No saved games found
+              Character: {coreStore.character.name} (Continue current session)
+            </div>
+          )}
+          
+          {!hasSaves && !hasCharacter && (
+            <div className="text-sm text-amber-600 mt-2">
+              No saved games or character found
             </div>
           )}
         </div>

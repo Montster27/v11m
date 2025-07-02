@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCoreGameStore, useNarrativeStore } from '../../stores/v2';
-import { createCharacterAtomically, validateCharacterCreationData } from '../../utils/characterFlowIntegration';
+import { createCharacterAsSaveSlot, validateCharacterCreationData } from '../../utils/characterFlowIntegration';
 import { Button, Card, Slider } from '../ui';
 
 interface DomainAdjustments {
@@ -29,18 +29,32 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
   const coreStore = useCoreGameStore();
   
   // Check if we're editing existing character
-  const isEditing = coreStore.character.name !== '';
+  const isEditing = coreStore.character.name && coreStore.character.name.trim() !== '';
   
   const [step, setStep] = useState(1);
   const [characterName, setCharacterName] = useState('');
+  // Point allocation system - start with minimum values and give points to allocate
+  const TOTAL_ATTRIBUTE_POINTS = 100;
+  const MIN_ATTRIBUTE_VALUE = 10;
+  const MAX_ATTRIBUTE_VALUE = 80;
+  
   const [attributes, setAttributes] = useState<AttributeValues>({
-    intelligence: 50,
-    creativity: 50,
-    charisma: 50,
-    strength: 50,
-    focus: 50,
-    empathy: 50
+    intelligence: MIN_ATTRIBUTE_VALUE,
+    creativity: MIN_ATTRIBUTE_VALUE,
+    charisma: MIN_ATTRIBUTE_VALUE,
+    strength: MIN_ATTRIBUTE_VALUE,
+    focus: MIN_ATTRIBUTE_VALUE,
+    empathy: MIN_ATTRIBUTE_VALUE
   });
+  
+  const getTotalAttributePoints = () => {
+    return Object.values(attributes).reduce((sum, value) => sum + value, 0);
+  };
+  
+  const getAvailableAttributePoints = () => {
+    return TOTAL_ATTRIBUTE_POINTS - getTotalAttributePoints();
+  };
+  const TOTAL_DOMAIN_POINTS = 40;
   const [domainAdjustments, setDomainAdjustments] = useState<DomainAdjustments>({
     intellectualCompetence: 0,
     physicalCompetence: 0,
@@ -58,16 +72,30 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
   };
 
   const handleAttributeChange = (attribute: keyof AttributeValues, value: number) => {
-    setAttributes(prev => ({
-      ...prev,
-      [attribute]: value
-    }));
+    // Calculate what the total would be with this change
+    const currentTotal = getTotalAttributePoints();
+    const currentValue = attributes[attribute];
+    const newTotal = currentTotal - currentValue + value;
+    
+    // Only allow the change if it doesn't exceed total points and stays within bounds
+    if (newTotal <= TOTAL_ATTRIBUTE_POINTS && value >= MIN_ATTRIBUTE_VALUE && value <= MAX_ATTRIBUTE_VALUE) {
+      setAttributes(prev => ({
+        ...prev,
+        [attribute]: value
+      }));
+    }
   };
 
   const handleDomainAdjustment = (domain: keyof DomainAdjustments, value: number) => {
-    const totalUsed = Object.values(domainAdjustments).reduce((sum, val) => sum + Math.abs(val), 0) - Math.abs(domainAdjustments[domain]) + Math.abs(value);
+    // Calculate current total points used (excluding the domain being changed)
+    const currentTotal = Object.entries(domainAdjustments)
+      .filter(([key]) => key !== domain)
+      .reduce((sum, [, val]) => sum + val, 0);
     
-    if (totalUsed <= 40) {
+    // Check if new value would exceed total points
+    const newTotal = currentTotal + value;
+    
+    if (newTotal <= TOTAL_DOMAIN_POINTS && value >= 0 && value <= TOTAL_DOMAIN_POINTS) {
       setDomainAdjustments(prev => ({
         ...prev,
         [domain]: value
@@ -76,7 +104,11 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
   };
 
   const getTotalDomainPoints = () => {
-    return Object.values(domainAdjustments).reduce((sum, val) => sum + Math.abs(val), 0);
+    return Object.values(domainAdjustments).reduce((sum, val) => sum + val, 0);
+  };
+  
+  const getAvailableDomainPoints = () => {
+    return TOTAL_DOMAIN_POINTS - getTotalDomainPoints();
   };
 
   const handleFinalize = () => {
@@ -94,15 +126,15 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
       return;
     }
     
-    // Single atomic operation across all stores
-    createCharacterAtomically({
+    // Create character as new save slot
+    const saveId = createCharacterAsSaveSlot({
       name: characterName,
       background: 'general', // Set default background since selection was removed
       attributes,
       domainAdjustments
     });
     
-    console.log('✅ Character creation complete - navigating to planner');
+    console.log(`✅ Character creation complete (save ID: ${saveId}) - navigating to planner`);
     navigate('/planner');
   };
 
@@ -151,9 +183,14 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
           <div className="max-w-4xl mx-auto">
             <Card title="Set Base Attributes" variant="elevated">
               <div className="space-y-6">
-                <p className="text-gray-600">
-                  Adjust your character's base attributes. These represent your natural abilities.
-                </p>
+                <div className="space-y-2">
+                  <p className="text-gray-600">
+                    Adjust your character's base attributes. These represent your natural abilities.
+                  </p>
+                  <p className="text-sm text-blue-600 font-medium">
+                    Points remaining: <span className="font-bold">{getAvailableAttributePoints()}</span> / {TOTAL_ATTRIBUTE_POINTS}
+                  </p>
+                </div>
                 
                 {Object.entries(attributes).map(([key, value]) => (
                   <div key={key} className="space-y-2">
@@ -164,11 +201,11 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
                       <span className="text-sm text-gray-600">{value}</span>
                     </div>
                     <Slider
-                      min={0}
-                      max={100}
+                      min={MIN_ATTRIBUTE_VALUE}
+                      max={MAX_ATTRIBUTE_VALUE}
                       step={5}
-                      value={[value]}
-                      onValueChange={(values) => handleAttributeChange(key as keyof AttributeValues, values[0])}
+                      value={value}
+                      onChange={(newValue) => handleAttributeChange(key as keyof AttributeValues, newValue)}
                       className="w-full"
                     />
                   </div>
@@ -202,8 +239,8 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
                   <p className="text-gray-600 mb-2">
                     Fine-tune your character with domain-specific bonuses and penalties.
                   </p>
-                  <p className="text-sm text-gray-500">
-                    You have <span className="font-bold">{40 - getTotalDomainPoints()}</span> points remaining (40 total)
+                  <p className="text-sm text-blue-600 font-medium">
+                    Points remaining: <span className="font-bold">{getAvailableDomainPoints()}</span> / {TOTAL_DOMAIN_POINTS}
                   </p>
                 </div>
                 
@@ -214,15 +251,15 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
                         {key.replace(/([A-Z])/g, ' $1').trim()}
                       </label>
                       <span className="text-sm text-gray-600">
-                        {value > 0 ? '+' : ''}{value}
+                        {value}
                       </span>
                     </div>
                     <Slider
-                      min={-20}
-                      max={20}
-                      step={5}
-                      value={[value]}
-                      onValueChange={(values) => handleDomainAdjustment(key as keyof DomainAdjustments, values[0])}
+                      min={0}
+                      max={TOTAL_DOMAIN_POINTS}
+                      step={1}
+                      value={value}
+                      onChange={(newValue) => handleDomainAdjustment(key as keyof DomainAdjustments, newValue)}
                       className="w-full"
                     />
                   </div>
@@ -261,7 +298,7 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
                     </div>
                     <div className="flex justify-between">
                       <dt className="text-gray-600">Background:</dt>
-                      <dd className="font-medium capitalize">{selectedBackground}</dd>
+                      <dd className="font-medium capitalize">General</dd>
                     </div>
                   </dl>
                 </div>

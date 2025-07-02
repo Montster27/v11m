@@ -124,7 +124,8 @@ const BACKGROUND_CONFIGS: Record<string, BackgroundConfig> = {
  * Get initial concerns based on character background
  */
 export const getInitialConcerns = (background: string): Record<string, number> => {
-  const config = BACKGROUND_CONFIGS[background] || BACKGROUND_CONFIGS.default;
+  const normalizedBackground = background === 'general' ? 'default' : background;
+  const config = BACKGROUND_CONFIGS[normalizedBackground] || BACKGROUND_CONFIGS.default;
   return { ...config.concerns };
 };
 
@@ -132,7 +133,8 @@ export const getInitialConcerns = (background: string): Record<string, number> =
  * Get initial development stats based on character background
  */
 export const getInitialDevelopmentStats = (background: string): Record<string, number> => {
-  const config = BACKGROUND_CONFIGS[background] || BACKGROUND_CONFIGS.default;
+  const normalizedBackground = background === 'general' ? 'default' : background;
+  const config = BACKGROUND_CONFIGS[normalizedBackground] || BACKGROUND_CONFIGS.default;
   return { ...config.developmentStats };
 };
 
@@ -140,7 +142,8 @@ export const getInitialDevelopmentStats = (background: string): Record<string, n
  * Get initial skills based on character background
  */
 export const getInitialSkills = (background: string): Record<string, number> => {
-  const config = BACKGROUND_CONFIGS[background] || BACKGROUND_CONFIGS.default;
+  const normalizedBackground = background === 'general' ? 'default' : background;
+  const config = BACKGROUND_CONFIGS[normalizedBackground] || BACKGROUND_CONFIGS.default;
   return { ...config.skills };
 };
 
@@ -164,7 +167,118 @@ export const calculateFinalAttributes = (
 };
 
 /**
- * Create character atomically across all consolidated stores
+ * Create character as a new save slot without overwriting existing data
+ */
+export const createCharacterAsSaveSlot = (data: CharacterCreationData): string => {
+  console.log('🔄 Creating character as new save slot...');
+  console.log('📊 Character data:', data);
+  
+  const startTime = performance.now();
+  
+  try {
+    // Get store instances
+    const socialStore = useSocialStore.getState();
+    
+    // Generate unique save ID for this character
+    const saveId = `character_${data.name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
+    
+    // Calculate final attributes
+    const baseAttributes = {
+      intelligence: 50,
+      creativity: 50,
+      charisma: 50,
+      strength: 50,
+      focus: 50,
+      empathy: 50,
+      ...data.attributes
+    };
+    
+    const finalAttributes = calculateFinalAttributes(baseAttributes, data.domainAdjustments);
+    
+    // Create fresh game state for this character
+    const freshGameState = {
+      core: {
+        character: {
+          name: data.name,
+          background: data.background,
+          attributes: finalAttributes,
+          developmentStats: getInitialDevelopmentStats(data.background)
+        },
+        player: {
+          level: 1,
+          experience: 0,
+          skillPoints: 0,
+          resources: {}
+        },
+        skills: {
+          totalExperience: 0,
+          coreCompetencies: getInitialSkills(data.background),
+          foundationExperiences: {},
+          characterClasses: {}
+        },
+        world: {
+          day: 1,
+          timeAllocation: {},
+          isTimePaused: false
+        }
+      },
+      narrative: {
+        concerns: {
+          current: getInitialConcerns(data.background)
+        },
+        flags: {
+          storylet: new Map([['character_created', true]])
+        },
+        storylets: {
+          active: [],
+          completed: []
+        }
+      },
+      social: {
+        npcs: {
+          relationships: {},
+          interactionHistory: {},
+          memories: {},
+          flags: {}
+        },
+        clues: {
+          discovered: [],
+          connections: {},
+          storyArcs: {},
+          discoveryEvents: []
+        }
+      }
+    };
+    
+    // Create save data with character metadata
+    const saveData = {
+      name: `${data.name}`,
+      characterName: data.name,
+      background: data.background,
+      day: 1,
+      level: 1,
+      gameState: freshGameState
+    };
+    
+    // Create the save slot
+    socialStore.createSaveSlot(saveId, saveData);
+    
+    // Load the save slot to make it active
+    socialStore.loadSaveSlot(saveId);
+    
+    const duration = performance.now() - startTime;
+    console.log(`✅ Character created as save slot ${saveId} in ${duration.toFixed(2)}ms`);
+    
+    return saveId;
+    
+  } catch (error) {
+    console.error('❌ Character creation as save slot failed:', error);
+    throw new Error(`Character creation failed: ${error.message}`);
+  }
+};
+
+/**
+ * Create character atomically across all consolidated stores (LEGACY - kept for compatibility)
  */
 export const createCharacterAtomically = (data: CharacterCreationData): void => {
   console.log('🔄 Creating character atomically across consolidated stores...');
@@ -216,7 +330,16 @@ export const createCharacterAtomically = (data: CharacterCreationData): void => 
       characterClasses: {}
     });
     
-    // Step 5: Initialize world state
+    // Step 5: Initialize player state
+    console.log('👤 Initializing player state...');
+    coreStore.updatePlayer({
+      level: 1,
+      experience: 0,
+      skillPoints: 0,
+      resources: {}
+    });
+    
+    // Step 6: Initialize world state
     console.log('🌍 Initializing world state...');
     coreStore.updateWorld({
       day: 1,
@@ -224,7 +347,7 @@ export const createCharacterAtomically = (data: CharacterCreationData): void => 
       isTimePaused: false
     });
     
-    // Step 6: Set up narrative concerns and flags
+    // Step 7: Set up narrative concerns and flags
     console.log('📖 Setting up narrative concerns and flags...');
     const initialConcerns = getInitialConcerns(data.background);
     narrativeStore.updateConcerns(initialConcerns);
@@ -232,7 +355,7 @@ export const createCharacterAtomically = (data: CharacterCreationData): void => 
     // Set character created flag to trigger tutorial storylet
     narrativeStore.setStoryletFlag('character_created', true);
     
-    // Step 7: Initialize social store with empty state
+    // Step 8: Initialize social store with empty state
     console.log('👥 Initializing social store...');
     // Social store is already reset, just ensure it's ready
     
@@ -291,7 +414,7 @@ export const validateCharacterCreationData = (data: CharacterCreationData): { va
   }
   
   // Validate background
-  const validBackgrounds = ['scholar', 'athlete', 'artist', 'social', 'default'];
+  const validBackgrounds = ['scholar', 'athlete', 'artist', 'social', 'default', 'general'];
   if (!validBackgrounds.includes(data.background)) {
     errors.push('Invalid character background');
   }

@@ -1,18 +1,22 @@
 // /Users/montysharma/V11M2/src/pages/CharacterCreation.tsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCoreGameStore } from '../stores/v2';
+import { useCoreGameStore, useSocialStore } from '../stores/v2';
 import { Card, Button } from '../components/ui';
 import ConsolidatedCharacterCreationFlow from '../components/CharacterCreation/ConsolidatedCharacterCreationFlow';
 
 const CharacterCreationPage: React.FC = () => {
   const navigate = useNavigate();
   const coreStore = useCoreGameStore();
+  const socialStore = useSocialStore();
   
-  // Use consolidated character system
-  const savedCharacters = coreStore.character && coreStore.character.name ? [coreStore.character] : [];
+  // Get saved characters from save slots
+  const saveSlots = Object.values(socialStore.saves.saveSlots);
+  const savedCharacters = saveSlots.filter(slot => slot.characterName);
   
-  const [mode, setMode] = useState<'menu' | 'create' | 'edit'>('menu');
+  // Check if coming from splash screen "New Game" - if no characters exist, go straight to create
+  const shouldCreateDirectly = savedCharacters.length === 0;
+  const [mode, setMode] = useState<'menu' | 'create' | 'edit'>(shouldCreateDirectly ? 'create' : 'menu');
 
   const handleNewCharacter = () => {
     setMode('create');
@@ -36,9 +40,10 @@ const CharacterCreationPage: React.FC = () => {
     }
   };
 
-  const handleSelectCharacter = () => {
-    // Character is already in consolidated store
-    console.log('✅ Character selected from consolidated store');
+  const handleSelectCharacter = (character: any) => {
+    // Load the character's save slot
+    console.log('✅ Loading character save slot:', character.id);
+    socialStore.loadSaveSlot(character.id);
     navigate('/planner');
   };
 
@@ -84,35 +89,38 @@ const CharacterCreationPage: React.FC = () => {
             <Card title="Saved Characters" variant="elevated">
               <div className="space-y-4">
                 <p className="text-gray-600 mb-4">
-                  Select an existing character to start playing, or edit to customize:
+                  Select an existing character to start playing:
                 </p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {savedCharacters.map((character, index) => (
                     <div 
-                      key={index} 
+                      key={character.id || index} 
                       className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
                     >
                       <div className="space-y-3">
                         <div>
-                          <h3 className="font-semibold text-gray-900">{character.name}</h3>
+                          <h3 className="font-semibold text-gray-900">{character.characterName || character.name}</h3>
                           <p className="text-xs text-gray-500">
-                            Background: {character.background || 'Not set'}
+                            Background: {character.background || 'General'}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Day {character.day || 1} • Level {character.level || 1}
                           </p>
                         </div>
                         
                         <div className="text-xs text-gray-600">
                           <div className="grid grid-cols-2 gap-1">
-                            <div>Intelligence: {character.attributes?.intelligence || 'N/A'}</div>
-                            <div>Charisma: {character.attributes?.charisma || 'N/A'}</div>
-                            <div>Strength: {character.attributes?.strength || 'N/A'}</div>
-                            <div>Creativity: {character.attributes?.creativity || 'N/A'}</div>
+                            <div>Intelligence: {character.gameState?.core?.character?.attributes?.intelligence || 'N/A'}</div>
+                            <div>Charisma: {character.gameState?.core?.character?.attributes?.charisma || 'N/A'}</div>
+                            <div>Strength: {character.gameState?.core?.character?.attributes?.strength || 'N/A'}</div>
+                            <div>Creativity: {character.gameState?.core?.character?.attributes?.creativity || 'N/A'}</div>
                           </div>
                         </div>
                         
                         <div className="space-y-2">
                           <Button
-                            onClick={handleSelectCharacter}
+                            onClick={() => handleSelectCharacter(character)}
                             variant="primary"
                             size="sm"
                             className="w-full"
@@ -121,18 +129,10 @@ const CharacterCreationPage: React.FC = () => {
                           </Button>
                           <div className="flex space-x-2">
                             <Button
-                              onClick={handleEditCharacter}
+                              onClick={() => socialStore.deleteSaveSlot(character.id)}
                               variant="outline"
                               size="sm"
-                              className="flex-1"
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              onClick={handleDeleteCharacter}
-                              variant="outline"
-                              size="sm"
-                              className="text-red-600 border-red-200 hover:bg-red-50"
+                              className="text-red-600 border-red-200 hover:bg-red-50 w-full"
                             >
                               Delete
                             </Button>

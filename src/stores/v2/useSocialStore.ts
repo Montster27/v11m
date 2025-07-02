@@ -292,12 +292,26 @@ export const useSocialStore = create<SocialState>()(
       },
 
       createSaveSlot: (saveId, saveData) => {
-        // Prepare basic save data
+        // Capture complete game state from all v2 stores
+        const coreGameState = useCoreGameStore.getState();
+        const narrativeState = useNarrativeStore.getState();
+        const currentSocialState = get();
+        
         const completeSaveData = {
           id: saveId,
           ...saveData,
           created: Date.now(),
-          lastModified: Date.now()
+          lastModified: Date.now(),
+          // Store complete game state for full restoration
+          gameState: {
+            core: coreGameState,
+            narrative: narrativeState,
+            social: {
+              ...currentSocialState,
+              // Don't include saves in the saved state to avoid recursion
+              saves: undefined
+            }
+          }
         };
         
         set((state) => {
@@ -323,12 +337,37 @@ export const useSocialStore = create<SocialState>()(
             }
           };
         });
+        
+        console.log(`✅ Save slot ${saveId} created with complete game state`);
       },
 
       updateSaveSlot: (saveId, saveData) => {
         set((state) => {
           // Defensive programming: ensure arrays exist
           const saveHistoryArray = Array.isArray(state.saves?.saveHistory) ? state.saves.saveHistory : [];
+          
+          const existingSlot = state.saves.saveSlots[saveId];
+          if (!existingSlot) {
+            console.error(`Cannot update save slot ${saveId} - slot not found`);
+            return state;
+          }
+          
+          // For auto-save updates, capture current game state
+          let updatedGameState = existingSlot.gameState;
+          if (saveData.autoSave) {
+            const coreGameState = useCoreGameStore.getState();
+            const narrativeState = useNarrativeStore.getState();
+            const currentSocialState = get();
+            
+            updatedGameState = {
+              core: coreGameState,
+              narrative: narrativeState,
+              social: {
+                ...currentSocialState,
+                saves: undefined // Avoid recursion
+              }
+            };
+          }
           
           const historyEntry = {
             action: 'update',
@@ -343,9 +382,10 @@ export const useSocialStore = create<SocialState>()(
               saveSlots: {
                 ...state.saves.saveSlots,
                 [saveId]: {
-                  ...state.saves.saveSlots[saveId],
+                  ...existingSlot,
                   ...saveData,
-                  lastModified: Date.now()
+                  lastModified: Date.now(),
+                  gameState: updatedGameState
                 }
               },
               saveHistory: [...saveHistoryArray, historyEntry]
@@ -385,32 +425,63 @@ export const useSocialStore = create<SocialState>()(
         
         if (!saveData) {
           console.error(`Save slot ${saveId} not found`);
-          // Don't change current save ID if load fails
           return;
         }
         
-        console.log(`🔄 Loading save slot: ${saveId} (basic load)`, saveData.name);
+        if (!saveData.gameState) {
+          console.error(`Save slot ${saveId} has no game state data - cannot restore`);
+          return;
+        }
         
-        // For now, just set the current save ID
-        // Full state restoration would require more complex cross-store coordination
+        console.log(`🔄 Loading save slot: ${saveId} with full game state restoration`, saveData.name);
         
-        // Add history entry
-        const historyEntry = {
-          action: 'load',
-          saveId,
-          timestamp: Date.now()
-        };
-        
-        set((state) => ({
-          ...state,
-          saves: {
-            ...state.saves,
-            currentSaveId: saveId,
-            saveHistory: [...(state.saves.saveHistory || []), historyEntry]
+        try {
+          // Restore complete game state across all v2 stores
+          if (saveData.gameState.core) {
+            useCoreGameStore.setState(saveData.gameState.core);
+            console.log('✅ Core game state restored');
           }
-        }));
-        
-        console.log(`✅ Save slot ${saveId} loaded successfully`);
+          
+          if (saveData.gameState.narrative) {
+            useNarrativeStore.setState(saveData.gameState.narrative);
+            console.log('✅ Narrative state restored');
+          }
+          
+          if (saveData.gameState.social) {
+            // Restore social state but preserve current save management
+            const currentSaves = get().saves;
+            set({
+              ...saveData.gameState.social,
+              saves: {
+                ...currentSaves,
+                currentSaveId: saveId
+              }
+            });
+            console.log('✅ Social state restored');
+          }
+          
+          // Add history entry
+          const historyEntry = {
+            action: 'load',
+            saveId,
+            timestamp: Date.now()
+          };
+          
+          set((state) => ({
+            ...state,
+            saves: {
+              ...state.saves,
+              currentSaveId: saveId,
+              saveHistory: [...(state.saves.saveHistory || []), historyEntry]
+            }
+          }));
+          
+          console.log(`✅ Save slot ${saveId} loaded successfully with complete state restoration`);
+          
+        } catch (error) {
+          console.error(`❌ Failed to load save slot ${saveId}:`, error);
+          throw error;
+        }
       },
 
       addSaveHistoryEntry: (entry) => {
