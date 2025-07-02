@@ -2,7 +2,11 @@
 // Consolidated store for player stats, character data, skill progression, and world state
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { debouncedStorage } from '../../utils/debouncedStorage';
+
+// Store versioning for migration handling
+const CURRENT_VERSION = 1;
 
 export interface CoreGameState {
   player: {
@@ -165,7 +169,43 @@ export const useCoreGameStore = create<CoreGameState>()(
     }),
     {
       name: 'mmv-core-game-store',
-      version: 1
+      version: CURRENT_VERSION,
+      storage: createJSONStorage(() => debouncedStorage),
+      migrate: (persistedState: any, version: number) => {
+        console.log(`[CoreGameStore] Migrating from version ${version} to ${CURRENT_VERSION}`);
+        
+        // Handle unversioned saves (version 0 or undefined)
+        if (!version || version === 0) {
+          console.log('[CoreGameStore] Detected unversioned save, applying defaults and preserving data');
+          const defaultState = getInitialCoreState();
+          
+          // Merge persisted data with defaults, preserving any existing values
+          return {
+            ...defaultState,
+            ...persistedState,
+            // Ensure nested objects are properly merged
+            player: { ...defaultState.player, ...(persistedState.player || {}) },
+            character: { ...defaultState.character, ...(persistedState.character || {}) },
+            skills: { ...defaultState.skills, ...(persistedState.skills || {}) },
+            world: { ...defaultState.world, ...(persistedState.world || {}) }
+          };
+        }
+        
+        // Future version migrations go here
+        // if (version === 1) {
+        //   // Migrate from v1 to v2
+        //   return migrateV1ToV2(persistedState);
+        // }
+        
+        return persistedState;
+      },
+      partialize: (state) => ({
+        // Only persist data, not action functions
+        player: state.player,
+        character: state.character,
+        skills: state.skills,
+        world: state.world
+      })
     }
   )
 );

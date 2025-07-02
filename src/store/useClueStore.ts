@@ -80,46 +80,72 @@ export const useClueStore = create<ClueState>()(
       
       // Clue Management
       createClue: (clueData: ClueFormData) => {
-        const newClue: Clue = {
-          id: clueData.id || 'clue-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
-          title: clueData.title,
-          description: clueData.description,
-          content: clueData.content,
-          category: clueData.category,
-          difficulty: clueData.difficulty,
-          storyArc: clueData.storyArc || undefined,
-          arcOrder: clueData.arcOrder || undefined,
-          minigameTypes: clueData.minigameTypes,
-          associatedStorylets: clueData.associatedStorylets,
-          positiveOutcomeStorylet: clueData.positiveOutcomeStorylet || undefined,
-          negativeOutcomeStorylet: clueData.negativeOutcomeStorylet || undefined,
-          isDiscovered: false,
-          tags: clueData.tags,
-          rarity: clueData.rarity,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        };
-        
-        set(state => ({
-          clues: [...state.clues, newClue]
-        }));
-        
-        // Update story arc clue count if applicable
-        if (newClue.storyArc) {
-          get().updateStoryArcClueCount(newClue.storyArc);
+        // Check for duplicate ID if one was provided
+        if (clueData.id && get().getClueById(clueData.id)) {
+          console.error(`❌ Cannot create clue: Clue with ID "${clueData.id}" already exists`);
+          throw new Error(`Clue with ID "${clueData.id}" already exists`);
         }
         
-        return newClue;
+        try {
+          const newClue: Clue = {
+            id: clueData.id || 'clue-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+            title: clueData.title,
+            description: clueData.description,
+            content: clueData.content,
+            category: clueData.category,
+            difficulty: clueData.difficulty,
+            storyArc: clueData.storyArc || undefined,
+            arcOrder: clueData.arcOrder || undefined,
+            minigameTypes: clueData.minigameTypes,
+            associatedStorylets: clueData.associatedStorylets,
+            positiveOutcomeStorylet: clueData.positiveOutcomeStorylet || undefined,
+            negativeOutcomeStorylet: clueData.negativeOutcomeStorylet || undefined,
+            isDiscovered: false,
+            tags: clueData.tags,
+            rarity: clueData.rarity,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+          
+          set(state => ({
+            clues: [...state.clues, newClue]
+          }));
+          
+          // Update story arc clue count if applicable
+          if (newClue.storyArc) {
+            get().updateStoryArcClueCount(newClue.storyArc);
+          }
+          
+          console.log(`✅ Successfully created clue: ${newClue.id}`);
+          return newClue;
+        } catch (error) {
+          console.error(`❌ Failed to create clue:`, error);
+          throw error;
+        }
       },
       
       updateClue: (id: string, updates: Partial<Clue>) => {
-        set(state => ({
-          clues: state.clues.map(clue => 
-            clue.id === id 
-              ? { ...clue, ...updates, updatedAt: new Date() }
-              : clue
-          )
-        }));
+        const existingClue = get().getClueById(id);
+        if (!existingClue) {
+          console.error(`❌ Cannot update clue: Clue with ID "${id}" not found`);
+          throw new Error(`Clue with ID "${id}" not found`);
+        }
+        
+        try {
+          set(state => ({
+            clues: state.clues.map(clue => 
+              clue.id === id 
+                ? { ...clue, ...updates, updatedAt: new Date() }
+                : clue
+            )
+          }));
+          
+          console.log(`✅ Successfully updated clue: ${id}`);
+          return true;
+        } catch (error) {
+          console.error(`❌ Failed to update clue ${id}:`, error);
+          throw error;
+        }
       },
       
       deleteClue: (id: string) => {

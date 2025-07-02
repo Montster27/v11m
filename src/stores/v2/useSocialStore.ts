@@ -2,8 +2,12 @@
 // Consolidated store for NPC relationships, clue discovery, and save system
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { debouncedStorage } from '../../utils/debouncedStorage';
 import type { Clue } from '../../types/clue';
+
+// Store versioning for migration handling
+const CURRENT_VERSION = 1;
 
 export interface SocialState {
   npcs: {
@@ -504,7 +508,60 @@ export const useSocialStore = create<SocialState>()(
     }),
     {
       name: 'mmv-social-store',
-      version: 1
+      version: CURRENT_VERSION,
+      storage: createJSONStorage(() => debouncedStorage),
+      migrate: (persistedState: any, version: number) => {
+        console.log(`[SocialStore] Migrating from version ${version} to ${CURRENT_VERSION}`);
+        
+        // Handle unversioned saves (version 0 or undefined)
+        if (!version || version === 0) {
+          console.log('[SocialStore] Detected unversioned save, applying defaults and preserving data');
+          const defaultState = getInitialSocialState();
+          
+          // Merge persisted data with defaults, preserving any existing values
+          return {
+            ...defaultState,
+            ...persistedState,
+            // Ensure nested objects are properly merged
+            npcs: { 
+              ...defaultState.npcs, 
+              ...(persistedState.npcs || {}),
+              relationships: { ...defaultState.npcs.relationships, ...(persistedState.npcs?.relationships || {}) },
+              interactionHistory: { ...defaultState.npcs.interactionHistory, ...(persistedState.npcs?.interactionHistory || {}) },
+              memories: { ...defaultState.npcs.memories, ...(persistedState.npcs?.memories || {}) },
+              flags: { ...defaultState.npcs.flags, ...(persistedState.npcs?.flags || {}) }
+            },
+            clues: { 
+              ...defaultState.clues, 
+              ...(persistedState.clues || {}),
+              discovered: Array.isArray(persistedState.clues?.discovered) ? persistedState.clues.discovered : [],
+              connections: { ...defaultState.clues.connections, ...(persistedState.clues?.connections || {}) },
+              storyArcs: { ...defaultState.clues.storyArcs, ...(persistedState.clues?.storyArcs || {}) },
+              discoveryEvents: Array.isArray(persistedState.clues?.discoveryEvents) ? persistedState.clues.discoveryEvents : []
+            },
+            saves: { 
+              ...defaultState.saves, 
+              ...(persistedState.saves || {}),
+              saveSlots: { ...defaultState.saves.saveSlots, ...(persistedState.saves?.saveSlots || {}) },
+              saveHistory: Array.isArray(persistedState.saves?.saveHistory) ? persistedState.saves.saveHistory : []
+            }
+          };
+        }
+        
+        // Future version migrations go here
+        // if (version === 1) {
+        //   // Migrate from v1 to v2
+        //   return migrateV1ToV2(persistedState);
+        // }
+        
+        return persistedState;
+      },
+      partialize: (state) => ({
+        // Only persist data, not action functions
+        npcs: state.npcs,
+        clues: state.clues,
+        saves: state.saves
+      })
     }
   )
 );

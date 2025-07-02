@@ -83,9 +83,14 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
     rarity: 'common' as const
   });
 
-  const { validateRequired } = useStudioValidation({
-    entityName: 'Clue',
-    existingItems: clues
+  const validation = useStudioValidation({
+    rules: [
+      {
+        field: 'title',
+        type: 'required',
+        message: 'Clue title is required'
+      }
+    ]
   });
 
   const persistence = useStudioPersistence(
@@ -151,10 +156,9 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
   };
 
   const handleCreateClue = async () => {
-    // Validate using shared validation
-    const titleValidation = validateRequired(clueFormData.title.trim(), 'Clue title is required');
-    if (!titleValidation.isValid) {
-      alert(titleValidation.error);
+    // Validate required fields
+    if (!clueFormData.title.trim()) {
+      alert('Clue title is required');
       return;
     }
     
@@ -208,10 +212,9 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
   const handleUpdateClue = async () => {
     if (!editingClue) return;
     
-    // Validate using shared validation
-    const titleValidation = validateRequired(clueFormData.title.trim(), 'Clue title is required');
-    if (!titleValidation.isValid) {
-      alert(titleValidation.error);
+    // Validate required fields
+    if (!clueFormData.title.trim()) {
+      alert('Clue title is required');
       return;
     }
 

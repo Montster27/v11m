@@ -41,7 +41,6 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onChoiceMade }) => {
     
     // Reset all game state for a truly new game
     try {
-      const { resetAllGameState } = require('../utils/characterFlowIntegration');
       resetAllGameState();
       console.log('✅ Game state reset for new game');
     } catch (error) {

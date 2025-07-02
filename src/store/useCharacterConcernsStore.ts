@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CharacterConcerns } from '../components/CharacterCreation/ConcernsDistribution';
+import { generateConcernFlags as generateMemoizedFlags, clearFlagCache, getFlagGeneratorStats } from '../utils/flagGenerator';
 
 interface CharacterConcernsState {
   // Current character's concerns
@@ -20,8 +21,12 @@ interface CharacterConcernsState {
   getConcernValue: (concernType: keyof CharacterConcerns) => number;
   getConcernLevel: (concernType: keyof CharacterConcerns) => 'none' | 'low' | 'moderate' | 'high' | 'extreme';
   
-  // Flag generation for storylets
+  // Flag generation for storylets (memoized)
   generateConcernFlags: () => Record<string, boolean>;
+  
+  // Cache management
+  clearFlagCache: () => void;
+  getFlagCacheStats: () => any;
   
   // Analytics
   getTopConcerns: (limit?: number) => Array<{ concern: keyof CharacterConcerns; value: number; label: string }>;
@@ -44,6 +49,22 @@ const concernLabels: Record<keyof CharacterConcerns, string> = {
   genderIssues: 'Gender Issues',
   raceIssues: 'Racial Issues',
   classIssues: 'Social Class Issues'
+};
+
+// Map our CharacterConcerns interface to the memoized flag generator's interface
+const mapConcernsToFlagGenerator = (concerns: CharacterConcerns | null): import('../utils/flagGenerator').CharacterConcerns => {
+  if (!concerns) return {};
+  
+  return {
+    academic: concerns.academics || 0,
+    social: (concerns.socialFitting || 0) + (concerns.isolation || 0), // Combine social concerns
+    financial: concerns.financial || 0,
+    personal: (concerns.genderIssues || 0) + (concerns.raceIssues || 0) + (concerns.classIssues || 0), // Combine identity concerns
+    health: 0, // Not tracked in our interface
+    family: 0, // Not tracked in our interface
+    career: concerns.academics || 0, // Academic concerns often relate to career
+    romantic: 0 // Not tracked in our interface
+  };
 };
 
 export const useCharacterConcernsStore = create<CharacterConcernsState>()(
@@ -91,65 +112,79 @@ export const useCharacterConcernsStore = create<CharacterConcernsState>()(
         const { concerns } = get();
         if (!concerns) return {};
         
-        const flags: Record<string, boolean> = {};
+        // Map to the flag generator's format and get memoized flags
+        const mappedConcerns = mapConcernsToFlagGenerator(concerns);
+        const memoizedFlags = generateMemoizedFlags(mappedConcerns);
         
-        // Generate basic concern flags
-        Object.entries(concerns).forEach(([key, value]) => {
-          const concernKey = key as keyof CharacterConcerns;
-          
+        // Add our custom flags for backward compatibility
+        const customFlags: Record<string, boolean> = {};
+        
+        // Generate basic concern flags for our specific concerns
+        (Object.entries(concerns) as Array<[keyof CharacterConcerns, number]>).forEach(([key, value]) => {
+          const keyStr = String(key);
           // Basic presence flags
-          flags[`concern_${key}`] = value > 0;
-          flags[`concern_${key}_none`] = value === 0;
-          flags[`concern_${key}_low`] = value > 0 && value <= 10;
-          flags[`concern_${key}_moderate`] = value > 10 && value <= 20;
-          flags[`concern_${key}_high`] = value > 20 && value <= 30;
-          flags[`concern_${key}_extreme`] = value > 30;
+          customFlags[`concern_${keyStr}`] = value > 0;
+          customFlags[`concern_${keyStr}_none`] = value === 0;
+          customFlags[`concern_${keyStr}_low`] = value > 0 && value <= 10;
+          customFlags[`concern_${keyStr}_moderate`] = value > 10 && value <= 20;
+          customFlags[`concern_${keyStr}_high`] = value > 20 && value <= 30;
+          customFlags[`concern_${keyStr}_extreme`] = value > 30;
           
           // Threshold flags for storylet triggers
-          flags[`concern_${key}_5plus`] = value >= 5;
-          flags[`concern_${key}_10plus`] = value >= 10;
-          flags[`concern_${key}_15plus`] = value >= 15;
-          flags[`concern_${key}_20plus`] = value >= 20;
-          flags[`concern_${key}_25plus`] = value >= 25;
+          customFlags[`concern_${keyStr}_5plus`] = value >= 5;
+          customFlags[`concern_${keyStr}_10plus`] = value >= 10;
+          customFlags[`concern_${keyStr}_15plus`] = value >= 15;
+          customFlags[`concern_${keyStr}_20plus`] = value >= 20;
+          customFlags[`concern_${keyStr}_25plus`] = value >= 25;
         });
         
         // Generate profile flags
         const profile = get().getConcernsProfile();
         if (profile.primary) {
-          flags[`primary_concern_${profile.primary}`] = true;
-          flags['has_primary_concern'] = true;
+          customFlags[`primary_concern_${String(profile.primary)}`] = true;
+          customFlags['has_primary_concern'] = true;
         }
         if (profile.secondary) {
-          flags[`secondary_concern_${profile.secondary}`] = true;
-          flags['has_secondary_concern'] = true;
+          customFlags[`secondary_concern_${String(profile.secondary)}`] = true;
+          customFlags['has_secondary_concern'] = true;
         }
         
-        // Combination flags for complex storylet triggers
-        flags['socially_concerned'] = concerns.socialFitting >= 15 || concerns.isolation >= 15;
-        flags['financially_stressed'] = concerns.financial >= 15;
-        flags['academically_focused'] = concerns.academics >= 20;
-        flags['culturally_aware'] = (concerns.genderIssues + concerns.raceIssues + concerns.classIssues) >= 25;
-        flags['highly_concerned'] = Object.values(concerns).some(v => v >= 25);
-        flags['well_balanced'] = Object.values(concerns).every(v => v >= 5 && v <= 15);
-        flags['minimally_concerned'] = Object.values(concerns).every(v => v <= 10);
+        // Combination flags for complex storylet triggers (specific to our concerns)
+        customFlags['socially_concerned'] = concerns.socialFitting >= 15 || concerns.isolation >= 15;
+        customFlags['financially_stressed'] = concerns.financial >= 15;
+        customFlags['academically_focused'] = concerns.academics >= 20;
+        customFlags['culturally_aware'] = (concerns.genderIssues + concerns.raceIssues + concerns.classIssues) >= 25;
+        customFlags['highly_concerned'] = (Object.values(concerns) as number[]).some(v => v >= 25);
+        customFlags['well_balanced'] = (Object.values(concerns) as number[]).every(v => v >= 5 && v <= 15);
+        customFlags['minimally_concerned'] = (Object.values(concerns) as number[]).every(v => v <= 10);
         
         // Social dynamics flags
-        flags['social_and_isolated'] = concerns.socialFitting >= 10 && concerns.isolation >= 10;
-        flags['academic_and_financial'] = concerns.academics >= 15 && concerns.financial >= 15;
-        flags['cultural_issues_focused'] = concerns.genderIssues >= 10 || concerns.raceIssues >= 10 || concerns.classIssues >= 10;
+        customFlags['social_and_isolated'] = concerns.socialFitting >= 10 && concerns.isolation >= 10;
+        customFlags['academic_and_financial'] = concerns.academics >= 15 && concerns.financial >= 15;
+        customFlags['cultural_issues_focused'] = concerns.genderIssues >= 10 || concerns.raceIssues >= 10 || concerns.classIssues >= 10;
         
-        return flags;
+        // Merge memoized flags with custom flags (custom flags take precedence)
+        return { ...memoizedFlags, ...customFlags };
+      },
+      
+      clearFlagCache: () => {
+        clearFlagCache();
+        console.log('🧹 Character concerns flag cache cleared');
+      },
+      
+      getFlagCacheStats: () => {
+        return getFlagGeneratorStats();
       },
       
       getTopConcerns: (limit = 3) => {
         const { concerns } = get();
         if (!concerns) return [];
         
-        return Object.entries(concerns)
+        return (Object.entries(concerns) as Array<[keyof CharacterConcerns, number]>)
           .map(([key, value]) => ({
-            concern: key as keyof CharacterConcerns,
+            concern: key,
             value,
-            label: concernLabels[key as keyof CharacterConcerns]
+            label: concernLabels[key]
           }))
           .sort((a, b) => b.value - a.value)
           .slice(0, limit)
@@ -168,12 +203,12 @@ export const useCharacterConcernsStore = create<CharacterConcernsState>()(
       
       hasActiveConcerns: () => {
         const { concerns } = get();
-        return concerns ? Object.values(concerns).some(v => v > 0) : false;
+        return concerns ? (Object.values(concerns) as number[]).some(v => v > 0) : false;
       },
       
       getTotalConcernPoints: () => {
         const { concerns } = get();
-        return concerns ? Object.values(concerns).reduce((sum, value) => sum + value, 0) : 0;
+        return concerns ? (Object.values(concerns) as number[]).reduce((sum, value) => sum + value, 0) : 0;
       }
     }),
     {
@@ -207,5 +242,16 @@ if (typeof window !== 'undefined') {
   (window as any).getConcernLevel = (concernType: keyof CharacterConcerns): string => {
     const store = useCharacterConcernsStore.getState();
     return store.getConcernLevel(concernType);
+  };
+  
+  // Cache management functions for dev/debugging
+  (window as any).clearConcernFlagCache = (): void => {
+    const store = useCharacterConcernsStore.getState();
+    store.clearFlagCache();
+  };
+  
+  (window as any).getConcernFlagCacheStats = (): any => {
+    const store = useCharacterConcernsStore.getState();
+    return store.getFlagCacheStats();
   };
 }

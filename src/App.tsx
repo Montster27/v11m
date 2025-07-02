@@ -6,6 +6,7 @@ import MinigameManager from './components/minigames/MinigameManager';
 import ClueNotification from './components/ClueNotification';
 import ClueDiscoveryManager from './components/ClueDiscoveryManager';
 import RefactorNotificationBanner from './components/RefactorNotificationBanner';
+import AutoSaveIndicator from './components/AutoSaveIndicator';
 import { CharacterCreation, Planner, Quests, Skills, StoryletDeveloper, ContentCreator, SplashScreen } from './pages';
 import { useAppStore } from './store/useAppStore';
 import { useStoryletStore } from './store/useStoryletStore';
@@ -111,6 +112,28 @@ if (process.env.NODE_ENV === 'development') {
     (window as any).useSocialStore = module.useSocialStore;
     console.log('🏪 Consolidated stores exposed globally for console access');
   });
+  
+  // Expose SaveManager and auto-save functions globally for testing
+  import('./utils/saveManager').then(module => {
+    (window as any).saveManager = module.saveManager;
+    console.log('💾 SaveManager exposed globally for console access');
+  });
+  
+  import('./hooks/useAutoSave').then(module => {
+    (window as any).AUTO_SAVE_CONFIG = module.AUTO_SAVE_CONFIG;
+    console.log('🔄 Auto-save config exposed globally for console access');
+  });
+  
+  // Expose flag generator functions globally for testing
+  import('./utils/flagGenerator').then(module => {
+    (window as any).generateConcernFlags = module.generateConcernFlags;
+    (window as any).generateAllFlags = module.generateAllFlags;
+    (window as any).clearFlagCache = module.clearFlagCache;
+    (window as any).getFlagGeneratorStats = module.getFlagGeneratorStats;
+    (window as any).warmUpFlagCache = module.warmUpFlagCache;
+    (window as any).optimizeFlagCache = module.optimizeFlagCache;
+    console.log('🏷️ Flag generator functions exposed globally for console access');
+  });
 }
 
 function App() {
@@ -191,6 +214,11 @@ function App() {
       <div className="min-h-screen bg-gray-50">
         <Navigation />
         <RefactorNotificationBanner />
+        
+        {/* Auto-save indicator in top-right corner */}
+        <div className="fixed top-4 right-4 z-50">
+          <AutoSaveIndicator className="bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg border" />
+        </div>
         <Routes>
           <Route path="/" element={<Navigate to="/planner" replace />} />
           <Route path="/planner" element={<Planner />} />

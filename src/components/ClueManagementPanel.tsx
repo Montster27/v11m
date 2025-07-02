@@ -57,23 +57,35 @@ const ClueManagementPanel: React.FC = () => {
   const discoveredClues = getDiscoveredClues();
 
   const handleCreateClue = () => {
-    if (!newClueForm.id.trim() || !newClueForm.title.trim()) return;
+    if (!newClueForm.id.trim() || !newClueForm.title.trim()) {
+      alert('Please fill in required fields (ID and Title)');
+      return;
+    }
     
-    createClue(newClueForm);
-    setNewClueForm({
-      id: '',
-      title: '',
-      description: '',
-      content: '',
-      category: 'general',
-      difficulty: 'medium',
-      storyArc: '',
-      arcOrder: 1,
-      minigameTypes: [],
-      associatedStorylets: [],
-      tags: [],
-      rarity: 'common'
-    });
+    try {
+      createClue(newClueForm);
+      
+      // Only reset form if creation succeeded
+      setNewClueForm({
+        id: '',
+        title: '',
+        description: '',
+        content: '',
+        category: 'general',
+        difficulty: 'medium',
+        storyArc: '',
+        arcOrder: 1,
+        minigameTypes: [],
+        associatedStorylets: [],
+        tags: [],
+        rarity: 'common'
+      });
+      
+      console.log('✅ Clue created successfully');
+    } catch (error) {
+      console.error('❌ Failed to create clue:', error);
+      alert('Failed to create clue. Please try again.');
+    }
   };
 
   const handleEditClue = (clue: Clue) => {
@@ -96,25 +108,38 @@ const ClueManagementPanel: React.FC = () => {
   };
 
   const handleUpdateClue = () => {
-    if (!editingClue || !newClueForm.id.trim() || !newClueForm.title.trim()) return;
+    if (!editingClue || !newClueForm.id.trim() || !newClueForm.title.trim()) {
+      alert('Please fill in required fields (ID and Title)');
+      return;
+    }
     
-    updateClue(editingClue.id, newClueForm);
-    setEditingClue(null);
-    setNewClueForm({
-      id: '',
-      title: '',
-      description: '',
-      content: '',
-      category: 'general',
-      difficulty: 'medium',
-      storyArc: '',
-      arcOrder: 1,
-      minigameTypes: [],
-      associatedStorylets: [],
-      tags: [],
-      rarity: 'common'
-    });
-    setActiveTab('all'); // Switch back to all clues
+    try {
+      // Update the clue
+      updateClue(editingClue.id, newClueForm);
+      
+      // Only close dialog and reset form if update succeeded
+      setEditingClue(null);
+      setNewClueForm({
+        id: '',
+        title: '',
+        description: '',
+        content: '',
+        category: 'general',
+        difficulty: 'medium',
+        storyArc: '',
+        arcOrder: 1,
+        minigameTypes: [],
+        associatedStorylets: [],
+        tags: [],
+        rarity: 'common'
+      });
+      setActiveTab('all'); // Switch back to all clues
+      
+      console.log('✅ Clue updated successfully');
+    } catch (error) {
+      console.error('❌ Failed to update clue:', error);
+      alert('Failed to update clue. Please try again.');
+    }
   };
 
   const handleCancelEdit = () => {

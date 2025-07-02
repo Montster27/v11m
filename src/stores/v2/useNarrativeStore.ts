@@ -2,8 +2,12 @@
 // Consolidated store for storylets, unified flags, story arcs, and character concerns
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { debouncedStorage } from '../../utils/debouncedStorage';
 import type { Storylet } from '../../types/storylet';
+
+// Store versioning for migration handling
+const CURRENT_VERSION = 1;
 
 export interface NarrativeState {
   storylets: {
@@ -333,7 +337,51 @@ export const useNarrativeStore = create<NarrativeState>()(
     }),
     {
       name: 'mmv-narrative-store',
-      version: 1,
+      version: CURRENT_VERSION,
+      storage: createJSONStorage(() => debouncedStorage),
+      migrate: (persistedState: any, version: number) => {
+        console.log(`[NarrativeStore] Migrating from version ${version} to ${CURRENT_VERSION}`);
+        
+        // Handle unversioned saves (version 0 or undefined)
+        if (!version || version === 0) {
+          console.log('[NarrativeStore] Detected unversioned save, applying defaults and preserving data');
+          const defaultState = getInitialNarrativeState();
+          
+          // Merge persisted data with defaults, preserving any existing values
+          const migrated = {
+            ...defaultState,
+            ...persistedState,
+            // Ensure nested objects are properly merged
+            storylets: { 
+              ...defaultState.storylets, 
+              ...(persistedState.storylets || {}),
+              // Ensure arrays are actually arrays
+              active: Array.isArray(persistedState.storylets?.active) ? persistedState.storylets.active : [],
+              completed: Array.isArray(persistedState.storylets?.completed) ? persistedState.storylets.completed : [],
+              userCreated: Array.isArray(persistedState.storylets?.userCreated) ? persistedState.storylets.userCreated : []
+            },
+            storyArcs: { ...defaultState.storyArcs, ...(persistedState.storyArcs || {}) },
+            concerns: { ...defaultState.concerns, ...(persistedState.concerns || {}) },
+            // Handle flags - may need to recreate Maps
+            flags: {
+              storylet: new Map(persistedState.flags?.storylet || []),
+              storyletFlag: new Map(persistedState.flags?.storyletFlag || []),
+              concerns: new Map(persistedState.flags?.concerns || []),
+              storyArc: new Map(persistedState.flags?.storyArc || [])
+            }
+          };
+          
+          return migrated;
+        }
+        
+        // Future version migrations go here
+        // if (version === 1) {
+        //   // Migrate from v1 to v2
+        //   return migrateV1ToV2(persistedState);
+        // }
+        
+        return persistedState;
+      },
       // Custom serialization for Maps
       serialize: (state) => {
         return JSON.stringify({
