@@ -32,8 +32,7 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
   const isEditing = coreStore.character.name !== '';
   
   const [step, setStep] = useState(1);
-  const [characterName, setCharacterName] = useState(coreStore.character.name || '');
-  const [selectedBackground, setSelectedBackground] = useState(coreStore.character.background || '');
+  const [characterName, setCharacterName] = useState('');
   const [attributes, setAttributes] = useState<AttributeValues>({
     intelligence: 50,
     creativity: 50,
@@ -52,22 +51,10 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
     lifePurpose: 0
   });
 
-  const backgrounds = [
-    { id: 'scholar', name: 'Scholar', description: 'Focused on academics and learning' },
-    { id: 'athlete', name: 'Athlete', description: 'Strong physical abilities and team spirit' },
-    { id: 'artist', name: 'Artist', description: 'Creative and expressive personality' },
-    { id: 'social', name: 'Social Butterfly', description: 'Excellent at making connections' }
-  ];
-
   const handleNameSubmit = () => {
     if (characterName.trim()) {
-      setStep(2);
+      setStep(2); // Go directly to attributes (was step 3)
     }
-  };
-
-  const handleBackgroundSelect = (background: string) => {
-    setSelectedBackground(background);
-    setStep(3);
   };
 
   const handleAttributeChange = (attribute: keyof AttributeValues, value: number) => {
@@ -97,7 +84,7 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
     
     const validation = validateCharacterCreationData({
       name: characterName,
-      background: selectedBackground,
+      background: 'general', // Set default background since selection was removed
       attributes,
       domainAdjustments
     });
@@ -110,7 +97,7 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
     // Single atomic operation across all stores
     createCharacterAtomically({
       name: characterName,
-      background: selectedBackground,
+      background: 'general', // Set default background since selection was removed
       attributes,
       domainAdjustments
     });
@@ -156,48 +143,8 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
     );
   }
 
-  // Step 2: Background
+  // Step 2: Attributes (was Step 3)
   if (step === 2) {
-    return (
-      <div className="page-container min-h-screen bg-gray-50 py-8">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <Card title="Choose Your Background" variant="elevated">
-              <div className="space-y-4">
-                <p className="text-gray-600 mb-6">
-                  Your background influences your starting skills and how you approach college life.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {backgrounds.map((bg) => (
-                    <button
-                      key={bg.id}
-                      onClick={() => handleBackgroundSelect(bg.id)}
-                      className={`p-4 border-2 rounded-lg text-left transition-all ${
-                        selectedBackground === bg.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <h3 className="font-semibold text-gray-900 mb-2">{bg.name}</h3>
-                      <p className="text-sm text-gray-600">{bg.description}</p>
-                    </button>
-                  ))}
-                </div>
-                <div className="flex justify-between mt-6">
-                  <Button onClick={() => setStep(1)} variant="outline">
-                    ← Back
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Step 3: Attributes
-  if (step === 3) {
     return (
       <div className="page-container min-h-screen bg-gray-50 py-8">
         <div className="container mx-auto px-4">
@@ -228,10 +175,10 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
                 ))}
                 
                 <div className="flex justify-between mt-6">
-                  <Button onClick={() => setStep(2)} variant="outline">
+                  <Button onClick={() => setStep(1)} variant="outline">
                     ← Back
                   </Button>
-                  <Button onClick={() => setStep(4)} variant="primary">
+                  <Button onClick={() => setStep(3)} variant="primary">
                     Next →
                   </Button>
                 </div>
@@ -243,8 +190,8 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
     );
   }
 
-  // Step 4: Domain Adjustments
-  if (step === 4) {
+  // Step 3: Domain Adjustments (was Step 4)
+  if (step === 3) {
     return (
       <div className="page-container min-h-screen bg-gray-50 py-8">
         <div className="container mx-auto px-4">
@@ -282,10 +229,10 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
                 ))}
                 
                 <div className="flex justify-between mt-6">
-                  <Button onClick={() => setStep(3)} variant="outline">
+                  <Button onClick={() => setStep(2)} variant="outline">
                     ← Back
                   </Button>
-                  <Button onClick={() => setStep(5)} variant="primary">
+                  <Button onClick={() => setStep(4)} variant="primary">
                     Review →
                   </Button>
                 </div>
@@ -297,7 +244,7 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
     );
   }
 
-  // Step 5: Review & Create
+  // Step 4: Review & Create (was Step 5)
   return (
     <div className="page-container min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4">
@@ -344,7 +291,7 @@ const ConsolidatedCharacterCreationFlow: React.FC = () => {
               </div>
               
               <div className="flex justify-between mt-8 pt-6 border-t">
-                <Button onClick={() => setStep(4)} variant="outline">
+                <Button onClick={() => setStep(3)} variant="outline">
                   ← Back
                 </Button>
                 <Button onClick={handleFinalize} variant="primary" size="lg">
