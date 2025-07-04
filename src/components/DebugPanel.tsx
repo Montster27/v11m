@@ -2,35 +2,62 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { useStoryletStore } from '../store/useStoryletStore';
+import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
 import ClueManagementPanel from './ClueManagementPanel';
 import BalanceTestingPanel from './BalanceTestingPanel';
 import StoryletManagementPanel from './StoryletManagementPanel';
 import { NPCManagementPanel } from './NPCManagementPanel';
+import type { Character } from '../types/character';
 import '../test-integration'; // Import test functions
 import '../utils/storyletTesting'; // Import storylet testing utilities
+
+interface DebugData {
+  character: Character | null;
+  allocations: Record<string, number>;
+  resources: Record<string, number>;
+  skills: Record<string, any>;
+  storyletFlags: Record<string, any>;
+  activeStorylets: string[];
+  completedStorylets: string[];
+  storyletCooldowns: Record<string, number>;
+  day: number;
+  userLevel: number;
+  experience: number;
+}
 
 const DebugPanel: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<'debug' | 'clues' | 'balance' | 'storylets' | 'npcs'>('debug');
-  const [debugData, setDebugData] = useState<any>({});
+  const [debugData, setDebugData] = useState<DebugData>({
+    character: null,
+    allocations: {},
+    resources: {},
+    skills: {},
+    storyletFlags: {},
+    activeStorylets: [],
+    completedStorylets: [],
+    storyletCooldowns: {},
+    day: 1,
+    userLevel: 1,
+    experience: 0
+  });
 
   // Subscribe to store changes
   useEffect(() => {
     const updateDebugData = () => {
       try {
         const appState = useAppStore.getState();
-        const storyletState = useStoryletStore.getState();
+        const narrativeState = useNarrativeStore.getState();
         
         setDebugData({
           character: appState.activeCharacter,
           allocations: appState.allocations,
           resources: appState.resources,
           skills: appState.skills,
-          storyletFlags: storyletState.activeFlags,
-          activeStorylets: storyletState.activeStoryletIds,
-          completedStorylets: storyletState.completedStoryletIds,
-          storyletCooldowns: storyletState.storyletCooldowns,
+          storyletFlags: narrativeState.flags,
+          activeStorylets: narrativeState.storylets.active,
+          completedStorylets: narrativeState.storylets.completed,
+          storyletCooldowns: narrativeState.storylets.cooldowns,
           day: appState.day,
           userLevel: appState.userLevel,
           experience: appState.experience

@@ -1,7 +1,7 @@
 // /Users/montysharma/V11M2/src/components/minigames/PathPlanner/KeyLockHUD.tsx
 import React from 'react';
 import { Card } from '../../ui';
-import { Key, Lock } from '../PathPlannerGame';
+import { Key, Lock } from '../../../types/pathPlanner';
 
 interface KeyLockHUDProps {
   keys: Key[];

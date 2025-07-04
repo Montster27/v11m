@@ -2,8 +2,11 @@
 // Migrated to use shared Content Studio foundation with preserved arc functionality
 
 import React, { useState, useMemo } from 'react';
-import { useStoryletStore } from '../../store/useStoryletStore';
+import { useNarrativeStore } from '../../stores/v2/useNarrativeStore';
+import { useSocialStore } from '../../stores/v2/useSocialStore';
 import { useStoryletCatalogStore } from '../../store/useStoryletCatalogStore';
+import { useClueStore } from '../../store/useClueStore';
+import { storyArcManager } from '../../utils/storyArcManager';
 import type { Storylet } from '../../types/storylet';
 import HelpTooltip from '../ui/HelpTooltip';
 import StoryArcVisualizer from '../StoryArcVisualizer';
@@ -12,7 +15,6 @@ import ArcTestingInterface from '../dev/ArcTestingInterface';
 // Shared foundation imports
 import BaseStudioComponent from './shared/BaseStudioComponent';
 import { useCRUDOperations } from './shared/useCRUDOperations';
-import { useStudioValidation } from './shared/useStudioValidation';
 import { useStudioPersistence } from './shared/useStudioPersistence';
 
 interface UndoRedoSystem {
@@ -30,41 +32,57 @@ interface ArcManagerProps {
 type ArcManagerTab = 'overview' | 'visualizer' | 'builder' | 'testing';
 
 const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
-  // Use catalog store for storylet data and management store for arcs
+  // Use V2 stores for unified state management
+  const { storyArcs, getAllArcs, getArc } = useNarrativeStore();
+  const { getCluesByArc } = useSocialStore();
+  
+  // Use catalog store for storylet data  
   const allStorylets = useStoryletCatalogStore(state => state.allStorylets);
   const getStoryletsForArc = useStoryletCatalogStore(state => state.getStoryletsForArc);
+  const updateStorylet = useStoryletCatalogStore(state => state.updateStorylet);
   
-  const {
-    storyArcs,
-    arcMetadata,
-    getArcStats,
-    addStoryArc,
-    removeStoryArc,
-    updateStorylet,
-    updateArcLastAccessed
-  } = useStoryletStore();
+  // Use clue store for clue data
+  const { clues } = useClueStore();
   
-  // Create a local getStoryletsByArc function that uses the catalog store
-  const getStoryletsByArc = (arcName: string): Storylet[] => {
-    return getStoryletsForArc(arcName);
+  // Get all arcs from V2 store
+  const allArcs = getAllArcs();
+  
+  // Create a local getStoryletsByArc function that uses the same logic as visualizer
+  const getStoryletsByArc = (arcId: string): Storylet[] => {
+    const arc = getArc(arcId);
+    if (!arc) return [];
+    
+    // Use the same filtering logic as the visualizer - filter by arc name
+    return Object.values(allStorylets).filter(storylet => 
+      storylet.storyArc === arc.name
+    );
   };
 
-  // Shared foundation hooks
+  // Shared foundation hooks - updated to use StoryArcManager
   const { handleCreate, handleUpdate, handleDelete } = useCRUDOperations({
     entityType: 'Arc',
-    getAllItems: () => storyArcs.map(name => ({ id: name, name })),
-    createItem: (arcData: { name: string }) => {
+    getAllItems: () => allArcs.map(arc => ({ id: arc.id, name: arc.name })),
+    createItem: (arcData: { name: string; description?: string }) => {
       console.log('Creating arc:', arcData.name);
-      addStoryArc(arcData.name);
-      return { id: arcData.name, ...arcData };
+      const arcId = storyArcManager.createArc({
+        name: arcData.name,
+        description: arcData.description || `Story arc: ${arcData.name}`,
+        progress: 0,
+        isCompleted: false,
+        failures: 0
+      });
+      return { id: arcId, name: arcData.name };
     },
-    updateItem: (arc: { id: string; name: string }) => {
+    updateItem: (arc: { id: string; name: string; description?: string }) => {
       console.log('Updating arc:', arc.id);
-      // Arc updates would be handled here if needed
+      storyArcManager.updateArc(arc.id, {
+        name: arc.name,
+        description: arc.description
+      });
     },
     deleteItem: (id: string) => {
       console.log('Deleting arc:', id);
-      removeStoryArc(id);
+      storyArcManager.deleteArc(id);
     },
     undoRedoSystem
   });
@@ -80,10 +98,20 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
   const [showArcTesting, setShowArcTesting] = useState(false);
   const [arcSortBy, setArcSortBy] = useState<'alphabetical' | 'lastWorked'>('alphabetical');
 
-  const { validateRequired, validateUnique } = useStudioValidation({
-    entityName: 'Arc',
-    existingItems: storyArcs.map(name => ({ id: name, name }))
-  });
+  // Simple validation functions for arc creation
+  const validateRequired = (value: string, message: string) => {
+    if (!value || value.trim() === '') {
+      return { isValid: false, error: message };
+    }
+    return { isValid: true, error: null };
+  };
+
+  const validateUnique = (value: string, message: string) => {
+    if (allArcs.some(arc => arc.name.toLowerCase() === value.toLowerCase())) {
+      return { isValid: false, error: message };
+    }
+    return { isValid: true, error: null };
+  };
 
   const persistence = useStudioPersistence(
     { selectedArc, visualizingArc, testingArc, arcSortBy },
@@ -96,38 +124,52 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
     }
   );
 
-  // Get arc statistics with sorting
+  // Get arc statistics with sorting - updated to use same logic as visualizer
   const arcStats = useMemo(() => {
     console.log('🔍 ArcManager: Calculating arcStats with sortBy:', arcSortBy);
-    console.log('🔍 ArcManager: arcMetadata:', arcMetadata);
+    console.log('🔍 ArcManager: allArcs:', allArcs);
     
-    const stats = storyArcs.map(arcName => {
-      const storylets = getStoryletsByArc(arcName);
+    const stats = allArcs.map(arc => {
+      const storylets = getStoryletsByArc(arc.id);
+      
+      // Use same clue filtering logic as visualizer
+      const arcClues = clues.filter(clue => 
+        clue.storyArc === arc.name || 
+        clue.associatedStorylets.some(storyletId => 
+          storylets.some(storylet => storylet.id === storyletId)
+        )
+      );
       const connections = storylets.reduce((total, storylet) => {
         return total + storylet.choices.filter(choice => choice.nextStoryletId).length;
       }, 0);
       
-      const metadata = arcMetadata[arcName];
-      console.log(`🔍 ArcManager: Arc "${arcName}" metadata:`, metadata);
+      // Calculate entry points
+      const entryPoints = storylets.filter(s => 
+        s.trigger.type === 'time' || 
+        (s.trigger.type === 'flag' && !storylets.some(other => 
+          other.choices.some(choice => 
+            choice.effects.some(effect => 
+              effect.type === 'flag' && 
+              effect.key === (s.trigger.conditions as any).flags?.[0]
+            )
+          )
+        ))
+      ).length;
       
       return {
-        name: arcName,
+        id: arc.id,
+        name: arc.name,
+        description: arc.description,
         storyletCount: storylets.length,
+        clueCount: arcClues.length,
         connections,
-        entryPoints: storylets.filter(s => 
-          s.trigger.type === 'time' || 
-          (s.trigger.type === 'flag' && !storylets.some(other => 
-            other.choices.some(choice => 
-              choice.effects.some(effect => 
-                effect.type === 'flag' && 
-                effect.key === (s.trigger.conditions as any).flags?.[0]
-              )
-            )
-          ))
-        ).length,
+        entryPoints,
         isValid: storylets.length > 0,
-        lastAccessedAt: metadata?.lastAccessedAt || 0,
-        createdAt: metadata?.createdAt || 0
+        progress: arc.progress,
+        isCompleted: arc.isCompleted,
+        failures: arc.failures,
+        lastAccessedAt: arc.metadata.lastAccessed,
+        createdAt: arc.metadata.createdAt
       };
     });
 
@@ -144,7 +186,7 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
       console.log('🔍 ArcManager: Last worked sorted:', sorted.map(s => ({ name: s.name, lastAccessed: s.lastAccessedAt })));
       return sorted;
     }
-  }, [storyArcs, allStorylets, arcMetadata, arcSortBy]);
+  }, [allArcs, allStorylets, clues, arcSortBy]);
 
   // Get unassigned storylets
   const unassignedStorylets = useMemo(() => {
@@ -168,37 +210,49 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
     }
     
     // Use CRUD operations for creation
-    const success = await handleCreate({ name: trimmedName });
-    if (success) {
+    const result = await handleCreate({ name: trimmedName });
+    if (result) {
       setNewArcName('');
       setShowCreateArcModal(false);
-      setSelectedArc(trimmedName);
+      setSelectedArc(result.id); // Use the returned arc ID
       persistence.markDirty();
     }
   };
 
-  const handleDeleteArc = async (arcName: string) => {
-    if (confirm(`Are you sure you want to delete the "${arcName}" story arc? This will unassign all storylets from this arc.`)) {
+  const handleDeleteArc = async (arcId: string) => {
+    const arc = getArc(arcId);
+    const arcName = arc?.name || arcId;
+    
+    if (confirm(`Are you sure you want to delete the "${arcName}" story arc? This will unassign all storylets and clues from this arc.`)) {
       // Use CRUD operations for deletion
-      const success = await handleDelete(arcName);
-      if (success && selectedArc === arcName) {
+      const success = await handleDelete(arcId);
+      if (success && selectedArc === arcId) {
         setSelectedArc('');
         persistence.markDirty();
       }
     }
   };
 
-  const handleArcAccess = (arcName: string) => {
+  const handleArcAccess = (arcId: string) => {
     // Update last accessed time when arc is opened/visualized
-    console.log('🔍 ArcManager: Updating access time for arc:', arcName);
-    updateArcLastAccessed(arcName);
-    console.log('🔍 ArcManager: After update, arcMetadata:', arcMetadata);
+    console.log('🔍 ArcManager: Updating access time for arc:', arcId);
+    storyArcManager.updateArc(arcId, {
+      metadata: {
+        ...getArc(arcId)?.metadata,
+        lastAccessed: Date.now()
+      }
+    });
   };
 
-  const handleAssignStoryletToArc = (storyletId: string, arcName: string) => {
+  const handleAssignStoryletToArc = (storyletId: string, arcId: string) => {
+    // Assign storylet to arc using StoryArcManager
+    storyArcManager.assignStoryletToArc(storyletId, arcId);
+    
+    // Also update the storylet in the catalog store for backwards compatibility
     const storylet = allStorylets[storyletId];
     if (storylet) {
-      const updatedStorylet = { ...storylet, storyArc: arcName };
+      const arc = getArc(arcId);
+      const updatedStorylet = { ...storylet, storyArc: arc?.name || arcId };
       updateStorylet(updatedStorylet);
     }
   };
@@ -261,7 +315,7 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
               {/* Story Arcs List */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-lg font-medium text-gray-800">Story Arcs ({storyArcs.length})</h4>
+                  <h4 className="text-lg font-medium text-gray-800">Story Arcs ({allArcs.length})</h4>
                   <div className="flex items-center gap-2">
                     <label className="text-sm text-gray-600">Sort by:</label>
                     <select
@@ -278,25 +332,30 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
                 <div className="space-y-3">
                   {arcStats.map((arc) => (
                     <div
-                      key={arc.name}
+                      key={arc.id}
                       className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                        selectedArc === arc.name
+                        selectedArc === arc.id
                           ? 'border-blue-300 bg-blue-50'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                       onClick={() => {
-                        handleArcAccess(arc.name);
-                        setSelectedArc(arc.name);
+                        handleArcAccess(arc.id);
+                        setSelectedArc(arc.id);
                       }}
                     >
                       <div className="flex items-center justify-between">
-                        <h5 className="font-medium text-gray-800">{arc.name}</h5>
+                        <div>
+                          <h5 className="font-medium text-gray-800">{arc.name}</h5>
+                          {arc.description && (
+                            <p className="text-xs text-gray-600 mt-1">{arc.description}</p>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleArcAccess(arc.name);
-                              setVisualizingArc(arc.name);
+                              handleArcAccess(arc.id);
+                              setVisualizingArc(arc.id);
                               setActiveTab('visualizer');
                             }}
                             className="text-blue-600 hover:text-blue-800 text-sm"
@@ -306,7 +365,8 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleArcAccess(arc.name);
+                              handleArcAccess(arc.id);
+                              setTestingArc(arc.id);
                               setShowArcTesting(true);
                             }}
                             className="text-green-600 hover:text-green-800 text-sm"
@@ -316,7 +376,7 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteArc(arc.name);
+                              handleDeleteArc(arc.id);
                             }}
                             className="text-red-600 hover:text-red-800 text-sm"
                           >
@@ -325,10 +385,14 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
                         </div>
                       </div>
                       
-                      <div className="mt-2 grid grid-cols-3 gap-4 text-sm text-gray-600">
+                      <div className="mt-2 grid grid-cols-4 gap-4 text-sm text-gray-600">
                         <div>
                           <span className="font-medium">{arc.storyletCount}</span>
                           <span className="ml-1">storylets</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">{arc.clueCount}</span>
+                          <span className="ml-1">clues</span>
                         </div>
                         <div>
                           <span className="font-medium">{arc.connections}</span>
@@ -358,7 +422,7 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
                     </div>
                   ))}
                   
-                  {storyArcs.length === 0 && (
+                  {allArcs.length === 0 && (
                     <div className="text-center py-8 text-gray-500">
                       <div className="text-4xl mb-2">🔗</div>
                       <p>No story arcs created yet</p>
@@ -373,7 +437,7 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
                 {selectedArc ? (
                   <>
                     <h4 className="text-lg font-medium text-gray-800">
-                      Storylets in "{selectedArc}"
+                      Storylets in "{getArc(selectedArc)?.name || 'Unknown Arc'}"
                     </h4>
                     <div className="space-y-2">
                       {getStoryletsByArc(selectedArc).map((storylet) => (
@@ -417,8 +481,8 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
                               className="text-sm border border-gray-300 rounded px-2 py-1"
                             >
                               <option value="">Assign to arc...</option>
-                              {storyArcs.map(arc => (
-                                <option key={arc} value={arc}>{arc}</option>
+                              {allArcs.map(arc => (
+                                <option key={arc.id} value={arc.id}>{arc.name}</option>
                               ))}
                             </select>
                           </div>
@@ -436,7 +500,7 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
           <div className="h-full">
             {visualizingArc ? (
               <StoryArcVisualizer
-                arcName={visualizingArc}
+                arcName={getArc(visualizingArc)?.name || visualizingArc}
                 onClose={() => setVisualizingArc(null)}
               />
             ) : (
@@ -445,15 +509,15 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
                   <div className="text-4xl mb-4">🎨</div>
                   <h4 className="text-lg font-medium mb-2">Select an Arc to Visualize</h4>
                   <p>Choose a story arc from the overview to see its visual representation</p>
-                  {storyArcs.length > 0 && (
+                  {allArcs.length > 0 && (
                     <select
                       onChange={(e) => e.target.value && setVisualizingArc(e.target.value)}
                       value={visualizingArc || ""}
                       className="mt-4 px-3 py-2 border border-gray-300 rounded"
                     >
                       <option value="">Select an arc...</option>
-                      {storyArcs.map(arc => (
-                        <option key={arc} value={arc}>{arc}</option>
+                      {allArcs.map(arc => (
+                        <option key={arc.id} value={arc.id}>{arc.name}</option>
                       ))}
                     </select>
                   )}
@@ -530,15 +594,15 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded mb-4"
                 >
                   <option value="">Choose an arc...</option>
-                  {storyArcs.map(arc => (
-                    <option key={arc} value={arc}>{arc}</option>
+                  {allArcs.map(arc => (
+                    <option key={arc.id} value={arc.id}>{arc.name}</option>
                   ))}
                 </select>
                 
                 {testingArc && (
                   <div className="space-y-4">
                     <div className="p-4 bg-blue-50 border border-blue-200 rounded">
-                      <h6 className="font-medium text-blue-800 mb-2">Testing: {testingArc}</h6>
+                      <h6 className="font-medium text-blue-800 mb-2">Testing: {getArc(testingArc)?.name || 'Unknown Arc'}</h6>
                       <p className="text-sm text-blue-700">
                         Arc testing functionality would allow you to simulate playthrough 
                         and validate all possible paths through the story arc.
@@ -584,7 +648,7 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
               </button>
               <button
                 onClick={handleCreateArc}
-                disabled={!newArcName.trim() || storyArcs.includes(newArcName.trim())}
+                disabled={!newArcName.trim() || allArcs.some(arc => arc.name === newArcName.trim())}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
               >
                 Create Arc

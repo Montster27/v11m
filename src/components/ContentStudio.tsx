@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { useStoryletStore } from '../store/useStoryletStore';
+import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
+import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
+import { useSocialStore } from '../stores/v2/useSocialStore';
 import { useUndoRedo } from '../hooks/useUndoRedo';
 import AdvancedStoryletCreator from './contentStudio/AdvancedStoryletCreator';
 import StoryletBrowser from './contentStudio/StoryletBrowser';
@@ -24,6 +26,10 @@ interface ContentStudioProps {
 }
 
 const ContentStudio: React.FC<ContentStudioProps> = ({ onBackupCreate }) => {
+  // V2 Store access
+  const narrativeStore = useNarrativeStore();
+  const socialStore = useSocialStore();
+  const catalogStore = useStoryletCatalogStore();
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<ContentStudioTab>('advanced');
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -67,15 +73,20 @@ const ContentStudio: React.FC<ContentStudioProps> = ({ onBackupCreate }) => {
     redoStackSize
   } = useUndoRedo(20);
 
-  // Auto-backup before destructive actions
+  // Auto-backup before destructive actions (V2 Enhanced)
   const createBackup = () => {
     try {
       const timestamp = new Date().toISOString();
       const gameState = {
         app: useAppStore.getState(),
-        storylets: useStoryletStore.getState(),
+        // V2 stores
+        narrative: narrativeStore,
+        social: socialStore,
+        catalog: catalogStore,
+        // Legacy for backwards compatibility
+        storylets: catalogStore, // Use catalog store as legacy storylets backup
         timestamp,
-        version: '1.0'
+        version: '2.0' // Updated version for V2 backups
       };
       
       const backupKey = `content_backup_${timestamp}`;

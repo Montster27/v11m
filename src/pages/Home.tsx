@@ -3,7 +3,7 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
-import { useStoryletStore } from '../store/useStoryletStore';
+import { useAvailableStorylets } from '../hooks/useAvailableStorylets';
 import { Button, Card } from '../components/ui';
 import StoryletPanel from '../components/StoryletPanel';
 import ResourcePanel from '../components/ResourcePanel';
@@ -11,24 +11,16 @@ import TimeAllocationPanel from '../components/TimeAllocationPanel';
 
 const Home: React.FC = () => {
   const { activeCharacter, setActiveCharacter, addExperience, isTimePaused } = useAppStore();
-  const { evaluateStorylets } = useStoryletStore();
+  const { availableStorylets, isEvaluating } = useAvailableStorylets();
   
-  // Evaluate storylets when component mounts and periodically
+  // V2 storylet evaluation is automatic via useAvailableStorylets hook
+  // The hook handles continuous evaluation when dependencies change
   useEffect(() => {
-    // Force immediate evaluation on mount
-    setTimeout(() => evaluateStorylets(), 100);
-    evaluateStorylets();
-    
-    // Re-evaluate storylets every 10 seconds to catch time-based triggers
-    const interval = setInterval(() => {
-      // Don't evaluate storylets if time is paused (minigame active)
-      if (!isTimePaused) {
-        evaluateStorylets();
-      }
-    }, 10000);
-    
-    return () => clearInterval(interval);
-  }, [evaluateStorylets, isTimePaused]);
+    // Log storylet evaluation status for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🎭 V2 Storylet evaluation: ${availableStorylets.length} available, evaluating: ${isEvaluating}`);
+    }
+  }, [availableStorylets.length, isEvaluating]);
 
   const handleCreateCharacter = () => {
     // Navigate to character creation - this should set activeCharacter when done

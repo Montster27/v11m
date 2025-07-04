@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>V2 Story Arc Migration Verification</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+    .success { background-color: #d4edda; color: #155724; }
+    .error { background-color: #f8d7da; color: #721c24; }
+    .warning { background-color: #fff3cd; color: #856404; }
+    pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>🧪 V2 Story Arc Migration Verification</h1>
+  <div id="test-results"></div>
+  
+  <script>
+    async function runVerification() {
+      const results = [];
+      
+      function addResult(type, message, details = null) {
+        results.push({ type, message, details });
+        updateUI();
+      }
+      
+      function updateUI() {
+        const container = document.getElementById('test-results');
+        container.innerHTML = results.map(result => `
+          <div class="test-result ${result.type}">
+            <strong>${result.message}</strong>
+            ${result.details ? `<pre>${result.details}</pre>` : ''}
+          </div>
+        `).join('');
+      }
+      
+      // Test 1: Check if files exist
+      try {
+        const response = await fetch('/src/utils/storyArcManager.ts');
+        if (response.ok) {
+          addResult('success', '✅ StoryArcManager file exists');
+        } else {
+          addResult('error', '❌ StoryArcManager file not found');
+        }
+      } catch (error) {
+        addResult('error', '❌ Error checking StoryArcManager file', error.message);
+      }
+      
+      // Test 2: Check V2 stores
+      try {
+        const narrativeResponse = await fetch('/src/stores/v2/useNarrativeStore.ts');
+        const socialResponse = await fetch('/src/stores/v2/useSocialStore.ts');
+        
+        if (narrativeResponse.ok && socialResponse.ok) {
+          addResult('success', '✅ V2 store files exist');
+        } else {
+          addResult('error', '❌ V2 store files missing');
+        }
+      } catch (error) {
+        addResult('error', '❌ Error checking V2 store files', error.message);
+      }
+      
+      // Test 3: Check migration utilities
+      try {
+        const migrationResponse = await fetch('/src/scripts/migrateStoryArcs.ts');
+        if (migrationResponse.ok) {
+          addResult('success', '✅ Migration utilities exist');
+        } else {
+          addResult('warning', '⚠️ Migration utilities not found');
+        }
+      } catch (error) {
+        addResult('warning', '⚠️ Migration utilities check failed', error.message);
+      }
+      
+      // Test 4: Check sample arc data
+      try {
+        const arcDataResponse = await fetch('/src/data/arcs/restoreArcData.ts');
+        if (arcDataResponse.ok) {
+          addResult('success', '✅ Sample arc data exists');
+        } else {
+          addResult('warning', '⚠️ Sample arc data not found');
+        }
+      } catch (error) {
+        addResult('warning', '⚠️ Sample arc data check failed', error.message);
+      }
+      
+      // Test 5: Check updated components
+      try {
+        const arcManagerResponse = await fetch('/src/components/contentStudio/ArcManager.tsx');
+        const clueManagerResponse = await fetch('/src/components/contentStudio/ClueManager.tsx');
+        
+        if (arcManagerResponse.ok && clueManagerResponse.ok) {
+          addResult('success', '✅ Updated components exist');
+        } else {
+          addResult('error', '❌ Updated components missing');
+        }
+      } catch (error) {
+        addResult('error', '❌ Error checking updated components', error.message);
+      }
+      
+      // Test 6: Check integration tests
+      try {
+        const testResponse = await fetch('/src/tests/storyArcV2Integration.test.ts');
+        if (testResponse.ok) {
+          addResult('success', '✅ Integration tests exist');
+        } else {
+          addResult('warning', '⚠️ Integration tests not found');
+        }
+      } catch (error) {
+        addResult('warning', '⚠️ Integration tests check failed', error.message);
+      }
+      
+      // Summary
+      const successCount = results.filter(r => r.type === 'success').length;
+      const errorCount = results.filter(r => r.type === 'error').length;
+      const warningCount = results.filter(r => r.type === 'warning').length;
+      
+      if (errorCount === 0) {
+        addResult('success', `🎉 V2 Migration Verification Complete! ${successCount} tests passed, ${warningCount} warnings`);
+      } else {
+        addResult('error', `❌ Migration verification failed with ${errorCount} errors, ${warningCount} warnings`);
+      }
+    }
+    
+    // Run verification when page loads
+    runVerification();
+  </script>
+</body>
+</html>

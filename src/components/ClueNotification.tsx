@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clue } from '../types/clue';
+import { useSubscriptionCleanup, useRenderTracking } from '../utils/memoryLeakDetector';
 
 interface ClueNotificationProps {
   clue: Clue | null;
@@ -8,20 +9,31 @@ interface ClueNotificationProps {
 }
 
 const ClueNotification: React.FC<ClueNotificationProps> = ({ clue, onClose, isVisible }) => {
+  // Track renders for performance monitoring
+  useRenderTracking('ClueNotification');
+  
+  // Use subscription cleanup hook
+  const { addSubscription } = useSubscriptionCleanup(
+    'ClueNotification',
+    [clue?.id, isVisible] // Re-setup when clue or visibility changes
+  );
+
   const [animate, setAnimate] = useState(false);
 
   useEffect(() => {
     if (isVisible && clue) {
       setAnimate(true);
+      
       // Auto-close after 5 seconds
       const timer = setTimeout(() => {
         setAnimate(false);
         setTimeout(onClose, 300); // Wait for animation to complete
       }, 5000);
 
-      return () => clearTimeout(timer);
+      // Track timer for cleanup
+      addSubscription(() => clearTimeout(timer), 'timer', 'auto-close-timer');
     }
-  }, [isVisible, clue, onClose]);
+  }, [isVisible, clue, onClose, addSubscription]);
 
   if (!isVisible || !clue) return null;
 

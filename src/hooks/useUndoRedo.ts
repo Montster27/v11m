@@ -41,8 +41,9 @@ export const useUndoRedo = (maxHistorySize: number = 20) => {
       };
     });
 
-    // Execute the action
-    action.redoAction();
+    // NOTE: We don't execute the action here because it's already been executed
+    // The action is just being recorded for undo/redo purposes
+    // action.redoAction(); // REMOVED - this was causing duplicate creation
   }, []);
 
   const undo = useCallback(() => {

@@ -1,7 +1,7 @@
 // /Users/montysharma/V11M2/src/utils/testPathPlanner.ts
 // Testing utilities for Path Planner minigame development and verification
 
-import { PathPlannerVariant, PuzzleLevel } from '../components/minigames/PathPlannerGame';
+import { PathPlannerVariant, PuzzleLevel } from '../types/pathPlanner';
 import { generatePuzzle, validateMove, checkWinCondition } from './pathPlannerUtils';
 
 // Test puzzle configurations for each variant

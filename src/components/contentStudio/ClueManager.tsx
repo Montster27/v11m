@@ -3,8 +3,10 @@
 
 import React, { useState, useMemo } from 'react';
 import { useClueStore } from '../../store/useClueStore';
-import { useStoryletStore } from '../../store/useStoryletStore';
+import { useNarrativeStore } from '../../stores/v2/useNarrativeStore';
+import { useSocialStore } from '../../stores/v2/useSocialStore';
 import { useStoryletCatalogStore } from '../../store/useStoryletCatalogStore';
+import { storyArcManager } from '../../utils/storyArcManager';
 import type { Clue } from '../../types/clue';
 import HelpTooltip from '../ui/HelpTooltip';
 import MinigameManagementPanel from '../MinigameManagementPanel';
@@ -27,21 +29,31 @@ interface ClueManagerProps {
   undoRedoSystem: UndoRedoSystem;
 }
 
-type ClueManagerTab = 'clues' | 'minigames' | 'connections';
+type ClueManagerTab = 'clues' | 'minigames' | 'connections' | 'arcs';
 
 const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
+  // Legacy clue store for backwards compatibility
   const {
     clues,
     createClue,
     updateClue,
     deleteClue,
-    getCluesByStoryArc,
     getCluesByMinigame,
     getCluesByStorylet
   } = useClueStore();
 
-  const { storyArcs } = useStoryletStore();
-  const { getStoryletsForArc, allStorylets } = useStoryletCatalogStore();
+  // V2 stores for enhanced arc integration
+  const { getAllArcs, getArc } = useNarrativeStore();
+  const { 
+    getCluesByArc, 
+    setClueArcRelationship, 
+    removeClueArcRelationship,
+    getArcCompletionPercentage,
+    getNextClueInArc 
+  } = useSocialStore();
+  
+  const { allStorylets, getStoryletsForArc } = useStoryletCatalogStore();
+  const allArcs = getAllArcs();
 
   // Shared foundation hooks
   const { handleCreate, handleUpdate, handleDelete } = useCRUDOperations({
@@ -61,6 +73,47 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
     },
     undoRedoSystem
   });
+
+  // Enhanced clue-arc operations
+  const handleAssignClueToArc = (clueId: string, arcId: string, order: number = 1) => {
+    try {
+      // Use StoryArcManager for the assignment
+      storyArcManager.assignClueToArc(clueId, arcId, order);
+      
+      // Also update legacy clue store for backwards compatibility
+      const clue = clues.find(c => c.id === clueId);
+      if (clue) {
+        const arc = getArc(arcId);
+        updateClue(clueId, { 
+          storyArc: arc?.name,
+          arcOrder: order 
+        });
+      }
+      
+      console.log(`✅ Assigned clue ${clueId} to arc ${arcId} at order ${order}`);
+    } catch (error) {
+      console.error('❌ Failed to assign clue to arc:', error);
+      alert('Failed to assign clue to arc. Please try again.');
+    }
+  };
+
+  const handleUnassignClueFromArc = (clueId: string) => {
+    try {
+      // Remove from V2 store
+      removeClueArcRelationship(clueId);
+      
+      // Update legacy store
+      updateClue(clueId, { 
+        storyArc: undefined,
+        arcOrder: undefined 
+      });
+      
+      console.log(`✅ Unassigned clue ${clueId} from arc`);
+    } catch (error) {
+      console.error('❌ Failed to unassign clue from arc:', error);
+      alert('Failed to unassign clue from arc. Please try again.');
+    }
+  };
 
   // State declarations - must come before hooks that use them
   const [activeTab, setActiveTab] = useState<ClueManagerTab>('clues');
@@ -133,8 +186,11 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
   // Get storylets for the currently selected story arc
   const arcStorylets = useMemo(() => {
     if (!clueFormData.storyArc) return [];
-    return getStoryletsForArc(clueFormData.storyArc);
-  }, [getStoryletsForArc, clueFormData.storyArc]);
+    // Convert arc ID to arc name for storylet lookup
+    const arc = getArc(clueFormData.storyArc);
+    if (!arc) return [];
+    return getStoryletsForArc(arc.name);
+  }, [getStoryletsForArc, clueFormData.storyArc, getArc]);
 
   const resetClueForm = () => {
     setClueFormData({
@@ -153,6 +209,14 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
       rarity: 'common'
     });
     setEditingClue(null);
+  };
+
+  // Validation helper function
+  const validateRequired = (value: string, message: string) => {
+    if (!value || value.trim() === '') {
+      return { isValid: false, error: message };
+    }
+    return { isValid: true, error: null };
   };
 
   const handleCreateClue = async () => {
@@ -274,7 +338,8 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
   const tabs = [
     { id: 'clues', label: 'Clue Library', icon: '🔍' },
     { id: 'minigames', label: 'Minigame Testing', icon: '🎮' },
-    { id: 'connections', label: 'Story Connections', icon: '🔗' }
+    { id: 'connections', label: 'Story Connections', icon: '🔗' },
+    { id: 'arcs', label: 'Arc Relationships', icon: '🗂️' }
   ];
 
   return (
@@ -578,13 +643,13 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
             <div className="max-w-4xl mx-auto space-y-6">
               <h4 className="text-lg font-medium text-gray-800">Story Arc Connections</h4>
               
-              {storyArcs.map((arcName) => {
-                const arcClues = getCluesByStoryArc(arcName);
+              {allArcs.map((arc) => {
+                const arcClues = clues.filter(clue => clue.storyArc === arc.name);
                 if (arcClues.length === 0) return null;
                 
                 return (
-                  <div key={arcName} className="p-4 border border-gray-200 rounded-lg">
-                    <h5 className="font-medium text-gray-800 mb-3">{arcName}</h5>
+                  <div key={arc.id} className="p-4 border border-gray-200 rounded-lg">
+                    <h5 className="font-medium text-gray-800 mb-3">{arc.name}</h5>
                     <div className="space-y-2">
                       {arcClues.map((clue) => (
                         <div key={clue.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
@@ -604,13 +669,210 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                 );
               })}
               
-              {storyArcs.filter(arc => getCluesByStoryArc(arc).length > 0).length === 0 && (
+              {allArcs.filter(arc => clues.filter(clue => clue.storyArc === arc.name).length > 0).length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   <div className="text-4xl mb-2">🔗</div>
                   <p>No clue connections found</p>
                   <p className="text-sm">Create clues and assign them to story arcs to see connections</p>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'arcs' && (
+          <div className="h-full overflow-y-auto p-6">
+            <div className="max-w-6xl mx-auto space-y-6">
+              <div className="flex items-center justify-between">
+                <h4 className="text-lg font-medium text-gray-800">Arc Relationships (V2)</h4>
+                <div className="text-sm text-gray-600">
+                  Enhanced clue-arc integration with prerequisites and dependencies
+                </div>
+              </div>
+
+              {/* Arc Overview Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {allArcs.map((arc) => {
+                  const arcClues = getCluesByArc(arc.id);
+                  const completionPercentage = getArcCompletionPercentage(arc.id);
+                  const nextClue = getNextClueInArc(arc.id);
+
+                  return (
+                    <div key={arc.id} className="p-4 border border-gray-200 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h5 className="font-medium text-gray-800">{arc.name}</h5>
+                          <p className="text-sm text-gray-600">{arc.description}</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-blue-600">
+                            {completionPercentage.toFixed(0)}% Complete
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {arcClues.length} clues
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${completionPercentage}%` }}
+                        ></div>
+                      </div>
+
+                      {/* Clue List */}
+                      <div className="space-y-2">
+                        {arcClues.length > 0 ? (
+                          arcClues.map((clueId) => {
+                            const clue = clues.find(c => c.id === clueId);
+                            if (!clue) return null;
+
+                            return (
+                              <div key={clueId} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                <div className="flex items-center gap-2">
+                                  <span className={`w-2 h-2 rounded-full ${
+                                    clue.isDiscovered ? 'bg-green-500' : 'bg-gray-300'
+                                  }`}></span>
+                                  <span className="font-medium text-gray-800">{clue.title}</span>
+                                  {clue.arcOrder && (
+                                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                      #{clue.arcOrder}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleUnassignClueFromArc(clueId)}
+                                    className="text-red-600 hover:text-red-800 text-xs"
+                                  >
+                                    Unassign
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="text-center py-4 text-gray-500">
+                            <p className="text-sm">No clues assigned to this arc</p>
+                            <p className="text-xs">Assign clues using the dropdown below</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Next Clue Indicator */}
+                      {nextClue && (
+                        <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
+                          <div className="text-sm text-blue-800">
+                            <strong>Next to discover:</strong> {clues.find(c => c.id === nextClue)?.title || 'Unknown'}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Quick Assign */}
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <div className="flex items-center gap-2">
+                          <select
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                const clueId = e.target.value;
+                                const maxOrder = Math.max(0, ...arcClues.map(id => {
+                                  const clue = clues.find(c => c.id === id);
+                                  return clue?.arcOrder || 0;
+                                }));
+                                handleAssignClueToArc(clueId, arc.id, maxOrder + 1);
+                                e.target.value = '';
+                              }
+                            }}
+                            className="flex-1 text-sm border border-gray-300 rounded px-2 py-1"
+                          >
+                            <option value="">Assign clue to this arc...</option>
+                            {clues
+                              .filter(clue => !clue.storyArc || !arcClues.includes(clue.id))
+                              .map(clue => (
+                                <option key={clue.id} value={clue.id}>
+                                  {clue.title}
+                                </option>
+                              ))
+                            }
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Unassigned Clues */}
+              <div className="mt-8">
+                <h5 className="font-medium text-gray-800 mb-3">Unassigned Clues</h5>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {clues
+                    .filter(clue => !clue.storyArc)
+                    .map(clue => (
+                      <div key={clue.id} className="p-3 border border-gray-200 rounded">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h6 className="font-medium text-gray-800">{clue.title}</h6>
+                            <p className="text-xs text-gray-600">{clue.category} • {clue.difficulty}</p>
+                          </div>
+                        </div>
+                        <select
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handleAssignClueToArc(clue.id, e.target.value, 1);
+                            }
+                          }}
+                          className="w-full mt-2 text-sm border border-gray-300 rounded px-2 py-1"
+                        >
+                          <option value="">Assign to arc...</option>
+                          {allArcs.map(arc => (
+                            <option key={arc.id} value={arc.id}>{arc.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))
+                  }
+                </div>
+
+                {clues.filter(clue => !clue.storyArc).length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="text-4xl mb-2">✅</div>
+                    <p>All clues are assigned to story arcs</p>
+                    <p className="text-sm">Create new clues to see them here</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Arc Statistics */}
+              <div className="mt-8 p-4 bg-gray-50 rounded-lg">
+                <h5 className="font-medium text-gray-800 mb-3">Statistics</h5>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <div className="text-lg font-bold text-blue-600">{allArcs.length}</div>
+                    <div className="text-gray-600">Total Arcs</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-green-600">
+                      {clues.filter(clue => clue.storyArc).length}
+                    </div>
+                    <div className="text-gray-600">Assigned Clues</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-orange-600">
+                      {clues.filter(clue => !clue.storyArc).length}
+                    </div>
+                    <div className="text-gray-600">Unassigned Clues</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-purple-600">
+                      {(allArcs.reduce((sum, arc) => sum + getArcCompletionPercentage(arc.id), 0) / allArcs.length || 0).toFixed(0)}%
+                    </div>
+                    <div className="text-gray-600">Avg Completion</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -703,8 +965,8 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded"
                 >
                   <option value="">-- No Story Arc --</option>
-                  {storyArcs.map(arc => (
-                    <option key={arc} value={arc}>{arc}</option>
+                  {allArcs.map(arc => (
+                    <option key={arc.id} value={arc.name}>{arc.name}</option>
                   ))}
                 </select>
               </div>

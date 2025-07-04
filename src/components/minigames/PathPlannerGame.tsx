@@ -6,69 +6,17 @@ import KeyLockHUD from './PathPlanner/KeyLockHUD';
 import ObstacleTimeline from './PathPlanner/ObstacleTimeline';
 import CostTracker from './PathPlanner/CostTracker';
 import { generatePuzzle, validateMove, checkWinCondition } from '../../utils/pathPlannerUtils';
-
-export type PathPlannerVariant = 'classic' | 'keyLock' | 'dynamic' | 'costOptim';
-
-export interface Coordinate {
-  x: number;
-  y: number;
-}
-
-export interface Key {
-  id: string;
-  position: Coordinate;
-  collected: boolean;
-}
-
-export interface Lock {
-  id: string;
-  position: Coordinate;
-  keyId: string;
-  unlocked: boolean;
-}
-
-export interface Obstacle {
-  id: string;
-  path: Coordinate[];
-  currentIndex: number;
-  period: number;
-}
-
-export interface CellCost {
-  position: Coordinate;
-  cost: number;
-}
-
-export interface PuzzleLevel {
-  variant: PathPlannerVariant;
-  size: Coordinate;
-  start: Coordinate;
-  goal: Coordinate;
-  walls: Coordinate[];
-  keys?: Key[];
-  locks?: Lock[];
-  obstacles?: Obstacle[];
-  costs?: CellCost[];
-  budget?: number;
-  timeLimit?: number;
-}
-
-export interface GameStats {
-  moves: number;
-  time: number;
-  cost?: number;
-  efficiency: number;
-  keysCollected?: number;
-  variant: PathPlannerVariant;
-}
-
-interface PathPlannerGameProps {
-  onGameComplete: (success: boolean, stats: GameStats) => void;
-  onClose: () => void;
-  difficulty?: 'easy' | 'medium' | 'hard';
-  variant?: PathPlannerVariant;
-  levelData?: PuzzleLevel;
-}
+import type { 
+  Coordinate, 
+  Key, 
+  Lock, 
+  Obstacle, 
+  CellCost,
+  PuzzleLevel,
+  GameStats,
+  PathPlannerGameProps,
+  PathPlannerVariant
+} from '../../types/pathPlanner';
 
 const PathPlannerGame: React.FC<PathPlannerGameProps> = ({
   onGameComplete,

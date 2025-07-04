@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Card } from './ui';
 import { BalanceSimulator, DEFAULT_ARCHETYPES, SimulationAnalysis, PlayerArchetype } from '../utils/balanceSimulator';
-import { QuickBalanceAnalyzer, OPTIMAL_STRATEGIES } from '../utils/quickBalanceTools';
+// import { QuickBalanceAnalyzer, OPTIMAL_STRATEGIES } from '../utils/quickBalanceTools'; // Removed - orphaned utility
 
 interface BalanceTestingPanelProps {
   className?: string;

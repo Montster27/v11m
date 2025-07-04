@@ -5,7 +5,9 @@ import StroopTestGame from './minigames/StroopTestGame';
 import WordScrambleGame from './minigames/WordScrambleGame';
 import ColorMatchGame from './minigames/ColorMatchGame';
 import { useClueStore } from '../store/useClueStore';
-import { useStoryletStore } from '../store/useStoryletStore';
+import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
+import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
+import { useSocialStore } from '../stores/v2/useSocialStore';
 import type { MinigameType } from '../types/storylet';
 import type { Clue } from '../types/clue';
 
@@ -24,8 +26,13 @@ const ClueDiscoveryManager: React.FC<ClueDiscoveryManagerProps> = ({
   onComplete,
   onClose
 }) => {
+  // Legacy stores for data access (still sources of truth)
   const { getClueById } = useClueStore();
-  const { addStorylet, unlockStorylet } = useStoryletStore();
+  const { addStorylet, allStorylets } = useStoryletCatalogStore();
+  
+  // V2 stores for enhanced functionality
+  const { unlockStorylet, setStoryletFlag } = useNarrativeStore();
+  const { discoverClue } = useSocialStore();
   const [discoveryState, setDiscoveryState] = useState<DiscoveryState>('description');
   const [minigameSuccess, setMinigameSuccess] = useState<boolean | null>(null);
   const [minigameStats, setMinigameStats] = useState<any>(null);
@@ -53,6 +60,16 @@ const ClueDiscoveryManager: React.FC<ClueDiscoveryManagerProps> = ({
 
   const handleFinish = () => {
     if (clue && minigameSuccess !== null) {
+      // Record clue discovery in V2 social store if successful
+      if (minigameSuccess) {
+        try {
+          discoverClue(clue);
+          console.log(`✅ Recorded clue discovery in V2 social store: ${clue.title}`);
+        } catch (error) {
+          console.warn('Could not record clue in V2 social store:', error);
+        }
+      }
+      
       // Generate follow-up storylets based on success/failure
       generateFollowUpStorylets(clue, minigameSuccess);
       onComplete(minigameSuccess, clue);
@@ -66,9 +83,6 @@ const ClueDiscoveryManager: React.FC<ClueDiscoveryManagerProps> = ({
     const failureId = `clue_followup_${clue.id}_failure`;
     const targetId = success ? successId : failureId;
     
-    // Get storylet store state to check for existing storylets
-    const { allStorylets, setFlag } = useStoryletStore.getState();
-    
     // Check if pre-authored storylet exists
     const existingStorylet = allStorylets[targetId];
     if (existingStorylet) {
@@ -79,8 +93,8 @@ const ClueDiscoveryManager: React.FC<ClueDiscoveryManagerProps> = ({
         choices: existingStorylet.choices.length
       });
       
-      // Set the flag that will unlock this storylet
-      setFlag(`clue_discovery_${clue.id}_${success ? 'success' : 'failure'}`, true);
+      // Set the flag that will unlock this storylet (V2 store)
+      setStoryletFlag(`clue_discovery_${clue.id}_${success ? 'success' : 'failure'}`, true);
       
       // Unlock the storylet immediately
       unlockStorylet(targetId);
@@ -130,8 +144,8 @@ const ClueDiscoveryManager: React.FC<ClueDiscoveryManagerProps> = ({
     // Add the dynamically generated storylet to the system
     addStorylet(followUpStorylet);
     
-    // Set the flag that will unlock this storylet
-    setFlag(`clue_discovery_${clue.id}_${success ? 'success' : 'failure'}`, true);
+    // Set the flag that will unlock this storylet (V2 store)
+    setStoryletFlag(`clue_discovery_${clue.id}_${success ? 'success' : 'failure'}`, true);
     
     // Unlock the storylet immediately
     unlockStorylet(baseId);

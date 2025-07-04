@@ -1,8 +1,9 @@
 // /Users/montysharma/V11M2/src/components/StoryletProgress.tsx
 
 import React, { useState } from 'react';
-import { useSaveStore } from '../store/useSaveStore';
-import { useStoryletStore } from '../store/useStoryletStore';
+import { useSaveStoreV2 } from '../store/useSaveStoreV2';
+import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
+import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
 import type { StoryletCompletion } from '../types/save';
 import Button from './ui/Button';
 
@@ -12,8 +13,12 @@ interface StoryletProgressProps {
 }
 
 export const StoryletProgress: React.FC<StoryletProgressProps> = ({ isOpen, onClose }) => {
-  const { getStoryletCompletions, getStoryletStats } = useSaveStore();
-  const { allStorylets } = useStoryletStore();
+  // V2 Save system for enhanced tracking
+  const { getStoryletCompletions, getStoryletStats } = useSaveStoreV2();
+  // Legacy store for storylet data (still source of truth)
+  const { allStorylets } = useStoryletCatalogStore();
+  // V2 narrative store for active storylets
+  const { storylets: { active: activeStoryletIds, completed: completedStoryletIds } } = useNarrativeStore();
   const [activeTab, setActiveTab] = useState<'completed' | 'statistics' | 'available'>('completed');
   const [sortBy, setSortBy] = useState<'timestamp' | 'day' | 'storylet'>('timestamp');
 
@@ -44,10 +49,11 @@ export const StoryletProgress: React.FC<StoryletProgressProps> = ({ isOpen, onCl
     return allStorylets[storyletId]?.name || storyletId;
   };
 
-  // Get available storylets (not yet completed)
-  const availableStorylets = Object.values(allStorylets).filter(
-    storylet => !completions.some(c => c.storyletId === storylet.id)
-  );
+  // Get available storylets (currently active from V2 store)
+  const availableStorylets = activeStoryletIds.map(id => allStorylets[id]).filter(Boolean);
+  
+  // Get completed storylets using V2 narrative store data
+  const completedStoryletData = completedStoryletIds.map(id => allStorylets[id]).filter(Boolean);
 
   // Calculate completion rate by day
   const completionsByDay = Object.entries(stats.completionsByDay)

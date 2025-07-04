@@ -21,6 +21,27 @@ export interface SocialState {
     connections: Record<string, string[]>;
     storyArcs: Record<string, string[]>;
     discoveryEvents: any[]; // from clue-store
+    
+    // Enhanced arc relationships
+    arcRelationships: {
+      [clueId: string]: {
+        storyArc: string;
+        arcOrder: number;
+        prerequisites: string[]; // Other clues needed first
+        unlocks: string[]; // Clues this unlocks
+        arcProgress: number; // % progress this clue represents
+      };
+    };
+    
+    // Arc discovery progress tracking
+    arcDiscoveryProgress: {
+      [arcId: string]: {
+        discoveredClues: string[];
+        totalClues: number;
+        completionPercentage: number;
+        nextClues: string[]; // Available to discover
+      };
+    };
   };
   saves: {
     // Integrate save system metadata from useSaveStore
@@ -39,11 +60,31 @@ export interface SocialState {
   setNPCMemory: (npcId: string, memory: any) => void;
   setNPCFlag: (npcId: string, flag: string, value: any) => void;
   
-  // Clue management
+  // Enhanced Clue management
+  getClueById: (clueId: string) => Clue | null;
+  getAllDiscoveredClues: () => Clue[];
   discoverClue: (clue: Clue) => void;
   connectClues: (clueId1: string, clueId2: string) => void;
   associateClueWithArc: (clueId: string, arcId: string) => void;
   recordClueDiscoveryEvent: (event: any) => void;
+  
+  // Clue-Arc relationship management
+  setClueArcRelationship: (clueId: string, relationship: {
+    storyArc: string;
+    arcOrder: number;
+    prerequisites?: string[];
+    unlocks?: string[];
+    arcProgress?: number;
+  }) => void;
+  removeClueArcRelationship: (clueId: string) => void;
+  getCluesByArc: (arcId: string) => string[];
+  getNextClueInArc: (arcId: string) => string | null;
+  
+  // Arc discovery progress management
+  initializeArcProgress: (arcId: string, totalClues: number) => void;
+  updateArcDiscoveryProgress: (arcId: string, discoveredClueId: string) => void;
+  getArcCompletionPercentage: (arcId: string) => number;
+  getAvailableCluesForArc: (arcId: string) => string[];
   
   // Save management
   setCurrentSave: (saveId: string | null) => void;
@@ -57,7 +98,9 @@ export interface SocialState {
 const getInitialSocialState = (): Omit<SocialState, 
   'resetSocial' | 'migrateFromLegacyStores' |
   'updateRelationship' | 'recordNPCInteraction' | 'setNPCMemory' | 'setNPCFlag' |
-  'discoverClue' | 'connectClues' | 'associateClueWithArc' | 'recordClueDiscoveryEvent' |
+  'getClueById' | 'getAllDiscoveredClues' | 'discoverClue' | 'connectClues' | 'associateClueWithArc' | 'recordClueDiscoveryEvent' |
+  'setClueArcRelationship' | 'removeClueArcRelationship' | 'getCluesByArc' | 'getNextClueInArc' |
+  'initializeArcProgress' | 'updateArcDiscoveryProgress' | 'getArcCompletionPercentage' | 'getAvailableCluesForArc' |
   'setCurrentSave' | 'createSaveSlot' | 'updateSaveSlot' | 'deleteSaveSlot' | 'loadSaveSlot' | 'addSaveHistoryEntry'
 > => ({
   npcs: {
@@ -70,7 +113,9 @@ const getInitialSocialState = (): Omit<SocialState,
     discovered: [],
     connections: {},
     storyArcs: {},
-    discoveryEvents: []
+    discoveryEvents: [],
+    arcRelationships: {},
+    arcDiscoveryProgress: {}
   },
   saves: {
     currentSaveId: null,
@@ -214,6 +259,17 @@ export const useSocialStore = create<SocialState>()(
       },
 
       // Clue management
+      getClueById: (clueId) => {
+        const state = get();
+        const discoveredArray = Array.isArray(state.clues?.discovered) ? state.clues.discovered : [];
+        return discoveredArray.find(clue => clue.id === clueId) || null;
+      },
+
+      getAllDiscoveredClues: () => {
+        const state = get();
+        return Array.isArray(state.clues?.discovered) ? state.clues.discovered : [];
+      },
+
       discoverClue: (clue) => {
         set((state) => {
           // Defensive programming: ensure arrays exist
@@ -282,6 +338,132 @@ export const useSocialStore = create<SocialState>()(
             }]
           }
         }));
+      },
+
+      // Enhanced Clue-Arc relationship management
+      setClueArcRelationship: (clueId, relationship) => {
+        set((state) => ({
+          ...state,
+          clues: {
+            ...state.clues,
+            arcRelationships: {
+              ...state.clues.arcRelationships,
+              [clueId]: {
+                prerequisites: [],
+                unlocks: [],
+                arcProgress: 0,
+                ...relationship
+              }
+            }
+          }
+        }));
+      },
+
+      removeClueArcRelationship: (clueId) => {
+        set((state) => {
+          const { [clueId]: removed, ...remainingRelationships } = state.clues.arcRelationships;
+          return {
+            ...state,
+            clues: {
+              ...state.clues,
+              arcRelationships: remainingRelationships
+            }
+          };
+        });
+      },
+
+      getCluesByArc: (arcId) => {
+        const state = get();
+        return Object.entries(state.clues.arcRelationships)
+          .filter(([_, relationship]) => relationship.storyArc === arcId)
+          .map(([clueId, _]) => clueId)
+          .sort((a, b) => {
+            const orderA = state.clues.arcRelationships[a]?.arcOrder || 0;
+            const orderB = state.clues.arcRelationships[b]?.arcOrder || 0;
+            return orderA - orderB;
+          });
+      },
+
+      getNextClueInArc: (arcId) => {
+        const state = get();
+        const arcClues = get().getCluesByArc(arcId);
+        const discoveredClueIds = state.clues.discovered.map(clue => clue.id);
+        
+        // Find the first clue in the arc that hasn't been discovered
+        for (const clueId of arcClues) {
+          if (!discoveredClueIds.includes(clueId)) {
+            const relationship = state.clues.arcRelationships[clueId];
+            // Check if prerequisites are met
+            if (relationship?.prerequisites?.every(prereqId => discoveredClueIds.includes(prereqId)) !== false) {
+              return clueId;
+            }
+          }
+        }
+        
+        return null;
+      },
+
+      // Arc discovery progress management
+      initializeArcProgress: (arcId, totalClues) => {
+        set((state) => ({
+          ...state,
+          clues: {
+            ...state.clues,
+            arcDiscoveryProgress: {
+              ...state.clues.arcDiscoveryProgress,
+              [arcId]: {
+                discoveredClues: [],
+                totalClues,
+                completionPercentage: 0,
+                nextClues: []
+              }
+            }
+          }
+        }));
+      },
+
+      updateArcDiscoveryProgress: (arcId, discoveredClueId) => {
+        set((state) => {
+          const currentProgress = state.clues.arcDiscoveryProgress[arcId];
+          if (!currentProgress) return state;
+
+          const newDiscoveredClues = [...currentProgress.discoveredClues, discoveredClueId];
+          const completionPercentage = (newDiscoveredClues.length / currentProgress.totalClues) * 100;
+          
+          // Update next available clues based on what was just discovered
+          const relationship = state.clues.arcRelationships[discoveredClueId];
+          const newNextClues = relationship?.unlocks ? 
+            [...currentProgress.nextClues.filter(id => id !== discoveredClueId), ...relationship.unlocks] :
+            currentProgress.nextClues.filter(id => id !== discoveredClueId);
+
+          return {
+            ...state,
+            clues: {
+              ...state.clues,
+              arcDiscoveryProgress: {
+                ...state.clues.arcDiscoveryProgress,
+                [arcId]: {
+                  ...currentProgress,
+                  discoveredClues: newDiscoveredClues,
+                  completionPercentage,
+                  nextClues: newNextClues
+                }
+              }
+            }
+          };
+        });
+      },
+
+      getArcCompletionPercentage: (arcId) => {
+        const state = get();
+        const progress = state.clues.arcDiscoveryProgress[arcId];
+        return progress?.completionPercentage || 0;
+      },
+
+      getAvailableCluesForArc: (arcId) => {
+        const state = get();
+        const progress = state.clues.arcDiscoveryProgress[arcId];
+        return progress?.nextClues || [];
       },
 
       // Save management
@@ -537,7 +719,9 @@ export const useSocialStore = create<SocialState>()(
               discovered: Array.isArray(persistedState.clues?.discovered) ? persistedState.clues.discovered : [],
               connections: { ...defaultState.clues.connections, ...(persistedState.clues?.connections || {}) },
               storyArcs: { ...defaultState.clues.storyArcs, ...(persistedState.clues?.storyArcs || {}) },
-              discoveryEvents: Array.isArray(persistedState.clues?.discoveryEvents) ? persistedState.clues.discoveryEvents : []
+              discoveryEvents: Array.isArray(persistedState.clues?.discoveryEvents) ? persistedState.clues.discoveryEvents : [],
+              arcRelationships: { ...defaultState.clues.arcRelationships, ...(persistedState.clues?.arcRelationships || {}) },
+              arcDiscoveryProgress: { ...defaultState.clues.arcDiscoveryProgress, ...(persistedState.clues?.arcDiscoveryProgress || {}) }
             },
             saves: { 
               ...defaultState.saves, 

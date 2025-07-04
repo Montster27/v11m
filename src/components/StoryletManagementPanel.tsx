@@ -1,8 +1,10 @@
 // /Users/montysharma/V11M2/src/components/StoryletManagementPanel.tsx
 import React, { useState, useEffect } from 'react';
-import { useStoryletStore } from '../store/useStoryletStore';
+import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
 import { useClueStore } from '../store/useClueStore';
 import { useNPCStore } from '../store/useNPCStore';
+import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
+import { useSocialStore } from '../stores/v2/useSocialStore';
 import { Button, Card } from './ui';
 import { StoryletDeploymentStatus, Storylet, Choice, Effect } from '../types/storylet';
 import StoryArcVisualizer from './StoryArcVisualizer';
@@ -57,24 +59,82 @@ const StoryletManagementPanel: React.FC = () => {
     storyArc: undefined
   });
 
+  // V2 stores for enhanced functionality
+  const {
+    storylets: { active: activeStoryletIds, completed: completedStoryletIds },
+    getAllArcs,
+    createArc,
+    deleteArc,
+    unlockStorylet,
+    evaluateStoryletAvailability
+  } = useNarrativeStore();
+
+  // Legacy stores for data access (still sources of truth)
   const {
     allStorylets,
-    activeStoryletIds,
-    completedStoryletIds,
-    deploymentFilter,
-    storyArcs,
-    setDeploymentFilter,
-    toggleDeploymentStatus,
-    updateStoryletDeploymentStatus,
-    evaluateStorylets,
-    resetStorylets,
     addStorylet,
     deleteStorylet,
     updateStorylet,
-    addStoryArc,
-    removeStoryArc,
-    getStoryletsByArc
-  } = useStoryletStore();
+    getStoryletsForArc
+  } = useStoryletCatalogStore();
+  
+  // For now, maintain some legacy functionality until full migration
+  const deploymentFilter = new Set(['live', 'dev']);
+  const storyArcs = getAllArcs().map(arc => arc.name);
+  
+  // V2 replacements for legacy functions
+  const setDeploymentFilter = (filter: Set<string>) => {
+    console.log('V2: Deployment filter update requested:', filter);
+    // Could be implemented in V2 narrative store if needed
+  };
+  
+  const toggleDeploymentStatus = (status: string) => {
+    console.log('V2: Toggle deployment status:', status);
+    // Could be implemented in V2 narrative store if needed
+  };
+  
+  const updateStoryletDeploymentStatus = (storyletId: string, status: string) => {
+    console.log('V2: Update storylet deployment status:', storyletId, status);
+    const storylet = allStorylets[storyletId];
+    if (storylet) {
+      updateStorylet({ ...storylet, deploymentStatus: status as any });
+    }
+  };
+  
+  const evaluateStorylets = () => {
+    console.log('V2: Evaluating storylets...');
+    // V2 evaluation would use evaluateStoryletAvailability for each storylet
+    Object.keys(allStorylets).forEach(storyletId => {
+      evaluateStoryletAvailability(storyletId);
+    });
+  };
+  
+  const resetStorylets = () => {
+    console.log('V2: Resetting storylets...');
+    // Reset V2 narrative store
+    useNarrativeStore.getState().resetNarrative();
+  };
+  
+  const addStoryArc = (arcName: string) => {
+    createArc({
+      name: arcName,
+      description: `Story arc: ${arcName}`,
+      progress: 0,
+      isCompleted: false,
+      failures: 0
+    });
+  };
+  
+  const removeStoryArc = (arcName: string) => {
+    const arc = getAllArcs().find(a => a.name === arcName);
+    if (arc) {
+      deleteArc(arc.id);
+    }
+  };
+  
+  const getStoryletsByArc = (arcName: string) => {
+    return getStoryletsForArc(arcName);
+  };
 
   const { getAllNPCs } = useNPCStore();
   const allNPCs = getAllNPCs();

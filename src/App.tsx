@@ -5,7 +5,7 @@ import Navigation from './components/Navigation';
 import MinigameManager from './components/minigames/MinigameManager';
 import ClueNotification from './components/ClueNotification';
 import ClueDiscoveryManager from './components/ClueDiscoveryManager';
-import RefactorNotificationBanner from './components/RefactorNotificationBanner';
+// import RefactorNotificationBanner from './components/RefactorNotificationBanner'; // Removed - refactor complete
 import AutoSaveIndicator from './components/AutoSaveIndicator';
 import { CharacterCreation, Planner, Quests, Skills, StoryletDeveloper, ContentCreator, SplashScreen } from './pages';
 import { useAppStore } from './store/useAppStore';
@@ -16,9 +16,9 @@ import { useCoreGameStore, useNarrativeStore, useSocialStore } from './stores/v2
 import { Clue } from './types/clue';
 // Development-only imports for testing utilities
 if (process.env.NODE_ENV === 'development') {
-  import('./utils/clueSystemTest'); // Import clue system test functions
+  // import('./utils/clueSystemTest'); // Removed - orphaned test utility
   import('./utils/balanceSimulator'); // Import balance testing utilities
-  import('./utils/quickBalanceTools'); // Import quick balance analysis tools
+  // import('./utils/quickBalanceTools'); // Removed - orphaned test utility
   import('./utils/clearAllData'); // Import data clearing utilities
   import('./utils/testClueDiscovery'); // Import clue discovery test utilities
   import('./utils/testArcClueDiscovery').then(module => {
@@ -44,6 +44,24 @@ if (process.env.NODE_ENV === 'development') {
   
   // Phase 6: Integration Testing imports
   import('./test/characterFlow/comprehensiveFlowTests'); // Import comprehensive flow tests
+  
+  // V2 Store Migration Integration Tests
+  import('../test/v2/testRunner').then(module => {
+    // Expose V2 test functions globally for browser console access
+    (window as any).runCompleteV2TestSuite = module.runCompleteV2TestSuite;
+    (window as any).runV2HealthCheck = module.runV2HealthCheck;
+    (window as any).getTestEnvironmentInfo = module.getTestEnvironmentInfo;
+    (window as any).exportTestResults = module.exportTestResults;
+    console.log('🧪 V2 Integration Tests loaded successfully');
+  });
+  import('../test/v2/v2IntegrationTests').then(module => {
+    (window as any).runV2IntegrationTests = module.runV2IntegrationTests;
+    console.log('🏪 V2 Store Tests loaded successfully');
+  });
+  import('../test/v2/componentIntegrationTests').then(module => {
+    (window as any).runComponentIntegrationTests = module.runComponentIntegrationTests;
+    console.log('🧩 V2 Component Tests loaded successfully');
+  });
   import('./test/characterFlow/performanceTests'); // Import performance tests
   import('./test/characterFlow/edgeCaseTests'); // Import edge case tests
   
@@ -89,11 +107,11 @@ if (process.env.NODE_ENV === 'development') {
     console.log('Type runComprehensiveMinigameTest() for COMPLETE system validation\n');
   }, 2000);
   import('./utils/debugClueConnections'); // Import clue connection debug utilities
-  import('./utils/refactorBackup'); // Import refactor backup utilities
+  // import('./utils/refactorBackup'); // Removed - refactor complete
   import('./utils/storeMigration'); // Import store migration utilities
-  import('./utils/preRefactorBackup'); // Import pre-refactor backup utilities
+  // import('./utils/preRefactorBackup'); // Removed - refactor complete
   import('./utils/atomicResetValidation'); // Import atomic reset validation utilities
-  import('./utils/legacyCleanup'); // Import legacy cleanup utilities
+  // import('./utils/legacyCleanup'); // Removed - cleanup complete
   import('../test/migration/dataMigrationTests'); // Import migration test suite
   import('../test/reset/atomicResetTests'); // Import atomic reset test suite
   import('../test/autosave/autoSaveIntegrationTests'); // Import auto-save test suite
@@ -145,6 +163,9 @@ function App() {
   const { activeCharacter, day, userLevel, experience } = useAppStore();
   const { activeMinigame, completeMinigame, closeMinigame } = useStoryletStore();
   
+  // V2 stores for enhanced functionality
+  const { migrateFromLegacyStores } = useNarrativeStore();
+  
   // Debug: Log app state on startup
   console.log('🚀 App startup - Current state:', { day, userLevel, experience, activeCharacter });
   
@@ -174,6 +195,14 @@ function App() {
       setOrphanedStateChecked(true);
     }
   }, [showSplash, orphanedStateChecked, day, userLevel, experience, activeCharacter]);
+  
+  // Initialize V2 stores with data migration
+  useEffect(() => {
+    if (!orphanedStateChecked) {
+      console.log('🔄 Initializing V2 stores and migrating data...');
+      migrateFromLegacyStores();
+    }
+  }, [orphanedStateChecked, migrateFromLegacyStores]);
   
   // Set up reactive orchestration (replaces setTimeout patterns)
   useGameOrchestrator();
@@ -213,7 +242,7 @@ function App() {
     <Router>
       <div className="min-h-screen bg-gray-50">
         <Navigation />
-        <RefactorNotificationBanner />
+        {/* <RefactorNotificationBanner /> - Removed: refactor complete */}
         
         {/* Auto-save indicator in top-right corner */}
         <div className="fixed top-4 right-4 z-50">

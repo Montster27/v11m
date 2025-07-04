@@ -2,7 +2,8 @@
 // Optimized hook for batched storylet evaluation with memoized flag generation
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useStoryletStore } from '../store/useStoryletStore';
+import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
+import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
 import { useCharacterConcernsStore } from '../store/useCharacterConcernsStore';
 import { useCoreGameStore } from '../stores/v2';
 import { generateAllFlags, getFlagGeneratorStats } from '../utils/flagGenerator';
@@ -56,10 +57,20 @@ const evaluateStoryletRequirements = (storylet: Storylet, flags: Record<string, 
     }
   }
   
-  // Check resource requirements (integrate with game state)
+  // Check resource requirements
   if (requirements.resources) {
-    // This would need to be implemented based on your resource system
-    // For now, assume resource checks pass
+    for (const [resourceKey, requiredAmount] of Object.entries(requirements.resources)) {
+      const currentAmount = flags[`player_${resourceKey}`] || 0;
+      if (typeof requiredAmount === 'number' && currentAmount < requiredAmount) {
+        return false;
+      }
+      // Handle range requirements: { min: 10, max: 50 }
+      if (typeof requiredAmount === 'object' && requiredAmount !== null) {
+        const range = requiredAmount as { min?: number; max?: number };
+        if (range.min !== undefined && currentAmount < range.min) return false;
+        if (range.max !== undefined && currentAmount > range.max) return false;
+      }
+    }
   }
   
   // Check other requirement types as needed
@@ -85,7 +96,7 @@ export function useAvailableStorylets(options: StoryletEvaluationOptions = {}): 
   const [evaluationTime, setEvaluationTime] = useState(0);
 
   // Store hooks
-  const allStorylets = useStoryletStore(state => state.storylets || []);
+  const allStorylets = Object.values(useStoryletCatalogStore(state => state.allStorylets));
   const concerns = useCharacterConcernsStore(state => state.concerns);
   const coreGameState = useCoreGameStore(state => ({
     player: state.player,
@@ -126,21 +137,33 @@ export function useAvailableStorylets(options: StoryletEvaluationOptions = {}): 
     return flags;
   }, [concerns, coreGameState, enableProfiling]);
 
-  // Batched evaluation function
+  // Batched evaluation function with proper cleanup
   const evaluateStoryletsBatched = useCallback(async (
     storylets: Storylet[],
     flags: Record<string, boolean>
   ): Promise<Storylet[]> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const available: Storylet[] = [];
       let currentIndex = 0;
+      let isAborted = false;
+      const timeoutIds: number[] = [];
+      const idleIds: number[] = [];
+
+      const cleanup = () => {
+        isAborted = true;
+        timeoutIds.forEach(id => clearTimeout(id));
+        idleIds.forEach(id => 'cancelIdleCallback' in window && (window as any).cancelIdleCallback(id));
+      };
 
       const processBatch = () => {
+        if (isAborted) return;
+        
         const startTime = performance.now();
         const endIndex = Math.min(currentIndex + batchSize, storylets.length);
 
         // Process current batch
         for (let i = currentIndex; i < endIndex; i++) {
+          if (isAborted) return;
           try {
             if (evaluateStoryletRequirements(storylets[i], flags)) {
               available.push(storylets[i]);
@@ -158,15 +181,16 @@ export function useAvailableStorylets(options: StoryletEvaluationOptions = {}): 
         }
 
         // Continue with next batch or finish
-        if (currentIndex < storylets.length) {
+        if (currentIndex < storylets.length && !isAborted) {
           // Schedule next batch
           if (enableIdleCallback && 'requestIdleCallback' in window) {
             const idleId = requestIdleCallback(processBatch, { timeout: timeoutMs });
-            // Store the ID for cleanup if needed
+            idleIds.push(idleId);
           } else {
-            setTimeout(processBatch, 0);
+            const timeoutId = setTimeout(processBatch, 0);
+            timeoutIds.push(timeoutId);
           }
-        } else {
+        } else if (!isAborted) {
           // All batches complete
           resolve(available);
         }
@@ -174,6 +198,9 @@ export function useAvailableStorylets(options: StoryletEvaluationOptions = {}): 
 
       // Start processing
       processBatch();
+
+      // Return cleanup function for potential cancellation
+      return { cleanup };
     });
   }, [batchSize, timeoutMs, enableIdleCallback, enableProfiling]);
 

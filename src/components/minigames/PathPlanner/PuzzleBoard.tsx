@@ -1,6 +1,6 @@
 // /Users/montysharma/V11M2/src/components/minigames/PathPlanner/PuzzleBoard.tsx
 import React, { useMemo } from 'react';
-import { Coordinate, PuzzleLevel } from '../PathPlannerGame';
+import { Coordinate, PuzzleLevel } from '../../../types/pathPlanner';
 
 interface PuzzleBoardProps {
   level: PuzzleLevel;

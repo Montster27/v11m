@@ -1,7 +1,7 @@
 // /Users/montysharma/V11M2/src/components/minigames/PathPlanner/ObstacleTimeline.tsx
 import React from 'react';
 import { Card } from '../../ui';
-import { Obstacle, Coordinate } from '../PathPlannerGame';
+import { Obstacle, Coordinate } from '../../../types/pathPlanner';
 
 interface ObstacleTimelineProps {
   obstacles: Obstacle[];

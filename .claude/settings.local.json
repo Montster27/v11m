@@ -45,7 +45,11 @@
       "Bash(open http://localhost:5173/test-fix.html)",
       "Bash(cp:*)",
       "Bash(mv:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(npm start)",
+      "Bash(npx vite build:*)",
+      "Bash(npx madge:*)",
+      "Bash(npm test:*)"
     ],
     "deny": []
   },

@@ -1,7 +1,9 @@
-// Arc Testing Framework
+// Arc Testing Framework - V2 Architecture Compatible
 // Provides interactive testing and validation of story arcs with playthrough simulation
+// Updated to work with V2 stores and StoryArcManager
 
 import type { Storylet, Choice, Effect, Trigger } from '../types/storylet';
+import { storyArcManager } from './storyArcManager';
 
 export interface TestingGameState {
   day: number;
@@ -372,10 +374,16 @@ export class ArcTester {
   }
 
   /**
-   * Get all storylets in the current arc
+   * Get all storylets in the current arc (V2 compatible)
    */
   private getArcStorylets(): Storylet[] {
-    return Object.values(this.storylets).filter(storylet => storylet.storyArc === this.arcName);
+    // Try to get arc by ID first (V2), then by name (legacy)
+    const arcById = storyArcManager.getArc(this.arcName);
+    const actualArcName = arcById?.name || this.arcName;
+    
+    return Object.values(this.storylets).filter(storylet => 
+      storylet.storyArc === actualArcName || storylet.storyArc === this.arcName
+    );
   }
 
   /**
@@ -637,5 +645,130 @@ export class ArcTester {
       completeness,
       playability
     };
+  }
+
+  /**
+   * V2 Enhanced Testing - Test arc with clue integration
+   */
+  testArcWithClues(): { success: boolean; report: string; issues: string[] } {
+    console.log(`🧪 Running V2 enhanced arc testing for: ${this.arcName}`);
+    
+    const issues: string[] = [];
+    const report: string[] = ['=== V2 Arc Testing Report ===\n'];
+    
+    try {
+      // Test 1: Arc exists in V2 stores
+      const arc = storyArcManager.getArc(this.arcName);
+      if (arc) {
+        report.push(`✅ Arc found in V2 store: ${arc.name}`);
+        report.push(`   Description: ${arc.description}`);
+        report.push(`   Progress: ${(arc.progress * 100).toFixed(1)}%`);
+        report.push(`   Completed: ${arc.isCompleted ? 'Yes' : 'No'}`);
+      } else {
+        issues.push('Arc not found in V2 stores');
+        report.push(`❌ Arc not found in V2 stores`);
+      }
+      
+      // Test 2: Clue integration
+      const socialStore = (window as any).useSocialStore;
+      if (socialStore) {
+        const arcClues = socialStore.getState().getCluesByArc(this.arcName);
+        report.push(`\n📝 Clue Integration:`);
+        report.push(`   Assigned clues: ${arcClues.length}`);
+        
+        if (arcClues.length > 0) {
+          const completionPercentage = socialStore.getState().getArcCompletionPercentage(this.arcName);
+          report.push(`   Discovery progress: ${completionPercentage.toFixed(1)}%`);
+          
+          const nextClue = socialStore.getState().getNextClueInArc(this.arcName);
+          if (nextClue) {
+            report.push(`   Next clue to discover: ${nextClue}`);
+          }
+        } else {
+          issues.push('No clues assigned to this arc');
+        }
+      }
+      
+      // Test 3: Storylet integration
+      const arcStorylets = this.getArcStorylets();
+      report.push(`\n🎭 Storylet Integration:`);
+      report.push(`   Assigned storylets: ${arcStorylets.length}`);
+      
+      if (arcStorylets.length === 0) {
+        issues.push('No storylets assigned to this arc');
+      }
+      
+      // Test 4: Arc validation
+      if (arc) {
+        const validation = storyArcManager.validateArc(arc.id);
+        report.push(`\n🔍 Arc Validation:`);
+        report.push(`   Valid: ${validation.isValid ? 'Yes' : 'No'}`);
+        
+        if (!validation.isValid) {
+          validation.issues.forEach(issue => {
+            issues.push(issue);
+            report.push(`   ❌ ${issue}`);
+          });
+        }
+      }
+      
+      // Test 5: Statistics
+      if (arc) {
+        const stats = storyArcManager.getArcStatistics(arc.id);
+        report.push(`\n📊 Statistics:`);
+        report.push(`   Total storylets: ${stats.totalStorylets}`);
+        report.push(`   Completed storylets: ${stats.completedStorylets}`);
+        report.push(`   Total clues: ${stats.totalClues}`);
+        report.push(`   Discovered clues: ${stats.discoveredClues}`);
+        report.push(`   Failures: ${stats.failures}`);
+      }
+      
+      const success = issues.length === 0;
+      report.push(`\n${success ? '✅' : '❌'} Test Result: ${success ? 'PASSED' : 'FAILED'}`);
+      
+      if (issues.length > 0) {
+        report.push(`\n⚠️ Issues Found: ${issues.length}`);
+        issues.forEach(issue => report.push(`   • ${issue}`));
+      }
+      
+      return {
+        success,
+        report: report.join('\n'),
+        issues
+      };
+      
+    } catch (error) {
+      const errorMessage = `Testing failed with exception: ${error instanceof Error ? error.message : String(error)}`;
+      issues.push(errorMessage);
+      report.push(`\n❌ ${errorMessage}`);
+      
+      return {
+        success: false,
+        report: report.join('\n'),
+        issues
+      };
+    }
+  }
+
+  /**
+   * Export arc data for sharing/backup (V2 format)
+   */
+  exportArcData(): any {
+    console.log(`📦 Exporting V2 arc data for: ${this.arcName}`);
+    
+    try {
+      const arcData = storyArcManager.exportArc(this.arcName);
+      return {
+        ...arcData,
+        testData: {
+          storylets: this.getArcStorylets(),
+          testSession: this.session,
+          analysisResults: this.analyzeArc()
+        }
+      };
+    } catch (error) {
+      console.error('Failed to export arc data:', error);
+      return null;
+    }
   }
 }

@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { MinigameProps, MinigameResult, MinigameStats } from '../core/types';
+import { useSubscriptionCleanup, useRenderTracking } from '../../../utils/memoryLeakDetector';
 
 export interface BaseGameState {
   isStarted: boolean;
@@ -280,6 +281,15 @@ export abstract class BaseMinigameComponent<GameState extends BaseGameState = Ba
 
 // Hook-based version for functional components
 export const useBaseMinigameState = (props: BaseMinigameProps) => {
+  // Track renders for performance monitoring
+  useRenderTracking('BaseMinigameState');
+  
+  // Use subscription cleanup hook
+  const { addSubscription } = useSubscriptionCleanup(
+    'BaseMinigameState',
+    [props.gameId] // Re-setup when game changes
+  );
+
   const [gameState, setGameState] = useState<BaseGameState>({
     isStarted: false,
     isPaused: false,
@@ -366,6 +376,35 @@ export const useBaseMinigameState = (props: BaseMinigameProps) => {
     startGame();
   }, [startGame]);
 
+  // Keyboard event handling for minigame controls
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (gameState.isCompleted) return;
+
+      switch (event.key) {
+        case 'Escape':
+          props.onClose();
+          break;
+        case ' ':
+          event.preventDefault();
+          if (gameState.isPaused) {
+            resumeGame();
+          } else {
+            pauseGame();
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    
+    // Track event listener for cleanup
+    addSubscription(() => {
+      window.removeEventListener('keydown', handleKeyDown);
+    }, 'event', 'keyboard-controls');
+
+  }, [gameState.isCompleted, gameState.isPaused, pauseGame, resumeGame, props, addSubscription]);
+
   return {
     gameState,
     setGameState,
@@ -374,6 +413,7 @@ export const useBaseMinigameState = (props: BaseMinigameProps) => {
     resumeGame,
     completeGame,
     incrementAttempts,
-    getElapsedTime
+    getElapsedTime,
+    addSubscription // Expose for game-specific subscriptions
   };
 };

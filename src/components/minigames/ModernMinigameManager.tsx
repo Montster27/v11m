@@ -12,6 +12,7 @@ import { useCoreGameStore, useNarrativeStore } from '../../stores/v2';
 import MinigameTutorial from './ui/MinigameTutorial';
 import MinigameFeedback from './ui/MinigameFeedback';
 import AchievementNotification from './ui/AchievementNotification';
+import { useSubscriptionCleanup, useRenderTracking } from '../../utils/memoryLeakDetector';
 
 interface ModernMinigameManagerProps {
   gameId: string | null;
@@ -32,6 +33,15 @@ const ModernMinigameManager: React.FC<ModernMinigameManagerProps> = ({
   onGameComplete,
   onClose
 }) => {
+  // Track renders for performance monitoring
+  useRenderTracking('ModernMinigameManager');
+  
+  // Use subscription cleanup hook
+  const { addSubscription } = useSubscriptionCleanup(
+    'ModernMinigameManager',
+    [gameId] // Re-setup when gameId changes
+  );
+
   const [launchedGame, setLaunchedGame] = useState<LaunchedGame | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -109,11 +119,16 @@ const ModernMinigameManager: React.FC<ModernMinigameManagerProps> = ({
     MinigameEngine.addEventListener('sessionStart', handleSessionStart);
     MinigameEngine.addEventListener('sessionEnd', handleSessionEnd);
 
-    return () => {
+    // Track event listeners for cleanup
+    addSubscription(() => {
       MinigameEngine.removeEventListener('sessionStart', handleSessionStart);
+    }, 'event', 'MinigameEngine-sessionStart');
+    
+    addSubscription(() => {
       MinigameEngine.removeEventListener('sessionEnd', handleSessionEnd);
-    };
-  }, [onGameComplete, minigameStore]);
+    }, 'event', 'MinigameEngine-sessionEnd');
+
+  }, [onGameComplete, minigameStore, addSubscription]);
 
   const launchGame = async () => {
     if (!gameId) return;

@@ -7,7 +7,7 @@ import {
   Lock, 
   Obstacle, 
   CellCost 
-} from '../components/minigames/PathPlannerGame';
+} from '../types/pathPlanner';
 
 export interface MoveResult {
   type: 'valid' | 'invalid' | 'fail';
