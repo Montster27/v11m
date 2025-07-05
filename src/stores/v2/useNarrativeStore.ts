@@ -42,6 +42,17 @@ export interface ArcProgress {
   }>;
 }
 
+// Quest domain interface (Domain: Narrative)
+export interface Quest {
+  id: string;
+  title: string;
+  description: string;
+  experienceReward: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  category: string;
+  completed: boolean;
+}
+
 export interface NarrativeState {
   storylets: {
     active: string[];
@@ -49,6 +60,13 @@ export interface NarrativeState {
     cooldowns: Record<string, number>;
     userCreated: Storylet[]; // from storylet-catalog-store
   };
+  
+  // Quest domain (Domain: Narrative)
+  quests: {
+    active: Quest[];
+    completed: Quest[];
+  };
+  
   flags: {
     // UNIFIED NAMESPACE - prevents conflicts from multiple flag stores
     storylet: Map<string, any>;     // from storylet-store
@@ -70,6 +88,37 @@ export interface NarrativeState {
   concerns: {
     current: Record<string, any>;
     history: any[];
+  };
+  
+  // Minigame achievement system
+  achievements: {
+    [achievementId: string]: {
+      id: string;
+      name: string;
+      description: string;
+      unlockedAt: number;
+      gameId?: string;
+      category: 'minigame' | 'story' | 'exploration' | 'character';
+    };
+  };
+  
+  // Minigame state (Domain: Narrative - Interactive Story Elements)
+  minigames: {
+    activeMinigame: string | null;
+    completedMinigames: string[];
+  };
+  
+  // Clue system (Domain: Narrative - Story Investigation)
+  clues: {
+    [clueId: string]: {
+      id: string;
+      name: string;
+      description: string;
+      discovered: boolean;
+      discoveredAt?: number;
+      category?: string;
+      importance?: 'low' | 'medium' | 'high' | 'critical';
+    };
   };
   
   // Actions
@@ -106,20 +155,64 @@ export interface NarrativeState {
   assignStoryletToArc: (storyletId: string, arcId: string) => void;
   getArcStorylets: (arcId: string) => string[];
   progressArcStorylet: (arcId: string, storyletId: string) => void;
+  updateArcLastAccessed: (arcId: string) => void;
+  
+  // Clue management (Domain: Narrative - Story Investigation)  
+  addClue: (clue: NarrativeState['clues'][string]) => void;
+  updateClue: (clueId: string, updates: Partial<NarrativeState['clues'][string]>) => void;
+  deleteClue: (clueId: string) => void;
+  discoverClue: (clueId: string) => void;
+  getClue: (clueId: string) => NarrativeState['clues'][string] | null;
+  getAllClues: () => NarrativeState['clues'];
+  getDiscoveredClues: () => NarrativeState['clues'][string][];
+  getCluesByMinigame: (minigameId: string) => NarrativeState['clues'][string][];
+  getCluesByStorylet: (storyletId: string) => NarrativeState['clues'][string][];
+  createClue: (clueData: Partial<NarrativeState['clues'][string]> & { id: string }) => void;
+  
+  // Storylet catalog access (Domain: Narrative - User Created Content)
+  getAllStorylets: () => Storylet[];
+  addUserStorylet: (storylet: Storylet) => void;
+  updateUserStorylet: (storyletId: string, updates: Partial<Storylet>) => void;
+  removeUserStorylet: (storyletId: string) => void;
+  getStoryletsForArc: (arcId: string) => Storylet[];
   
   // Concerns management
   updateConcerns: (concerns: Record<string, any>) => void;
   addConcernHistory: (entry: any) => void;
+  
+  // Quest management (Domain: Narrative)
+  addQuest: (quest: Quest) => void;
+  updateQuest: (questId: string, updatedQuest: Quest) => void;
+  deleteQuest: (questId: string) => void;
+  completeQuest: (questId: string) => void;
+  convertStoryletToQuest: (storyletId: string, choiceId: string) => void;
+  getActiveQuests: () => Quest[];
+  getCompletedQuests: () => Quest[];
+  
+  // Achievement system
+  unlockAchievement: (achievementId: string, name: string, description: string, gameId?: string, category?: 'minigame' | 'story' | 'exploration' | 'character') => void;
+  getUnlockedAchievements: (gameId?: string, category?: string) => NarrativeState['achievements'][string][];
+  hasAchievement: (achievementId: string) => boolean;
+  
+  // Minigame management (Domain: Narrative - Interactive Story Elements)
+  setActiveMinigame: (minigameId: string | null) => void;
+  completeMinigame: (minigameId: string) => void;
+  closeMinigame: () => void;
+  getActiveMinigame: () => string | null;
 }
 
 const getInitialNarrativeState = (): Omit<NarrativeState, 
   'evaluateStoryletAvailability' | 'resetNarrative' | 'migrateFromLegacyStores' |
-  'addActiveStorylet' | 'completeStorylet' | 'setCooldown' |
+  'addActiveStorylet' | 'removeActiveStorylet' | 'completeStorylet' | 'setCooldown' | 'unlockStorylet' | 'getCurrentStorylet' |
   'setStoryletFlag' | 'getStoryletFlag' | 'setConcernFlag' | 'getConcernFlag' |
   'setArcFlag' | 'getArcFlag' | 'createArc' | 'updateArc' | 'deleteArc' |
   'getArc' | 'getAllArcs' | 'startArc' | 'completeArc' | 'recordArcFailure' |
-  'getArcProgress' | 'assignStoryletToArc' | 'getArcStorylets' | 'progressArcStorylet' |
-  'updateConcerns' | 'addConcernHistory'
+  'getArcProgress' | 'assignStoryletToArc' | 'getArcStorylets' | 'progressArcStorylet' | 'updateArcLastAccessed' |
+  'updateConcerns' | 'addConcernHistory' | 'addQuest' | 'updateQuest' | 'deleteQuest' | 'completeQuest' | 'convertStoryletToQuest' | 'getActiveQuests' | 'getCompletedQuests' |
+  'unlockAchievement' | 'getUnlockedAchievements' | 'hasAchievement' |
+  'setActiveMinigame' | 'completeMinigame' | 'closeMinigame' | 'getActiveMinigame' |
+  'addClue' | 'updateClue' | 'deleteClue' | 'discoverClue' | 'getClue' | 'getAllClues' | 'getDiscoveredClues' | 'getCluesByMinigame' | 'getCluesByStorylet' | 'createClue' |
+  'getAllStorylets' | 'addUserStorylet' | 'updateUserStorylet' | 'removeUserStorylet' | 'getStoryletsForArc'
 > => ({
   storylets: {
     active: [],
@@ -127,6 +220,13 @@ const getInitialNarrativeState = (): Omit<NarrativeState,
     cooldowns: {},
     userCreated: []
   },
+  
+  // Quest domain initial state (Domain: Narrative)
+  quests: {
+    active: [],
+    completed: []
+  },
+  
   flags: {
     storylet: new Map(),
     storyletFlag: new Map(),
@@ -138,7 +238,17 @@ const getInitialNarrativeState = (): Omit<NarrativeState,
   concerns: {
     current: {},
     history: []
-  }
+  },
+  achievements: {},
+  
+  // Minigame state initial state (Domain: Narrative - Interactive Story Elements)
+  minigames: {
+    activeMinigame: null,
+    completedMinigames: []
+  },
+  
+  // Clue system initial state (Domain: Narrative - Story Investigation)
+  clues: {}
 });
 
 export const useNarrativeStore = create<NarrativeState>()(
@@ -221,6 +331,71 @@ export const useNarrativeStore = create<NarrativeState>()(
                 current: legacyCharacterStore.concerns
               }
             }));
+          }
+
+          // Migrate from useMinigameStore achievements
+          const legacyMinigameStore = (window as any).useMinigameStore?.getState();
+          if (legacyMinigameStore?.achievements) {
+            set((state) => ({
+              ...state,
+              achievements: {
+                ...state.achievements,
+                ...Object.fromEntries(
+                  Object.entries(legacyMinigameStore.achievements).map(([id, achievement]: [string, any]) => [
+                    id,
+                    {
+                      ...achievement,
+                      category: 'minigame'
+                    }
+                  ])
+                )
+              }
+            }));
+          }
+
+          // Migrate quest data from useAppStore
+          const legacyAppStore = (window as any).useAppStore?.getState();
+          if (legacyAppStore) {
+            const activeQuests = legacyAppStore.activeQuests || [];
+            const completedQuests = legacyAppStore.completedQuests || [];
+            
+            set((state) => ({
+              ...state,
+              quests: {
+                active: activeQuests,
+                completed: completedQuests
+              }
+            }));
+            
+            console.log(`✅ Migrated ${activeQuests.length} active quests and ${completedQuests.length} completed quests from AppStore`);
+          }
+
+          // Migrate clue data from useClueStore
+          const legacyClueStore = (window as any).useClueStore?.getState();
+          if (legacyClueStore?.clues) {
+            set((state) => ({
+              ...state,
+              clues: legacyClueStore.clues
+            }));
+            
+            console.log(`✅ Migrated ${Object.keys(legacyClueStore.clues).length} clues from ClueStore`);
+          }
+
+          // Migrate minigame data from useStoryletStore
+          const legacyStoryletStoreForMinigames = (window as any).useStoryletStore?.getState();
+          if (legacyStoryletStoreForMinigames) {
+            const activeMinigame = legacyStoryletStoreForMinigames.activeMinigame || null;
+            const completedMinigames = legacyStoryletStoreForMinigames.completedMinigames || [];
+            
+            set((state) => ({
+              ...state,
+              minigames: {
+                activeMinigame,
+                completedMinigames
+              }
+            }));
+            
+            console.log(`✅ Migrated minigame state from StoryletStore: active=${activeMinigame}, completed=${completedMinigames.length}`);
           }
 
           console.log('✅ Narrative Store migration completed');
@@ -620,6 +795,392 @@ export const useNarrativeStore = create<NarrativeState>()(
             history: [...state.concerns.history, entry]
           }
         }));
+      },
+
+      // Achievement system
+      unlockAchievement: (achievementId: string, name: string, description: string, gameId?: string, category: 'minigame' | 'story' | 'exploration' | 'character' = 'minigame') => {
+        set((state) => {
+          if (!state.achievements[achievementId]) {
+            return {
+              ...state,
+              achievements: {
+                ...state.achievements,
+                [achievementId]: {
+                  id: achievementId,
+                  name,
+                  description,
+                  unlockedAt: Date.now(),
+                  gameId,
+                  category
+                }
+              }
+            };
+          }
+          return state;
+        });
+      },
+
+      getUnlockedAchievements: (gameId?: string, category?: string) => {
+        const achievements = Object.values(get().achievements);
+        return achievements.filter(achievement => {
+          const matchesGame = !gameId || achievement.gameId === gameId;
+          const matchesCategory = !category || achievement.category === category;
+          return matchesGame && matchesCategory;
+        });
+      },
+
+      hasAchievement: (achievementId: string) => {
+        return !!get().achievements[achievementId];
+      },
+
+      // Quest management (Domain: Narrative)
+      addQuest: (quest: Quest) => {
+        set((state) => ({
+          ...state,
+          quests: {
+            ...state.quests,
+            active: [...state.quests.active, quest]
+          }
+        }));
+      },
+
+      updateQuest: (questId: string, updatedQuest: Quest) => {
+        set((state) => ({
+          ...state,
+          quests: {
+            ...state.quests,
+            active: state.quests.active.map(quest => 
+              quest.id === questId ? updatedQuest : quest
+            )
+          }
+        }));
+      },
+
+      deleteQuest: (questId: string) => {
+        set((state) => ({
+          ...state,
+          quests: {
+            ...state.quests,
+            active: state.quests.active.filter(quest => quest.id !== questId)
+          }
+        }));
+      },
+
+      completeQuest: (questId: string) => {
+        set((state) => {
+          const quest = state.quests.active.find(q => q.id === questId);
+          if (!quest) return state;
+          
+          const updatedActiveQuests = state.quests.active.filter(q => q.id !== questId);
+          const completedQuest = { ...quest, completed: true };
+          
+          return {
+            ...state,
+            quests: {
+              active: updatedActiveQuests,
+              completed: [...state.quests.completed, completedQuest]
+            }
+          };
+        });
+      },
+
+      convertStoryletToQuest: (storyletId: string, choiceId: string) => {
+        try {
+          // Get storylet data from storylet store
+          if (typeof window !== 'undefined' && (window as any).useStoryletStore) {
+            const storyletStore = (window as any).useStoryletStore.getState();
+            const storylet = storyletStore.allStorylets[storyletId];
+            const choice = storylet?.choices.find((c: any) => c.id === choiceId);
+            
+            if (storylet && choice) {
+              // Calculate XP reward based on choice effects
+              const skillXpEffects = choice.effects.filter((e: any) => e.type === 'skillXp');
+              const totalSkillXp = skillXpEffects.reduce((sum: number, effect: any) => sum + effect.amount, 0);
+              const baseXp = Math.max(25, totalSkillXp * 10); // Convert skill XP to quest XP
+              
+              // Determine difficulty based on effects and complexity
+              let difficulty: 'easy' | 'medium' | 'hard' = 'easy';
+              const effectCount = choice.effects.length;
+              const hasNegativeEffects = choice.effects.some((e: any) => 
+                e.type === 'resource' && e.delta < 0
+              );
+              
+              if (effectCount >= 4 || totalSkillXp >= 5) {
+                difficulty = 'hard';
+              } else if (effectCount >= 2 || totalSkillXp >= 3 || hasNegativeEffects) {
+                difficulty = 'medium';
+              }
+              
+              // Map storylet themes to quest categories
+              const categoryMap: Record<string, string> = {
+                'midterm': 'Learning',
+                'study': 'Learning',
+                'library': 'Learning',
+                'coffee': 'Social',
+                'rival': 'Social',
+                'dorm': 'Social',
+                'stress': 'Health',
+                'energy': 'Health',
+                'sleep': 'Health',
+                'money': 'Finance',
+                'work': 'Career',
+                'knowledge': 'Learning'
+              };
+              
+              let category = 'General';
+              for (const [keyword, cat] of Object.entries(categoryMap)) {
+                if (storylet.name.toLowerCase().includes(keyword) || 
+                    storylet.description.toLowerCase().includes(keyword)) {
+                  category = cat;
+                  break;
+                }
+              }
+              
+              const completedQuest: Quest = {
+                id: `storylet_${storyletId}_${choiceId}_${Date.now()}`,
+                title: `${storylet.name}: ${choice.text}`,
+                description: `Completed storylet choice: ${storylet.description.substring(0, 100)}...`,
+                experienceReward: baseXp,
+                difficulty,
+                category,
+                completed: true
+              };
+              
+              // Add to completed quests
+              set((state) => ({
+                ...state,
+                quests: {
+                  ...state.quests,
+                  completed: [...state.quests.completed, completedQuest]
+                }
+              }));
+              
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`🎯 Converted storylet to quest: ${completedQuest.title} (+${completedQuest.experienceReward} XP)`);
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('Could not convert storylet to quest:', error);
+        }
+      },
+
+      getActiveQuests: () => {
+        const state = get();
+        return state.quests.active;
+      },
+
+      getCompletedQuests: () => {
+        const state = get();
+        return state.quests.completed;
+      },
+
+      // Minigame management (Domain: Narrative - Interactive Story Elements)
+      setActiveMinigame: (minigameId: string | null) => {
+        set((state) => ({
+          ...state,
+          minigames: {
+            ...state.minigames,
+            activeMinigame: minigameId
+          }
+        }));
+      },
+
+      completeMinigame: (minigameId: string) => {
+        set((state) => ({
+          ...state,
+          minigames: {
+            activeMinigame: null,
+            completedMinigames: state.minigames.completedMinigames.includes(minigameId) 
+              ? state.minigames.completedMinigames 
+              : [...state.minigames.completedMinigames, minigameId]
+          }
+        }));
+      },
+
+      closeMinigame: () => {
+        set((state) => ({
+          ...state,
+          minigames: {
+            ...state.minigames,
+            activeMinigame: null
+          }
+        }));
+      },
+
+      getActiveMinigame: () => {
+        const state = get();
+        return state.minigames.activeMinigame;
+      },
+
+      // Arc access management 
+      updateArcLastAccessed: (arcId: string) => {
+        set((state) => {
+          const arc = state.storyArcs[arcId];
+          if (!arc) return state;
+          
+          return {
+            ...state,
+            storyArcs: {
+              ...state.storyArcs,
+              [arcId]: {
+                ...arc,
+                metadata: {
+                  ...arc.metadata,
+                  lastAccessed: Date.now()
+                }
+              }
+            }
+          };
+        });
+      },
+
+      // Clue management (Domain: Narrative - Story Investigation)
+      addClue: (clue) => {
+        set((state) => ({
+          ...state,
+          clues: {
+            ...state.clues,
+            [clue.id]: clue
+          }
+        }));
+      },
+
+      updateClue: (clueId: string, updates) => {
+        set((state) => {
+          const existingClue = state.clues[clueId];
+          if (!existingClue) return state;
+          
+          return {
+            ...state,
+            clues: {
+              ...state.clues,
+              [clueId]: { ...existingClue, ...updates }
+            }
+          };
+        });
+      },
+
+      discoverClue: (clueId: string) => {
+        set((state) => {
+          const clue = state.clues[clueId];
+          if (!clue) return state;
+          
+          return {
+            ...state,
+            clues: {
+              ...state.clues,
+              [clueId]: {
+                ...clue,
+                discovered: true,
+                discoveredAt: Date.now()
+              }
+            }
+          };
+        });
+      },
+
+      getClue: (clueId: string) => {
+        const state = get();
+        return state.clues[clueId] || null;
+      },
+
+      getAllClues: () => {
+        const state = get();
+        return state.clues;
+      },
+
+      getDiscoveredClues: () => {
+        const state = get();
+        return Object.values(state.clues).filter(clue => clue.discovered);
+      },
+
+      deleteClue: (clueId: string) => {
+        set((state) => {
+          const { [clueId]: deleted, ...remainingClues } = state.clues;
+          return {
+            ...state,
+            clues: remainingClues
+          };
+        });
+      },
+
+      getCluesByMinigame: (minigameId: string) => {
+        const state = get();
+        return Object.values(state.clues).filter(clue => 
+          (clue as any).minigameId === minigameId || (clue as any).source === minigameId
+        );
+      },
+
+      getCluesByStorylet: (storyletId: string) => {
+        const state = get();
+        return Object.values(state.clues).filter(clue => 
+          (clue as any).storyletId === storyletId || (clue as any).source === storyletId
+        );
+      },
+
+      createClue: (clueData) => {
+        const newClue = {
+          name: '',
+          description: '',
+          discovered: false,
+          category: 'general',
+          importance: 'medium' as const,
+          ...clueData
+        };
+        
+        set((state) => ({
+          ...state,
+          clues: {
+            ...state.clues,
+            [clueData.id]: newClue
+          }
+        }));
+      },
+
+      // Storylet catalog access (Domain: Narrative - User Created Content)
+      getAllStorylets: () => {
+        const state = get();
+        return state.storylets.userCreated;
+      },
+
+      addUserStorylet: (storylet: Storylet) => {
+        set((state) => ({
+          ...state,
+          storylets: {
+            ...state.storylets,
+            userCreated: [...state.storylets.userCreated, storylet]
+          }
+        }));
+      },
+
+      updateUserStorylet: (storyletId: string, updates) => {
+        set((state) => ({
+          ...state,
+          storylets: {
+            ...state.storylets,
+            userCreated: state.storylets.userCreated.map(storylet =>
+              storylet.id === storyletId ? { ...storylet, ...updates } : storylet
+            )
+          }
+        }));
+      },
+
+      removeUserStorylet: (storyletId: string) => {
+        set((state) => ({
+          ...state,
+          storylets: {
+            ...state.storylets,
+            userCreated: state.storylets.userCreated.filter(storylet => storylet.id !== storyletId)
+          }
+        }));
+      },
+
+      getStoryletsForArc: (arcId: string) => {
+        const state = get();
+        return state.storylets.userCreated.filter(storylet => 
+          storylet.storyArc === arcId || (storylet as any).arcId === arcId
+        );
       }
     }),
     {
@@ -650,6 +1211,20 @@ export const useNarrativeStore = create<NarrativeState>()(
             storyArcs: { ...defaultState.storyArcs, ...(persistedState.storyArcs || {}) },
             arcProgress: { ...defaultState.arcProgress, ...(persistedState.arcProgress || {}) },
             concerns: { ...defaultState.concerns, ...(persistedState.concerns || {}) },
+            achievements: { ...defaultState.achievements, ...(persistedState.achievements || {}) },
+            quests: { 
+              ...defaultState.quests, 
+              ...(persistedState.quests || {}),
+              active: Array.isArray(persistedState.quests?.active) ? persistedState.quests.active : [],
+              completed: Array.isArray(persistedState.quests?.completed) ? persistedState.quests.completed : []
+            },
+            minigames: {
+              ...defaultState.minigames,
+              ...(persistedState.minigames || {}),
+              activeMinigame: persistedState.minigames?.activeMinigame || null,
+              completedMinigames: Array.isArray(persistedState.minigames?.completedMinigames) ? persistedState.minigames.completedMinigames : []
+            },
+            clues: { ...defaultState.clues, ...(persistedState.clues || {}) },
             // Handle flags - may need to recreate Maps
             flags: {
               storylet: new Map(persistedState.flags?.storylet || []),
@@ -699,6 +1274,20 @@ export const useNarrativeStore = create<NarrativeState>()(
           },
           storyArcs: state.storyArcs || {},
           arcProgress: state.arcProgress || {},
+          achievements: state.achievements || {},
+          quests: {
+            ...initialState.quests,
+            ...(state.quests || {}),
+            active: Array.isArray(state.quests?.active) ? state.quests.active : [],
+            completed: Array.isArray(state.quests?.completed) ? state.quests.completed : []
+          },
+          minigames: {
+            ...initialState.minigames,
+            ...(state.minigames || {}),
+            activeMinigame: state.minigames?.activeMinigame || null,
+            completedMinigames: Array.isArray(state.minigames?.completedMinigames) ? state.minigames.completedMinigames : []
+          },
+          clues: { ...initialState.clues, ...(state.clues || {}) },
           flags: {
             storylet: new Map(state.flags?.storylet || []),
             storyletFlag: new Map(state.flags?.storyletFlag || []),

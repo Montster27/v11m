@@ -1,9 +1,7 @@
 // /Users/montysharma/V11M2/src/components/StoryArcVisualizer.tsx
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useArcVisualizerStore, useArcStorylets, useSelectedStorylet, useEditingStorylet } from '../store/useArcVisualizerStore';
-import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
-import { useStoryletStore } from '../store/useStoryletStore';
-import { useClueStore } from '../store/useClueStore';
+import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
 import { Button, Card } from './ui';
 import { Storylet, Choice, Effect, StoryletDeploymentStatus } from '../types/storylet';
 import { safeParseJSON, validateTriggerConditions } from '../utils/validation';
@@ -35,9 +33,10 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   const selectedStorylet = useSelectedStorylet();
   const editingStorylet = useEditingStorylet();
   
-  // We'll use useStoryletCatalogStore.getState() when needed to avoid reactive dependencies
-  const { clues } = useClueStore();
-  const { updateArcLastAccessed, storyArcs } = useStoryletStore();
+  // V2 stores - Narrative domain
+  const { getAllClues, updateArcLastAccessed, getAllArcs, getAllStorylets } = useNarrativeStore();
+  const clues = getAllClues();
+  const storyArcs = getAllArcs();
   
   // Local UI state (not managed by store)
   const [highlightedPath, setHighlightedPath] = useState<string[]>([]);
@@ -62,8 +61,14 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     description: ''
   });
 
-  // Reactive subscription to catalog store
-  const catalogStorylets = useStoryletCatalogStore(state => state.allStorylets);
+  // Get storylets from V2 narrative store (convert array to object for compatibility)
+  const catalogStoryletsArray = getAllStorylets();
+  const catalogStorylets = useMemo(() => {
+    return catalogStoryletsArray.reduce((acc, storylet) => {
+      acc[storylet.id] = storylet;
+      return acc;
+    }, {} as Record<string, Storylet>);
+  }, [catalogStoryletsArray]);
   
   // Initialize and reactively update when catalog changes or arc changes
   useEffect(() => {
@@ -92,16 +97,19 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     const exportedStorylets = exportToMainStore();
     console.log(`📤 Exported ${exportedStorylets.length} storylets back to main store`);
     
-    // Actually save them to the catalog store
-    const catalogStore = useStoryletCatalogStore.getState();
+    // Actually save them to the V2 narrative store
+    const { addUserStorylet, updateUserStorylet, getAllStorylets } = useNarrativeStore.getState();
+    const existingStorylets = getAllStorylets();
+    const existingIds = new Set(existingStorylets.map(s => s.id));
+    
     exportedStorylets.forEach(storylet => {
-      console.log(`💾 Saving storylet to catalog: ${storylet.id} - ${storylet.name}`);
-      if (catalogStore.hasStorylet(storylet.id)) {
+      console.log(`💾 Saving storylet to V2 store: ${storylet.id} - ${storylet.name}`);
+      if (existingIds.has(storylet.id)) {
         console.log(`📝 Updating existing storylet: ${storylet.id}`);
-        catalogStore.updateStorylet(storylet);
+        updateUserStorylet(storylet.id, storylet);
       } else {
         console.log(`🆕 Adding new storylet: ${storylet.id}`);
-        catalogStore.addStorylet(storylet);
+        addUserStorylet(storylet);
       }
     });
     
@@ -145,6 +153,22 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     const layout = calculateGraphLayout(filteredStorylets, arcClues);
     console.log(`🎨 Generated ${layout.nodes.length} nodes and ${layout.edges.length} edges`);
     console.log(`🎨 Using ${arcClues.length} clues for outcome connections`);
+    
+    // Debug: Log edge types to see if clue connections are present
+    const edgesByType = layout.edges.reduce((acc, edge) => {
+      acc[edge.edgeType || 'choice'] = (acc[edge.edgeType || 'choice'] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    console.log(`🎨 Edge types breakdown:`, edgesByType);
+    
+    // Debug: Log clue-related edges specifically
+    const clueEdges = layout.edges.filter(edge => edge.edgeType?.includes('clue'));
+    if (clueEdges.length > 0) {
+      console.log(`🎨 Clue edges found:`, clueEdges.map(e => `${e.from} -> ${e.to} (${e.edgeType})`));
+    } else {
+      console.log(`⚠️ No clue edges found despite ${arcClues.length} clues`);
+    }
+    
     return layout;
   }, [filteredStorylets, clues, arcName]);
   const [isDragSelecting, setIsDragSelecting] = useState<boolean>(false);
@@ -1000,27 +1024,36 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
               </div>
             </div>
             
-            {/* Connection Legend */}
+            {/* Enhanced Connection Legend */}
             {edges.some(e => e.edgeType === 'clue_positive' || e.edgeType === 'clue_negative') && (
-              <div className="absolute bottom-4 right-4 z-10 bg-white border border-gray-300 rounded p-3 shadow-sm">
-                <div className="text-xs font-medium text-gray-700 mb-2">Connection Types</div>
-                <div className="space-y-1">
+              <div className="absolute bottom-4 right-4 z-10 bg-white border border-gray-300 rounded p-3 shadow-lg">
+                <div className="text-sm font-medium text-gray-800 mb-2">🔗 Connection Types</div>
+                <div className="space-y-2">
                   <div className="flex items-center space-x-2">
-                    <div className="w-6 h-0.5 bg-gray-500"></div>
-                    <span className="text-xs text-gray-600">Choice</span>
+                    <svg width="24" height="2" className="flex-shrink-0">
+                      <line x1="0" y1="1" x2="24" y2="1" stroke="#6b7280" strokeWidth="2"/>
+                    </svg>
+                    <span className="text-xs text-gray-600">Regular Choice</span>
                   </div>
                   {edges.some(e => e.edgeType === 'clue_positive') && (
                     <div className="flex items-center space-x-2">
-                      <div className="w-6 h-0.5 bg-green-500" style={{borderTop: '2px dashed #22c55e'}}></div>
-                      <span className="text-xs text-green-700">✅ Clue Success</span>
+                      <svg width="24" height="2" className="flex-shrink-0">
+                        <line x1="0" y1="1" x2="24" y2="1" stroke="#22c55e" strokeWidth="2.5" strokeDasharray="5,3"/>
+                      </svg>
+                      <span className="text-xs text-green-700 font-medium">✅ Clue Success</span>
                     </div>
                   )}
                   {edges.some(e => e.edgeType === 'clue_negative') && (
                     <div className="flex items-center space-x-2">
-                      <div className="w-6 h-0.5 bg-red-500" style={{borderTop: '2px dashed #ef4444'}}></div>
-                      <span className="text-xs text-red-700">❌ Clue Failure</span>
+                      <svg width="24" height="2" className="flex-shrink-0">
+                        <line x1="0" y1="1" x2="24" y2="1" stroke="#ef4444" strokeWidth="2.5" strokeDasharray="5,3"/>
+                      </svg>
+                      <span className="text-xs text-red-700 font-medium">❌ Clue Failure</span>
                     </div>
                   )}
+                </div>
+                <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-500">
+                  Dashed lines show clue discovery outcomes
                 </div>
               </div>
             )}
@@ -1782,8 +1815,8 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                               // Check if this choice has an arcJump effect to show destination arc storylets
                               const arcJumpEffect = choice.effects.find(effect => effect.type === 'arcJump');
                               if (arcJumpEffect && arcJumpEffect.destinationArc) {
-                                const catalogStore = useStoryletCatalogStore.getState();
-                                const destinationArcStorylets = Object.values(catalogStore.allStorylets)
+                                const narrativeStore = useNarrativeStore.getState();
+                                const destinationArcStorylets = narrativeStore.getAllStorylets()
                                   .filter(storylet => storylet.storyArc === arcJumpEffect.destinationArc);
                                 
                                 if (destinationArcStorylets.length > 0) {
@@ -1952,9 +1985,9 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                 
                                 {effect.type === 'arcJump' && (() => {
                                   const arcJumpEffect = effect as { type: 'arcJump'; destinationArc: string; targetStoryletId?: string; unlockStorylets?: string[] };
-                                  const catalogStore = useStoryletCatalogStore.getState();
+                                  const narrativeStore = useNarrativeStore.getState();
                                   const destinationArcStorylets = arcJumpEffect.destinationArc 
-                                    ? Object.values(catalogStore.allStorylets).filter(storylet => storylet.storyArc === arcJumpEffect.destinationArc)
+                                    ? narrativeStore.getAllStorylets().filter(storylet => storylet.storyArc === arcJumpEffect.destinationArc)
                                     : [];
                                   
                                   return (

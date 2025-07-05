@@ -8,8 +8,6 @@ import ClueDiscoveryManager from './components/ClueDiscoveryManager';
 // import RefactorNotificationBanner from './components/RefactorNotificationBanner'; // Removed - refactor complete
 import AutoSaveIndicator from './components/AutoSaveIndicator';
 import { CharacterCreation, Planner, Quests, Skills, StoryletDeveloper, ContentCreator, SplashScreen } from './pages';
-import { useAppStore } from './store/useAppStore';
-import { useStoryletStore } from './store/useStoryletStore';
 import { useGameOrchestrator, useStoryletNotifications } from './hooks/useGameOrchestrator';
 import { useAutoSave } from './hooks/useAutoSave';
 import { useCoreGameStore, useNarrativeStore, useSocialStore } from './stores/v2';
@@ -52,8 +50,12 @@ if (process.env.NODE_ENV === 'development') {
     (window as any).runV2HealthCheck = module.runV2HealthCheck;
     (window as any).getTestEnvironmentInfo = module.getTestEnvironmentInfo;
     (window as any).exportTestResults = module.exportTestResults;
-    console.log('🧪 V2 Integration Tests loaded successfully');
   });
+  
+  // Memory Game Image Test
+  import('./utils/testMemoryGame'); // Import memory game test utility
+  import('./utils/quickMemoryGameTest'); // Import quick memory game test
+  
   import('../test/v2/v2IntegrationTests').then(module => {
     (window as any).runV2IntegrationTests = module.runV2IntegrationTests;
     console.log('🏪 V2 Store Tests loaded successfully');
@@ -159,12 +161,14 @@ function App() {
   const [clueNotification, setClueNotification] = useState<{clue: Clue; isVisible: boolean} | null>(null);
   const [orphanedStateChecked, setOrphanedStateChecked] = useState(false);
   
-  // Core store hooks
-  const { activeCharacter, day, userLevel, experience } = useAppStore();
-  const { activeMinigame, completeMinigame, closeMinigame } = useStoryletStore();
+  // V2 stores - Core Game domain  
+  const { activeCharacter, player, world } = useCoreGameStore();
+  const { level: userLevel, experience } = player;
+  const { day } = world;
   
-  // V2 stores for enhanced functionality
-  const { migrateFromLegacyStores } = useNarrativeStore();
+  // V2 stores - Narrative domain
+  const { getActiveMinigame, completeMinigame, closeMinigame, migrateFromLegacyStores } = useNarrativeStore();
+  const activeMinigame = getActiveMinigame();
   
   // Debug: Log app state on startup
   console.log('🚀 App startup - Current state:', { day, userLevel, experience, activeCharacter });
@@ -182,12 +186,8 @@ function App() {
       if (!currentSaveId && !activeCharacter) {
         console.log('🚨 No currentSaveId and no active character - forcing reset');
         // Force reset to initial state if no active save justifies the persisted data
-        (window as any).useAppStore.setState({
-          userLevel: 1,
-          experience: 0,
-          day: 1,
-          activeCharacter: null
-        });
+        const coreStore = useCoreGameStore.getState();
+        coreStore.resetGame();
       } else {
         console.log('ℹ️ State justified by:', { currentSaveId, activeCharacter: activeCharacter?.name });
       }
@@ -284,9 +284,12 @@ function App() {
             onComplete={(success, clue) => {
               console.log(`🔍 Clue discovery completed: ${success ? 'SUCCESS' : 'FAILURE'}`, { clue });
               
-              // Trigger the storylet store's completion handler
-              const { completeClueDiscovery } = useStoryletStore.getState();
-              completeClueDiscovery(success, clueDiscoveryRequest.clueId);
+              // Trigger the legacy storylet store's completion handler for now
+              // TODO: Migrate clue discovery to V2 stores
+              const legacyStoryletStore = (window as any).useStoryletStore?.getState();
+              if (legacyStoryletStore?.completeClueDiscovery) {
+                legacyStoryletStore.completeClueDiscovery(success, clueDiscoveryRequest.clueId);
+              }
               
               // Clear the discovery request reactively
               clearClueDiscoveryRequest();

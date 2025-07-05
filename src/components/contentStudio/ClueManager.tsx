@@ -2,10 +2,8 @@
 // Migrated to use shared Content Studio foundation with preserved clue functionality
 
 import React, { useState, useMemo } from 'react';
-import { useClueStore } from '../../store/useClueStore';
 import { useNarrativeStore } from '../../stores/v2/useNarrativeStore';
 import { useSocialStore } from '../../stores/v2/useSocialStore';
-import { useStoryletCatalogStore } from '../../store/useStoryletCatalogStore';
 import { storyArcManager } from '../../utils/storyArcManager';
 import type { Clue } from '../../types/clue';
 import HelpTooltip from '../ui/HelpTooltip';
@@ -32,18 +30,29 @@ interface ClueManagerProps {
 type ClueManagerTab = 'clues' | 'minigames' | 'connections' | 'arcs';
 
 const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
-  // Legacy clue store for backwards compatibility
+  // V2 stores - Narrative domain
   const {
-    clues,
+    getAllClues,
     createClue,
     updateClue,
     deleteClue,
     getCluesByMinigame,
-    getCluesByStorylet
-  } = useClueStore();
-
-  // V2 stores for enhanced arc integration
-  const { getAllArcs, getArc } = useNarrativeStore();
+    getCluesByStorylet,
+    getAllArcs,
+    getArc,
+    getAllStorylets,
+    getStoryletsForArc
+  } = useNarrativeStore();
+  
+  // Get clue data (convert object to array for compatibility)
+  const cluesObject = getAllClues();
+  const clues = useMemo(() => Object.values(cluesObject), [cluesObject]);
+  
+  // Get storylet data
+  const allStorylets = getAllStorylets();
+  const allArcs = getAllArcs();
+  
+  // Social store for arc-clue relationships
   const { 
     getCluesByArc, 
     setClueArcRelationship, 
@@ -51,9 +60,6 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
     getArcCompletionPercentage,
     getNextClueInArc 
   } = useSocialStore();
-  
-  const { allStorylets, getStoryletsForArc } = useStoryletCatalogStore();
-  const allArcs = getAllArcs();
 
   // Shared foundation hooks
   const { handleCreate, handleUpdate, handleDelete } = useCRUDOperations({
@@ -186,11 +192,8 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
   // Get storylets for the currently selected story arc
   const arcStorylets = useMemo(() => {
     if (!clueFormData.storyArc) return [];
-    // Convert arc ID to arc name for storylet lookup
-    const arc = getArc(clueFormData.storyArc);
-    if (!arc) return [];
-    return getStoryletsForArc(arc.name);
-  }, [getStoryletsForArc, clueFormData.storyArc, getArc]);
+    return getStoryletsForArc(clueFormData.storyArc);
+  }, [getStoryletsForArc, clueFormData.storyArc]);
 
   const resetClueForm = () => {
     setClueFormData({
@@ -472,6 +475,11 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                         {clue.positiveOutcomeStorylet && clue.negativeOutcomeStorylet && (
                           <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
                             ⚡ Both Outcomes
+                          </span>
+                        )}
+                        {clue.associatedStorylets.length > 0 && (clue.positiveOutcomeStorylet || clue.negativeOutcomeStorylet) && (
+                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                            🔗 Arc Connections
                           </span>
                         )}
                         {clue.positiveOutcomeStorylet && !clue.negativeOutcomeStorylet && (
@@ -1008,6 +1016,49 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                 )}
               </div>
 
+              {/* Associated Storylets - only show if story arc is selected */}
+              {clueFormData.storyArc && (
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <h4 className="text-sm font-semibold text-gray-800 mb-3">
+                    🎭 Storylets That Trigger This Clue
+                    <HelpTooltip content="Select which storylets in this arc can trigger the discovery of this clue through minigames" />
+                  </h4>
+                  <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-300 rounded p-2">
+                    {arcStorylets.map(storylet => (
+                      <label key={storylet.id} className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={clueFormData.associatedStorylets.includes(storylet.id)}
+                          onChange={(e) => {
+                            setClueFormData(prev => ({
+                              ...prev,
+                              associatedStorylets: e.target.checked
+                                ? [...prev.associatedStorylets, storylet.id]
+                                : prev.associatedStorylets.filter(id => id !== storylet.id)
+                            }));
+                          }}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <div className="flex-1">
+                          <span className="text-sm font-medium text-gray-700">{storylet.name}</span>
+                          <div className="text-xs text-gray-500">ID: {storylet.id}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  {arcStorylets.length === 0 && (
+                    <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded">
+                      No storylets found in the "{clueFormData.storyArc}" arc. Create storylets for this arc first.
+                    </div>
+                  )}
+                  {clueFormData.associatedStorylets.length > 0 && (
+                    <div className="text-sm text-blue-600 mt-2">
+                      Selected: {clueFormData.associatedStorylets.length} storylet{clueFormData.associatedStorylets.length !== 1 ? 's' : ''}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Outcome Storylets - only show if story arc is selected */}
               {clueFormData.storyArc && (
                 <div className="bg-gradient-to-r from-green-50 to-red-50 p-4 rounded-lg border">
@@ -1066,16 +1117,40 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                       </div>
                     )}
                     
-                    {clueFormData.minigameTypes.length > 0 && (clueFormData.positiveOutcomeStorylet || clueFormData.negativeOutcomeStorylet) && (
+                    {/* Clue Workflow Explanation */}
+                    {clueFormData.associatedStorylets.length > 0 && clueFormData.minigameTypes.length > 0 && (clueFormData.positiveOutcomeStorylet || clueFormData.negativeOutcomeStorylet) && (
                       <div className="text-sm text-purple-600 bg-purple-50 p-3 rounded border border-purple-200">
-                        💡 <strong>How it works:</strong> When players attempt the selected minigame(s), 
-                        {clueFormData.positiveOutcomeStorylet && clueFormData.negativeOutcomeStorylet 
-                          ? ' they\'ll follow the success path if they win or the failure path if they lose.'
-                          : clueFormData.positiveOutcomeStorylet 
-                            ? ' they\'ll follow the success path if they win (no specific failure path set).'
-                            : ' they\'ll follow the failure path if they lose (no specific success path set).'
-                        }
+                        💡 <strong>Complete Clue Flow:</strong>
+                        <ol className="mt-2 ml-4 list-decimal space-y-1">
+                          <li>Player reaches one of the selected trigger storylets</li>
+                          <li>Player attempts the configured minigame(s)</li>
+                          <li>Based on minigame result:
+                            {clueFormData.positiveOutcomeStorylet && clueFormData.negativeOutcomeStorylet 
+                              ? ' SUCCESS → follows the success path, FAILURE → follows the failure path'
+                              : clueFormData.positiveOutcomeStorylet 
+                                ? ' SUCCESS → follows the success path (no specific failure path)'
+                                : ' FAILURE → follows the failure path (no specific success path)'
+                            }
+                          </li>
+                        </ol>
                       </div>
+                    )}
+                    
+                    {/* Warning if incomplete setup */}
+                    {clueFormData.storyArc && (
+                      clueFormData.associatedStorylets.length === 0 ? (
+                        <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded border border-amber-200">
+                          ⚠️ <strong>Incomplete Setup:</strong> Select trigger storylets to enable connections in the arc visualizer.
+                        </div>
+                      ) : clueFormData.minigameTypes.length === 0 ? (
+                        <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded border border-amber-200">
+                          ⚠️ <strong>Incomplete Setup:</strong> Select discovery minigames to enable clue mechanics.
+                        </div>
+                      ) : !clueFormData.positiveOutcomeStorylet && !clueFormData.negativeOutcomeStorylet ? (
+                        <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded border border-amber-200">
+                          ⚠️ <strong>Incomplete Setup:</strong> Set outcome storylets to complete the narrative flow.
+                        </div>
+                      ) : null
                     )}
                   </div>
                 </div>
