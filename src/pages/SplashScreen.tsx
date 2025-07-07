@@ -48,8 +48,8 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onChoiceMade }) => {
     }
     
     onChoiceMade();
-    console.log('🎮 Navigating to character-creation');
-    navigate('/character-creation');
+    console.log('🎮 Navigating to character-creation with new=true');
+    navigate('/character-creation?new=true');
   };
 
   const handleContinue = () => {
@@ -68,6 +68,11 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onChoiceMade }) => {
     } else if (hasCharacter) {
       console.log('🔄 Continuing with existing character:', coreStore.character.name);
       // Continue with existing character (no save loading needed)
+      onChoiceMade();
+      navigate('/planner');
+    } else {
+      // Navigate to character selection menu if no saves but want to continue
+      console.log('🔄 No saves found, going to character selection');
       onChoiceMade();
       navigate('/character-creation');
     }

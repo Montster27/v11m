@@ -1,12 +1,13 @@
 // /Users/montysharma/V11M2/src/pages/CharacterCreation.tsx
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCoreGameStore, useSocialStore } from '../stores/v2';
 import { Card, Button } from '../components/ui';
 import ConsolidatedCharacterCreationFlow from '../components/CharacterCreation/ConsolidatedCharacterCreationFlow';
 
 const CharacterCreationPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const coreStore = useCoreGameStore();
   const socialStore = useSocialStore();
   
@@ -14,8 +15,9 @@ const CharacterCreationPage: React.FC = () => {
   const saveSlots = Object.values(socialStore.saves.saveSlots);
   const savedCharacters = saveSlots.filter(slot => slot.characterName);
   
-  // Check if coming from splash screen "New Game" - if no characters exist, go straight to create
-  const shouldCreateDirectly = savedCharacters.length === 0;
+  // Check if coming from splash screen "New Game"
+  const isNewGame = searchParams.get('new') === 'true';
+  const shouldCreateDirectly = isNewGame || savedCharacters.length === 0;
   const [mode, setMode] = useState<'menu' | 'create' | 'edit'>(shouldCreateDirectly ? 'create' : 'menu');
 
   const handleNewCharacter = () => {
