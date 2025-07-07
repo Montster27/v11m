@@ -4,9 +4,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNarrativeStore } from '../../stores/v2/useNarrativeStore';
 import { useSocialStore } from '../../stores/v2/useSocialStore';
-import { useStoryletCatalogStore } from '../../store/useStoryletCatalogStore';
-import { useClueStore } from '../../store/useClueStore';
-import { storyArcManager } from '../../utils/storyArcManager';
+// Legacy V1 imports removed - using V2 stores only
 import type { Storylet } from '../../types/storylet';
 import HelpTooltip from '../ui/HelpTooltip';
 import StoryArcVisualizer from '../StoryArcVisualizer';
@@ -33,16 +31,23 @@ type ArcManagerTab = 'overview' | 'visualizer' | 'builder' | 'testing';
 
 const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
   // Use V2 stores for unified state management
-  const { storyArcs, getAllArcs, getArc } = useNarrativeStore();
+  const { 
+    storyArcs, 
+    getAllArcs, 
+    getArc, 
+    createArc, 
+    updateArc, 
+    deleteArc 
+  } = useNarrativeStore();
   const { getCluesByArc } = useSocialStore();
   
-  // Use catalog store for storylet data  
-  const allStorylets = useStoryletCatalogStore(state => state.allStorylets);
-  const getStoryletsForArc = useStoryletCatalogStore(state => state.getStoryletsForArc);
-  const updateStorylet = useStoryletCatalogStore(state => state.updateStorylet);
+  // Use V2 stores for storylet and clue data  
+  const { getAllStorylets, getStoryletsForArc, updateUserStorylet } = useNarrativeStore();
+  const allStorylets = getAllStorylets();
   
-  // Use clue store for clue data
-  const { clues } = useClueStore();
+  // Use V2 stores for clue data
+  const cluesObject = useSocialStore(state => state.clues || {});
+  const clues = Object.values(cluesObject); // Convert object to array
   
   // Get all arcs from V2 store
   const allArcs = getAllArcs();
@@ -58,13 +63,13 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
     );
   };
 
-  // Shared foundation hooks - updated to use StoryArcManager
+  // Shared foundation hooks - using V2 store arc methods
   const { handleCreate, handleUpdate, handleDelete } = useCRUDOperations({
     entityType: 'Arc',
     getAllItems: () => allArcs.map(arc => ({ id: arc.id, name: arc.name })),
     createItem: (arcData: { name: string; description?: string }) => {
-      console.log('Creating arc:', arcData.name);
-      const arcId = storyArcManager.createArc({
+      console.log('Creating arc with V2 store:', arcData.name);
+      const arcId = createArc({
         name: arcData.name,
         description: arcData.description || `Story arc: ${arcData.name}`,
         progress: 0,
@@ -74,15 +79,15 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
       return { id: arcId, name: arcData.name };
     },
     updateItem: (arc: { id: string; name: string; description?: string }) => {
-      console.log('Updating arc:', arc.id);
-      storyArcManager.updateArc(arc.id, {
+      console.log('Updating arc with V2 store:', arc.id);
+      updateArc(arc.id, {
         name: arc.name,
         description: arc.description
       });
     },
     deleteItem: (id: string) => {
-      console.log('Deleting arc:', id);
-      storyArcManager.deleteArc(id);
+      console.log('Deleting arc with V2 store:', id);
+      deleteArc(id);
     },
     undoRedoSystem
   });
@@ -132,28 +137,36 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
     const stats = allArcs.map(arc => {
       const storylets = getStoryletsByArc(arc.id);
       
-      // Use same clue filtering logic as visualizer
+      // Use same clue filtering logic as visualizer with null safety
       const arcClues = clues.filter(clue => 
-        clue.storyArc === arc.name || 
-        clue.associatedStorylets.some(storyletId => 
-          storylets.some(storylet => storylet.id === storyletId)
+        clue && (
+          clue.storyArc === arc.name || 
+          (clue.associatedStorylets && Array.isArray(clue.associatedStorylets) && 
+           clue.associatedStorylets.some(storyletId => 
+             storylets.some(storylet => storylet.id === storyletId)
+           ))
         )
       );
       const connections = storylets.reduce((total, storylet) => {
-        return total + storylet.choices.filter(choice => choice.nextStoryletId).length;
+        if (!storylet || !storylet.choices || !Array.isArray(storylet.choices)) return total;
+        return total + storylet.choices.filter(choice => choice && choice.nextStoryletId).length;
       }, 0);
       
-      // Calculate entry points
+      // Calculate entry points with null safety
       const entryPoints = storylets.filter(s => 
-        s.trigger.type === 'time' || 
-        (s.trigger.type === 'flag' && !storylets.some(other => 
-          other.choices.some(choice => 
-            choice.effects.some(effect => 
-              effect.type === 'flag' && 
-              effect.key === (s.trigger.conditions as any).flags?.[0]
+        s && s.trigger && (
+          s.trigger.type === 'time' || 
+          (s.trigger.type === 'flag' && !storylets.some(other => 
+            other && other.choices && Array.isArray(other.choices) &&
+            other.choices.some(choice => 
+              choice && choice.effects && Array.isArray(choice.effects) &&
+              choice.effects.some(effect => 
+                effect && effect.type === 'flag' && 
+                effect.key === (s.trigger.conditions as any)?.flags?.[0]
+              )
             )
-          )
-        ))
+          ))
+        )
       ).length;
       
       return {
@@ -249,11 +262,11 @@ const ArcManager: React.FC<ArcManagerProps> = ({ undoRedoSystem }) => {
     storyArcManager.assignStoryletToArc(storyletId, arcId);
     
     // Also update the storylet in the catalog store for backwards compatibility
-    const storylet = allStorylets[storyletId];
+    const storylet = allStorylets.find(s => s.id === storyletId);
     if (storylet) {
       const arc = getArc(arcId);
       const updatedStorylet = { ...storylet, storyArc: arc?.name || arcId };
-      updateStorylet(updatedStorylet);
+      updateUserStorylet(updatedStorylet);
     }
   };
 
