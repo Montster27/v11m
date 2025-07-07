@@ -160,7 +160,7 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
   });
 
   const persistence = useStudioPersistence(
-    { activeTab, selectedClue, clueFormData, editingClue },
+    { activeTab, selectedClue, clueFormData, editingItem },
     {
       storageKey: 'clue_manager_state',
       autoSaveEnabled: true,
