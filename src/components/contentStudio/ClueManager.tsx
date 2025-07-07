@@ -76,7 +76,15 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
     getAllItems: () => clues,
     createItem: (clueData: any) => {
       console.log('Creating clue:', clueData.title);
-      return createClue(clueData);
+      // Generate ID for the clue
+      const clueId = `clue_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const fullClueData = { ...clueData, id: clueId };
+      
+      // Call createClue (void return)
+      createClue(fullClueData);
+      
+      // Return the created clue data for CRUD operations
+      return fullClueData;
     },
     updateItem: (clue: any) => {
       console.log('Updating clue:', clue.id);
