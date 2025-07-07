@@ -2,6 +2,7 @@
 // Migrated to use shared Content Studio foundation with preserved clue functionality
 
 import React, { useState, useMemo } from 'react';
+// Legacy V1 imports removed - using V2 stores only
 import { useNarrativeStore } from '../../stores/v2/useNarrativeStore';
 import { useSocialStore } from '../../stores/v2/useSocialStore';
 import { storyArcManager } from '../../utils/storyArcManager';
@@ -62,7 +63,15 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
   } = useSocialStore();
 
   // Shared foundation hooks
-  const { handleCreate, handleUpdate, handleDelete } = useCRUDOperations({
+  const { 
+    handleCreate, 
+    handleUpdate, 
+    handleDelete,
+    showCreateModal,
+    setShowCreateModal,
+    editingItem,
+    setEditingItem
+  } = useCRUDOperations({
     entityType: 'Clue',
     getAllItems: () => clues,
     createItem: (clueData: any) => {
@@ -124,8 +133,6 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
   // State declarations - must come before hooks that use them
   const [activeTab, setActiveTab] = useState<ClueManagerTab>('clues');
   const [selectedClue, setSelectedClue] = useState<string>('');
-  const [showCreateClueForm, setShowCreateClueForm] = useState(false);
-  const [editingClue, setEditingClue] = useState<Clue | null>(null);
   const [clueFormData, setClueFormData] = useState({
     title: '',
     description: '',
@@ -249,15 +256,14 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
 
     if (success) {
       resetClueForm();
-      setShowCreateClueForm(false);
-      // We can't easily get the new clue ID from the success response
+      // Modal will be closed by CRUD operations automatically
       setSelectedClue('');
       persistence.markDirty();
     }
   };
 
   const handleEditClue = (clue: Clue) => {
-    setEditingClue(clue);
+    setEditingItem(clue);
     setClueFormData({
       title: clue.title,
       description: clue.description,
@@ -273,11 +279,11 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
       tags: clue.tags.join(', '),
       rarity: clue.rarity
     });
-    setShowCreateClueForm(true);
+    setShowCreateModal(true);
   };
 
   const handleUpdateClue = async () => {
-    if (!editingClue) return;
+    if (!editingItem) return;
     
     // Validate required fields
     if (!clueFormData.title.trim()) {
@@ -287,7 +293,7 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
 
     // Prepare the updated clue data
     const updatedClue = {
-      ...editingClue,
+      ...editingItem,
       title: clueFormData.title.trim(),
       description: clueFormData.description.trim(),
       content: clueFormData.content.trim(),
@@ -309,8 +315,7 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
       const success = await handleUpdate(updatedClue);
       
       if (success) {
-        setShowCreateClueForm(false);
-        setEditingClue(null);
+        // Modal will be closed by CRUD operations automatically
         resetClueForm();
         persistence.markDirty();
         console.log('✅ Clue updated successfully');
@@ -356,7 +361,7 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
             <span className="text-xs text-orange-600">Unsaved changes</span>
           )}
           <button
-            onClick={() => setShowCreateClueForm(true)}
+            onClick={() => setShowCreateModal(true)}
             className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
           >
             + New Clue
@@ -887,11 +892,11 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
       </div>
 
       {/* Create/Edit Clue Modal */}
-      {showCreateClueForm && (
+      {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96 max-h-screen overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">
-              {editingClue ? 'Edit Clue' : 'Create New Clue'}
+              {editingItem ? 'Edit Clue' : 'Create New Clue'}
             </h3>
             
             <div className="space-y-4">
@@ -1171,8 +1176,8 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
             <div className="flex justify-end gap-2 mt-6">
               <button
                 onClick={() => {
-                  setShowCreateClueForm(false);
-                  setEditingClue(null);
+                  setShowCreateModal(false);
+                  setEditingItem(null);
                   resetClueForm();
                 }}
                 className="px-4 py-2 text-gray-600 hover:text-gray-800"
@@ -1180,11 +1185,11 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                 Cancel
               </button>
               <button
-                onClick={editingClue ? handleUpdateClue : handleCreateClue}
+                onClick={editingItem ? handleUpdateClue : handleCreateClue}
                 disabled={!clueFormData.title.trim() || !clueFormData.description.trim() || !clueFormData.content.trim()}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
               >
-                {editingClue ? 'Update Clue' : 'Create Clue'}
+                {editingItem ? 'Update Clue' : 'Create Clue'}
               </button>
             </div>
           </div>
