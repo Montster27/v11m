@@ -1,12 +1,13 @@
 // /Users/montysharma/V11M2/src/hooks/useTimeSimulation.ts
 // Time simulation hook - manages day progression, tick rates, pause/play state
+// FIXED: Stale closure issue that caused time to stop at day 2
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useCoreGameStore } from '../stores/v2';
+import { SimulationEngine } from '../services/SimulationEngine';
 
 export interface TimeSimulationState {
   isPlaying: boolean;
-  localDay: number;
   canPlay: boolean;
   isTimePaused: boolean;
 }
@@ -22,6 +23,7 @@ export interface UseTimeSimulationReturn extends TimeSimulationState, TimeSimula
 interface UseTimeSimulationOptions {
   onCrash?: (type: 'exhaustion' | 'burnout') => void;
   onStoryletEvaluation?: () => void;
+  onResourceProcessing?: (resourceDeltas: any) => void;
   validationCheck?: () => boolean;
   crashCheck?: () => boolean;
   tickInterval?: number; // milliseconds, default 3000 (3 seconds = 1 day)
@@ -31,19 +33,23 @@ export const useTimeSimulation = (options: UseTimeSimulationOptions = {}): UseTi
   const {
     onCrash,
     onStoryletEvaluation,
+    onResourceProcessing,
     validationCheck = () => true,
     crashCheck = () => true,
     tickInterval = 3000
   } = options;
 
   const coreStore = useCoreGameStore();
-  const { player, world } = coreStore;
+  const { player, world, character } = coreStore;
+  const simulationEngine = SimulationEngine.getInstance();
   
   const [isPlaying, setIsPlaying] = useState(false);
-  const [localDay, setLocalDay] = useState(world.day);
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutRefs = useRef<Set<NodeJS.Timeout>>(new Set());
+
+  // CRITICAL FIX: Use ref to always call the latest simulateTick
+  const simulateTickRef = useRef<() => void>();
 
   // Determine if simulation can be played
   const canPlay = validationCheck() && crashCheck() && !world.isTimePaused;
@@ -80,44 +86,105 @@ export const useTimeSimulation = (options: UseTimeSimulationOptions = {}): UseTi
     return currentDate.toLocaleDateString('en-US', options);
   }, []);
 
-  // Core simulation tick logic
+  // Core simulation tick logic using SimulationEngine
   const simulateTick = useCallback(() => {
-    console.log('=== SIMULATION TICK CALLED ===');
+    // Get fresh values from store on each tick
+    const currentState = useCoreGameStore.getState();
+    const { player: currentPlayer, world: currentWorld, character: currentCharacter } = currentState;
+    
+    console.log('=== V2 SIMULATION TICK (ENGINE-POWERED) ===');
+    console.log('Store state:', { 
+      worldDay: currentWorld.day,
+      resources: currentPlayer.resources,
+      timeAllocation: currentWorld.timeAllocation,
+      isTimePaused: currentWorld.isTimePaused 
+    });
+    
+    // CRITICAL SAFETY CHECK: Validate resources before processing
+    if (!currentPlayer.resources || Object.keys(currentPlayer.resources).length === 0) {
+      console.error('❌ CRITICAL: Resources are empty, cannot simulate');
+      setIsPlaying(false); // Stop simulation
+      return;
+    }
+    
+    // Check for NaN values
+    const hasNaN = Object.entries(currentPlayer.resources).some(([key, value]) => 
+      typeof value !== 'number' || isNaN(value) || !isFinite(value)
+    );
+    
+    if (hasNaN) {
+      console.error('❌ CRITICAL: Resources contain NaN values:', currentPlayer.resources);
+      setIsPlaying(false); // Stop simulation
+      return;
+    }
     
     // Don't simulate if time is paused (minigame active)
-    if (world.isTimePaused) {
+    if (currentWorld.isTimePaused) {
       console.log('⏸️ Simulation tick skipped - time is paused');
       return;
     }
     
-    const currentResources = player.resources;
-    const newDay = world.day + 1;
+    // Create simulation state for engine
+    const simulationState = {
+      day: currentWorld.day,
+      resources: currentPlayer.resources,
+      allocations: currentWorld.timeAllocation,
+      isTimePaused: currentWorld.isTimePaused
+    };
     
-    console.log('Current day:', world.day, '-> New day:', newDay);
-    console.log('Current resources BEFORE tick:', currentResources);
+    console.log('🔧 Processing with SimulationEngine...');
+    const result = simulationEngine.processTick(simulationState, currentCharacter);
     
-    // Update day in store
-    coreStore.updateWorld({ day: newDay });
-    setLocalDay(newDay);
+    console.log('🔧 Engine result:', result);
     
-    // Trigger storylet evaluation after day change
-    if (onStoryletEvaluation) {
+    // CRITICAL SAFETY CHECK: Validate engine result
+    if (!result || !result.newResources) {
+      console.error('❌ CRITICAL: SimulationEngine returned invalid result');
+      setIsPlaying(false);
+      return;
+    }
+    
+    // Check if engine result has NaN values
+    const resultHasNaN = Object.entries(result.newResources).some(([key, value]) => 
+      typeof value !== 'number' || isNaN(value) || !isFinite(value)
+    );
+    
+    if (resultHasNaN) {
+      console.error('❌ CRITICAL: Engine result contains NaN values:', result.newResources);
+      setIsPlaying(false);
+      return;
+    }
+    
+    // Apply all changes atomically using fresh store reference
+    currentState.updateWorld({ day: result.newDay });
+    
+    // Apply resource changes via callback to resource manager
+    if (onResourceProcessing) {
+      onResourceProcessing(result.resourceDeltas);
+    } else {
+      // Fallback: apply directly to store
+      currentState.updatePlayer({ resources: result.newResources });
+    }
+    
+    // Handle crash conditions FIRST (before storylets)
+    if (result.crashConditions.crashType && onCrash) {
+      console.log(`🚨 CRASH DETECTED: ${result.crashConditions.crashType}`);
+      onCrash(result.crashConditions.crashType);
+      return; // Don't evaluate storylets during crash
+    }
+    
+    // Trigger storylet evaluation after all updates are complete
+    if (result.shouldTriggerStorylets && onStoryletEvaluation) {
       createTimeout(() => {
-        console.log('🎭 Triggering storylet evaluation after day', newDay);
+        console.log('🎭 Triggering storylet evaluation after day', result.newDay);
         onStoryletEvaluation();
-      }, 300);
+      }, 100); // Reduced timeout for better responsiveness
     }
     
-    // Check for crash conditions after resource updates (handled externally)
-    const { energy, stress } = currentResources;
-    if (energy <= 0 && onCrash) {
-      console.log('CRASH: Energy depleted!');
-      onCrash('exhaustion');
-    } else if (stress >= 100 && onCrash) {
-      console.log('CRASH: Stress maxed out!');
-      onCrash('burnout');
-    }
-  }, [world.isTimePaused, world.day, player.resources, coreStore, createTimeout, onStoryletEvaluation, onCrash]);
+  }, [simulationEngine, createTimeout, onStoryletEvaluation, onResourceProcessing, onCrash]);
+
+  // CRITICAL FIX: Update the ref whenever simulateTick changes
+  simulateTickRef.current = simulateTick;
 
   // Start/stop simulation
   const toggleSimulation = useCallback(() => {
@@ -141,17 +208,18 @@ export const useTimeSimulation = (options: UseTimeSimulationOptions = {}): UseTi
       
       console.log(`Starting simulation - setting interval for ${tickInterval}ms`);
       setIsPlaying(true);
-      intervalRef.current = setInterval(simulateTick, tickInterval);
+      // CRITICAL FIX: Use ref to always call the latest simulateTick
+      intervalRef.current = setInterval(() => {
+        if (simulateTickRef.current) {
+          simulateTickRef.current();
+        }
+      }, tickInterval);
       console.log('Interval set:', intervalRef.current);
     }
-  }, [isPlaying, canPlay, simulateTick, tickInterval]);
+  }, [isPlaying, canPlay, tickInterval]);
 
-  // Sync local day with store day changes
+  // Trigger storylet evaluation on external day changes
   useEffect(() => {
-    console.log('🔄 Day changed in store:', world.day);
-    setLocalDay(world.day);
-    
-    // Trigger storylet evaluation on external day changes
     if (onStoryletEvaluation) {
       createTimeout(() => {
         console.log('🎭 Re-evaluating storylets due to day change:', world.day);
@@ -198,7 +266,6 @@ export const useTimeSimulation = (options: UseTimeSimulationOptions = {}): UseTi
   return {
     // State
     isPlaying,
-    localDay,
     canPlay,
     isTimePaused: world.isTimePaused,
     

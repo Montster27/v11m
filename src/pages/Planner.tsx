@@ -6,7 +6,7 @@ import { useCoreGameStore, useNarrativeStore, useSocialStore } from '../stores/v
 import { useTimeSimulation } from '../hooks/useTimeSimulation';
 import { useResourceManager } from '../hooks/useResourceManager';
 import { useCrashRecovery } from '../hooks/useCrashRecovery';
-import { SimulationEngine } from '../services/SimulationEngine';
+// SimulationEngine import removed - will be integrated into useTimeSimulation
 
 // UI Components
 import TimeAllocationPanel from '../components/TimeAllocationPanel';
@@ -25,7 +25,6 @@ const Planner: React.FC = () => {
   
   const { player, character, world, skills } = coreStore;
   const { storylets } = narrativeStore;
-  const simulationEngine = SimulationEngine.getInstance();
 
   // Resource management hook
   const resourceManager = useResourceManager();
@@ -38,8 +37,8 @@ const Planner: React.FC = () => {
     {
       onCrashStart: (type) => {
         console.log(`Crash started: ${type}`);
-        // Force rest allocation
-        const restAllocations = simulationEngine.generateCrashRecoveryAllocations();
+        // Force rest allocation using store action
+        const restAllocations = coreStore.generateCrashRecoveryAllocations();
         Object.entries(restAllocations).forEach(([activity, value]) => {
           resourceActions.updateTimeAllocation(activity, value);
         });
@@ -56,43 +55,34 @@ const Planner: React.FC = () => {
   // Storylet evaluation function
   const evaluateStorylets = () => {
     console.log('📖 Evaluating storylets with consolidated stores');
-    console.log('   Active storylets:', storylets.active);
+    console.log('   Active storylets before:', storylets.active);
     console.log('   Tutorial storylet flag:', narrativeStore.getStoryletFlag('character_created'));
+    
+    // Actually call the storylet evaluation
+    narrativeStore.evaluateStorylets();
+    
+    console.log('   Active storylets after:', narrativeStore.storylets.active);
   };
 
-  // Time simulation hook
+  // Resource processing now handled by SimulationEngine via useTimeSimulation
+
+  // Time simulation hook with SimulationEngine integration
   const timeSimulation = useTimeSimulation({
     onCrash: crashRecovery.actions.handleCrash,
-    onStoryletEvaluation: evaluateStorylets,
+    onResourceProcessing: (resourceDeltas) => {
+      console.log('📊 Applying resource deltas via resource manager:', resourceDeltas);
+      resourceManager.actions.applyResourceChanges(resourceDeltas);
+    },
+    onStoryletEvaluation: () => {
+      // Resources are now processed by the engine before this callback
+      evaluateStorylets();
+    },
     validationCheck: () => validation.canAllocate && !crashRecovery.state.isCrashRecovery,
     crashCheck: () => crashRecovery.state.crashCheck.isValid,
     tickInterval: 3000
   });
 
-  // Enhanced simulation tick that uses SimulationEngine
-  const enhancedSimulateTick = () => {
-    const simulationState = {
-      day: world.day,
-      resources: resourceState.resources,
-      allocations: resourceState.allocations,
-      isTimePaused: world.isTimePaused
-    };
-
-    const result = simulationEngine.processTick(simulationState, character);
-    
-    // Apply results
-    coreStore.updateWorld({ day: result.newDay });
-    resourceActions.applyResourceChanges(result.resourceDeltas);
-    
-    if (result.shouldTriggerStorylets) {
-      evaluateStorylets();
-    }
-    
-    // Handle crashes
-    if (result.crashConditions.crashType) {
-      crashRecovery.actions.handleCrash(result.crashConditions.crashType);
-    }
-  };
+  // SimulationEngine integration moved to useTimeSimulation hook
 
   // Level progression calculations
   const nextLevelXP = player.level * 100;
@@ -111,6 +101,10 @@ const Planner: React.FC = () => {
 
   // Initialize on mount
   useEffect(() => {
+    // Set character_created flag if character exists
+    if (character && character.name) {
+      narrativeStore.setStoryletFlag('character_created', true);
+    }
     evaluateStorylets();
   }, []);
 
@@ -132,10 +126,10 @@ const Planner: React.FC = () => {
               </Button>
               
               <div className="text-lg font-semibold text-gray-700">
-                {timeSimulation.getFormattedDate(timeSimulation.localDay)}
+                {timeSimulation.getFormattedDate(world.day)}
               </div>
               <div className="text-sm text-gray-500">
-                Day {timeSimulation.localDay}
+                Day {world.day}
               </div>
               
               {!timeSimulation.canPlay && !timeSimulation.isPlaying && (
@@ -150,8 +144,13 @@ const Planner: React.FC = () => {
             
             {/* Title & Level Progress */}
             <div className="text-right">
+              {character && character.name && (
+                <div className="text-xl font-semibold text-gray-700 mb-2">
+                  {character.name}
+                </div>
+              )}
               <h1 className="text-4xl font-bold text-teal-800 mb-4">
-                Time & Resource Allocation Dashboard
+                Planner
               </h1>
               
               <div className="max-w-md ml-auto mb-2">
@@ -207,8 +206,7 @@ const Planner: React.FC = () => {
         {/* Footer */}
         <div className="text-center text-sm text-gray-500">
           <p>
-            {timeSimulation.isPlaying ? 'Simulation running - 3 seconds = 1 in-game day' : 'Simulation paused'} • 
-            {character ? ` Playing as ${character.name}` : ' No character selected'}
+            {timeSimulation.isPlaying ? 'Simulation running - 3 seconds = 1 in-game day' : 'Simulation paused'}
           </p>
         </div>
       </div>
