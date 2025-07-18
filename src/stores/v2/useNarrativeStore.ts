@@ -54,6 +54,9 @@ export interface Quest {
 }
 
 export interface NarrativeState {
+  // Store hydration tracking
+  _hasHydrated: boolean;
+  
   storylets: {
     active: string[];
     completed: string[];
@@ -114,15 +117,30 @@ export interface NarrativeState {
       id: string;
       name: string;
       description: string;
+      content?: string;
       discovered: boolean;
       discoveredAt?: number;
       category?: string;
+      difficulty?: 'easy' | 'medium' | 'hard';
       importance?: 'low' | 'medium' | 'high' | 'critical';
+      storyArc?: string;
+      arcOrder?: number;
+      minigameTypes?: string[];
+      associatedStorylets?: string[];
+      positiveOutcomeStorylet?: string;
+      negativeOutcomeStorylet?: string;
+      tags?: string[];
+      rarity?: 'common' | 'uncommon' | 'rare' | 'legendary';
     };
   };
   
   // Actions
   evaluateStoryletAvailability: (storyletId: string) => boolean;
+  evaluateStorylets: () => void;
+  evaluateStoryletTrigger: (storylet: any) => boolean;
+  evaluateTimeTrigger: (trigger: any, coreGameStore: any) => boolean;
+  evaluateFlagTrigger: (trigger: any, narrativeState: any) => boolean;
+  evaluateResourceTrigger: (trigger: any, coreGameStore: any) => boolean;
   resetNarrative: () => void;
   migrateFromLegacyStores: () => void;
   
@@ -133,6 +151,7 @@ export interface NarrativeState {
   setCooldown: (storyletId: string, cooldownEnd: number) => void;
   unlockStorylet: (storyletId: string) => void;
   getCurrentStorylet: () => string | null;
+  recordStoryletCompletion: (storyletId: string, choiceId: string, completionData?: any) => void;
   
   // Flag management
   setStoryletFlag: (key: string, value: any) => void;
@@ -171,6 +190,7 @@ export interface NarrativeState {
   
   // Storylet catalog access (Domain: Narrative - User Created Content)
   getAllStorylets: () => Storylet[];
+  getStorylet: (storyletId: string) => Storylet | null;
   addUserStorylet: (storylet: Storylet) => void;
   updateUserStorylet: (storyletId: string, updates: Partial<Storylet>) => void;
   removeUserStorylet: (storyletId: string) => void;
@@ -199,11 +219,14 @@ export interface NarrativeState {
   completeMinigame: (minigameId: string) => void;
   closeMinigame: () => void;
   getActiveMinigame: () => string | null;
+  
+  // Store hydration tracking
+  setHasHydrated: (state: boolean) => void;
 }
 
 const getInitialNarrativeState = (): Omit<NarrativeState, 
-  'evaluateStoryletAvailability' | 'resetNarrative' | 'migrateFromLegacyStores' |
-  'addActiveStorylet' | 'removeActiveStorylet' | 'completeStorylet' | 'setCooldown' | 'unlockStorylet' | 'getCurrentStorylet' |
+  'evaluateStoryletAvailability' | 'evaluateStorylets' | 'evaluateStoryletTrigger' | 'evaluateTimeTrigger' | 'evaluateFlagTrigger' | 'evaluateResourceTrigger' | 'resetNarrative' | 'migrateFromLegacyStores' |
+  'addActiveStorylet' | 'removeActiveStorylet' | 'completeStorylet' | 'setCooldown' | 'unlockStorylet' | 'getCurrentStorylet' | 'recordStoryletCompletion' |
   'setStoryletFlag' | 'getStoryletFlag' | 'setConcernFlag' | 'getConcernFlag' |
   'setArcFlag' | 'getArcFlag' | 'createArc' | 'updateArc' | 'deleteArc' |
   'getArc' | 'getAllArcs' | 'startArc' | 'completeArc' | 'recordArcFailure' |
@@ -212,8 +235,11 @@ const getInitialNarrativeState = (): Omit<NarrativeState,
   'unlockAchievement' | 'getUnlockedAchievements' | 'hasAchievement' |
   'setActiveMinigame' | 'completeMinigame' | 'closeMinigame' | 'getActiveMinigame' |
   'addClue' | 'updateClue' | 'deleteClue' | 'discoverClue' | 'getClue' | 'getAllClues' | 'getDiscoveredClues' | 'getCluesByMinigame' | 'getCluesByStorylet' | 'createClue' |
-  'getAllStorylets' | 'addUserStorylet' | 'updateUserStorylet' | 'removeUserStorylet' | 'getStoryletsForArc'
+  'getAllStorylets' | 'getStorylet' | 'addUserStorylet' | 'updateUserStorylet' | 'removeUserStorylet' | 'getStoryletsForArc' | 'setHasHydrated'
 > => ({
+  // Store hydration tracking
+  _hasHydrated: false,
+  
   storylets: {
     active: [],
     completed: [],
@@ -262,6 +288,10 @@ export const useNarrativeStore = create<NarrativeState>()(
         // No auto-save timing concerns
         const state = get();
         
+        // Get storylet data
+        const storylet = state.storylets.userCreated.find(s => s.id === storyletId);
+        if (!storylet) return false;
+        
         // Check if storylet is on cooldown
         const cooldownEnd = state.storylets.cooldowns[storyletId];
         if (cooldownEnd && Date.now() < cooldownEnd) {
@@ -270,16 +300,193 @@ export const useNarrativeStore = create<NarrativeState>()(
         
         // Check if already completed and not repeatable
         if (state.storylets.completed.includes(storyletId)) {
-          // Would need storylet data to check if repeatable
+          // Resource-based storylets are repeatable
+          if (storylet.trigger?.type !== 'resource') {
+            return false;
+          }
+        }
+        
+        // Check if already active
+        if (state.storylets.active.includes(storyletId)) {
           return false;
         }
         
-        // Additional flag-based checks would go here
-        // This provides a unified evaluation point
-        return true;
+        // Evaluate trigger conditions
+        return get().evaluateStoryletTrigger(storylet);
       },
 
-      resetNarrative: () => set(getInitialNarrativeState()),
+      // Comprehensive storylet evaluation system
+      evaluateStorylets: () => {
+        console.log('🎭 ===== V2 STORYLET EVALUATION =====');
+        
+        const state = get();
+        const newActiveIds: string[] = [];
+        
+        // Get core game state for trigger evaluation
+        const coreGameStore = (window as any).useCoreGameStore?.getState();
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('📊 V2 Evaluation state:', {
+            totalStorylets: state.storylets.userCreated.length,
+            activeStorylets: state.storylets.active.length,
+            completedStorylets: state.storylets.completed.length,
+            coreGameDay: coreGameStore?.world?.day,
+            coreGameResources: coreGameStore?.player?.resources
+          });
+        }
+        
+        // Evaluate each storylet
+        state.storylets.userCreated.forEach((storylet) => {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`🔍 V2 Checking storylet: ${storylet.id} (${storylet.name})`);
+          }
+          
+          // Skip if already active or completed (except resource-based)
+          if (state.storylets.active.includes(storylet.id)) {
+            return;
+          }
+          
+          if (state.storylets.completed.includes(storylet.id) && storylet.trigger?.type !== 'resource') {
+            return;
+          }
+          
+          // Check cooldown
+          const cooldownEnd = state.storylets.cooldowns[storylet.id];
+          if (cooldownEnd && coreGameStore?.world?.day && coreGameStore.world.day < cooldownEnd) {
+            return;
+          }
+          
+          // Evaluate trigger
+          const canTrigger = get().evaluateStoryletTrigger(storylet);
+          
+          if (canTrigger) {
+            newActiveIds.push(storylet.id);
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`✅ 🎉 V2 UNLOCKING STORYLET: ${storylet.id} - ${storylet.name}`);
+            }
+          } else {
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`❌ V2 Cannot trigger ${storylet.id}`);
+            }
+          }
+        });
+        
+        // Add newly unlocked storylets
+        if (newActiveIds.length > 0) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`🎆 V2 Activating ${newActiveIds.length} new storylets:`, newActiveIds);
+          }
+          
+          set((state) => ({
+            ...state,
+            storylets: {
+              ...state.storylets,
+              active: [...state.storylets.active, ...newActiveIds]
+            }
+          }));
+        } else if (process.env.NODE_ENV === 'development') {
+          console.log('😴 V2 No new storylets activated');
+        }
+      },
+
+      // Helper method to evaluate storylet triggers
+      evaluateStoryletTrigger: (storylet: any): boolean => {
+        if (!storylet.trigger) return false;
+        
+        const coreGameStore = (window as any).useCoreGameStore?.getState();
+        const state = get();
+        
+        switch (storylet.trigger.type) {
+          case 'time':
+            return get().evaluateTimeTrigger(storylet.trigger, coreGameStore);
+          
+          case 'flag':
+            return get().evaluateFlagTrigger(storylet.trigger, state);
+          
+          case 'resource':
+            return get().evaluateResourceTrigger(storylet.trigger, coreGameStore);
+          
+          default:
+            console.warn(`V2 Unsupported trigger type: ${storylet.trigger.type}`);
+            return false;
+        }
+      },
+
+      // Time-based trigger evaluation
+      evaluateTimeTrigger: (trigger: any, coreGameStore: any): boolean => {
+        const currentDay = coreGameStore?.world?.day || 1;
+        const conditions = trigger.conditions || {};
+        
+        if (conditions.day !== undefined) {
+          return currentDay >= conditions.day;
+        }
+        
+        if (conditions.week !== undefined) {
+          return currentDay >= (conditions.week * 7);
+        }
+        
+        return false;
+      },
+
+      // Flag-based trigger evaluation
+      evaluateFlagTrigger: (trigger: any, narrativeState: any): boolean => {
+        const conditions = trigger.conditions || {};
+        const requiredFlags = conditions.flags || [];
+        
+        if (requiredFlags.length === 0) return true;
+        
+        // Check if all required flags are set
+        return requiredFlags.every((flagKey: string) => {
+          const flagValue = narrativeState.flags?.storylet?.get?.(flagKey);
+          return !!flagValue;
+        });
+      },
+
+      // Resource-based trigger evaluation
+      evaluateResourceTrigger: (trigger: any, coreGameStore: any): boolean => {
+        const conditions = trigger.conditions || {};
+        const currentResources = coreGameStore?.player?.resources || {};
+        
+        // Check each resource condition
+        return Object.entries(conditions).every(([resource, condition]) => {
+          const currentValue = currentResources[resource] || 0;
+          
+          if (typeof condition === 'number') {
+            return currentValue >= condition;
+          }
+          
+          if (typeof condition === 'object') {
+            const { min, max } = condition as any;
+            if (min !== undefined && currentValue < min) return false;
+            if (max !== undefined && currentValue > max) return false;
+            return true;
+          }
+          
+          return false;
+        });
+      },
+
+      resetNarrative: () => {
+        const currentState = get();
+        const initialState = getInitialNarrativeState();
+        
+        // Preserve user-created content when resetting
+        set({
+          ...initialState,
+          // Keep user-created storylets and arcs
+          storylets: {
+            ...initialState.storylets,
+            userCreated: currentState.storylets.userCreated // Preserve user storylets
+          },
+          storyArcs: currentState.storyArcs, // Preserve user arcs
+          clues: currentState.clues, // Preserve user clues
+          achievements: currentState.achievements, // Preserve achievements
+          // Keep hydration state
+          _hasHydrated: currentState._hasHydrated
+        });
+        
+        console.log('🔄 Narrative store reset (preserved user content)');
+      },
 
       migrateFromLegacyStores: () => {
         console.log('🔄 Migrating data from legacy stores to Narrative Store...');
@@ -475,6 +682,36 @@ export const useNarrativeStore = create<NarrativeState>()(
         const state = get();
         const activeArray = Array.isArray(state.storylets?.active) ? state.storylets.active : [];
         return activeArray.length > 0 ? activeArray[0] : null;
+      },
+
+      recordStoryletCompletion: (storyletId: string, choiceId: string, completionData?: any) => {
+        // Record the completion in our completion history
+        set((state) => {
+          const timestamp = Date.now();
+          const completion = {
+            storyletId,
+            choiceId,
+            timestamp,
+            completionData
+          };
+          
+          // For now, just mark as completed - can extend with completion history later
+          const activeArray = Array.isArray(state.storylets?.active) ? state.storylets.active : [];
+          const completedArray = Array.isArray(state.storylets?.completed) ? state.storylets.completed : [];
+          
+          return {
+            ...state,
+            storylets: {
+              ...state.storylets,
+              active: activeArray.filter(id => id !== storyletId),
+              completed: [...completedArray, storyletId]
+            }
+          };
+        });
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`📝 Recorded storylet completion: ${storyletId} -> choice: ${choiceId}`);
+        }
       },
 
       // Flag management
@@ -1123,9 +1360,15 @@ export const useNarrativeStore = create<NarrativeState>()(
         const newClue = {
           name: '',
           description: '',
+          content: '',
           discovered: false,
           category: 'general',
+          difficulty: 'medium' as const,
           importance: 'medium' as const,
+          minigameTypes: [],
+          associatedStorylets: [],
+          tags: [],
+          rarity: 'common' as const,
           ...clueData
         };
         
@@ -1142,6 +1385,11 @@ export const useNarrativeStore = create<NarrativeState>()(
       getAllStorylets: () => {
         const state = get();
         return state.storylets.userCreated;
+      },
+
+      getStorylet: (storyletId: string) => {
+        const state = get();
+        return state.storylets.userCreated.find(storylet => storylet.id === storyletId) || null;
       },
 
       addUserStorylet: (storylet: Storylet) => {
@@ -1176,17 +1424,60 @@ export const useNarrativeStore = create<NarrativeState>()(
         }));
       },
 
-      getStoryletsForArc: (arcId: string) => {
+      getStoryletsForArc: (arcIdOrName: string) => {
         const state = get();
+        
+        // Try to find arc by ID first
+        let arc = state.storyArcs[arcIdOrName];
+        
+        // If not found by ID, try to find by name
+        if (!arc) {
+          arc = Object.values(state.storyArcs).find(a => a.name === arcIdOrName);
+        }
+        
+        if (!arc) return [];
+        
+        // Filter by arc name (how storylets are actually assigned)
         return state.storylets.userCreated.filter(storylet => 
-          storylet.storyArc === arcId || (storylet as any).arcId === arcId
+          storylet.storyArc === arc.name || storylet.storyArc === arc.id || (storylet as any).arcId === arc.id
         );
+      },
+      
+      // Store hydration tracking
+      setHasHydrated: (state: boolean) => {
+        set((prevState) => ({
+          ...prevState,
+          _hasHydrated: state
+        }));
       }
     }),
     {
       name: 'mmv-narrative-store',
       version: CURRENT_VERSION,
       storage: createJSONStorage(() => debouncedStorage),
+      partialize: (state) => ({
+        // Only persist data, not action functions
+        _hasHydrated: state._hasHydrated,
+        storylets: state.storylets,
+        quests: state.quests,
+        flags: state.flags,
+        storyArcs: state.storyArcs,
+        arcProgress: state.arcProgress,
+        concerns: state.concerns,
+        achievements: state.achievements,
+        minigames: state.minigames,
+        clues: state.clues
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          console.log('✅ Narrative store hydrated');
+          console.log('🔍 Hydrated with arcs:', Object.keys(state.storyArcs || {}).length);
+          console.log('🔍 Hydrated with clues:', Object.keys(state.clues || {}).length);
+          state.setHasHydrated(true);
+        } else {
+          console.log('⚠️ Narrative store hydration failed - no state');
+        }
+      },
       migrate: (persistedState: any, version: number) => {
         console.log(`[NarrativeStore] Migrating from version ${version} to ${CURRENT_VERSION}`);
         

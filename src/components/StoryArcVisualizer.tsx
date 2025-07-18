@@ -35,7 +35,8 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   
   // V2 stores - Narrative domain
   const { getAllClues, updateArcLastAccessed, getAllArcs, getAllStorylets } = useNarrativeStore();
-  const clues = getAllClues();
+  const cluesObject = getAllClues();
+  const clues = Array.isArray(cluesObject) ? cluesObject : Object.values(cluesObject || {});
   const storyArcs = getAllArcs();
   
   // Local UI state (not managed by store)
@@ -143,9 +144,9 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     
     const arcClues = clues.filter(clue => 
       clue.storyArc === arcName || 
-      clue.associatedStorylets.some(storyletId => 
+      (clue.associatedStorylets && clue.associatedStorylets.some(storyletId => 
         filteredStorylets.some(storylet => storylet.id === storyletId)
-      )
+      ))
     );
     
     console.log(`🔍 Filtered clues for arc "${arcName}":`, arcClues.map(c => ({ id: c.id, title: c.title, outcomes: { pos: c.positiveOutcomeStorylet, neg: c.negativeOutcomeStorylet } })));

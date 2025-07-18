@@ -78,17 +78,34 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
       console.log('Creating clue:', clueData.title);
       // Generate ID for the clue
       const clueId = `clue_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const fullClueData = { ...clueData, id: clueId };
+      
+      // Map form fields to store fields
+      const mappedClueData = {
+        ...clueData,
+        id: clueId,
+        name: clueData.title,           // title → name
+        discovered: clueData.isDiscovered, // isDiscovered → discovered
+        minigameTypes: clueData.minigameTypes || [], // Ensure minigameTypes is always an array
+        associatedStorylets: clueData.associatedStorylets || [] // Ensure associatedStorylets is always an array
+      };
       
       // Call createClue (void return)
-      createClue(fullClueData);
+      createClue(mappedClueData);
       
       // Return the created clue data for CRUD operations
-      return fullClueData;
+      return mappedClueData;
     },
     updateItem: (clue: any) => {
       console.log('Updating clue:', clue.id);
-      updateClue(clue.id, clue);
+      // Map form fields to store fields
+      const mappedClueData = {
+        ...clue,
+        name: clue.title,           // title → name
+        discovered: clue.isDiscovered, // isDiscovered → discovered
+        minigameTypes: clue.minigameTypes || [], // Ensure minigameTypes is always an array
+        associatedStorylets: clue.associatedStorylets || [] // Ensure associatedStorylets is always an array
+      };
+      updateClue(clue.id, mappedClueData);
     },
     deleteItem: (id: string) => {
       console.log('Deleting clue:', id);
@@ -226,7 +243,7 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
       tags: '',
       rarity: 'common'
     });
-    setEditingClue(null);
+    setEditingItem(null);
   };
 
   // Validation helper function
@@ -264,7 +281,7 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
 
     if (success) {
       resetClueForm();
-      // Modal will be closed by CRUD operations automatically
+      setShowCreateModal(false); // Close the modal
       setSelectedClue('');
       persistence.markDirty();
     }
@@ -323,8 +340,8 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
       const success = await handleUpdate(updatedClue);
       
       if (success) {
-        // Modal will be closed by CRUD operations automatically
         resetClueForm();
+        setShowCreateModal(false); // Close the modal
         persistence.markDirty();
         console.log('✅ Clue updated successfully');
       } else {
@@ -480,7 +497,7 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                             {clue.storyArc}
                           </span>
                         )}
-                        {clue.minigameTypes.length > 0 && (
+                        {clue.minigameTypes && clue.minigameTypes.length > 0 && (
                           <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
                             {clue.minigameTypes.length} minigame{clue.minigameTypes.length !== 1 ? 's' : ''}
                           </span>
@@ -490,7 +507,7 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                             ⚡ Both Outcomes
                           </span>
                         )}
-                        {clue.associatedStorylets.length > 0 && (clue.positiveOutcomeStorylet || clue.negativeOutcomeStorylet) && (
+                        {clue.associatedStorylets && clue.associatedStorylets.length > 0 && (clue.positiveOutcomeStorylet || clue.negativeOutcomeStorylet) && (
                           <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800">
                             🔗 Arc Connections
                           </span>
@@ -559,7 +576,7 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                           </div>
                         </div>
                         
-                        {clue.minigameTypes.length > 0 && (
+                        {clue.minigameTypes && clue.minigameTypes.length > 0 && (
                           <div>
                             <h5 className="font-medium text-gray-800 mb-2">🎮 Discovery Minigames</h5>
                             <div className="space-y-1">
@@ -606,7 +623,7 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                           </div>
                         )}
                         
-                        {clue.associatedStorylets.length > 0 && (
+                        {clue.associatedStorylets && clue.associatedStorylets.length > 0 && (
                           <div>
                             <h5 className="font-medium text-gray-800 mb-2">Associated Storylets</h5>
                             <div className="space-y-1">
@@ -681,7 +698,7 @@ const ClueManager: React.FC<ClueManagerProps> = ({ undoRedoSystem }) => {
                             </span>
                           </div>
                           <div className="text-sm text-gray-600">
-                            {clue.associatedStorylets.length} storylet{clue.associatedStorylets.length !== 1 ? 's' : ''}
+                            {(clue.associatedStorylets || []).length} storylet{(clue.associatedStorylets || []).length !== 1 ? 's' : ''}
                           </div>
                         </div>
                       ))}
