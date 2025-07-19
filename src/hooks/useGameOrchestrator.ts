@@ -27,7 +27,7 @@ export function useGameOrchestrator() {
   const previousValuesRef = useRef({
     resources: resources,
     day: day,
-    storyletFlags: storyletFlags,
+    storyletFlags: storyletFlags instanceof Map ? new Map(storyletFlags) : storyletFlags,
     skills: skills,
     activeStoryletIds: activeStoryletIds,
     completedStoryletIds: completedStoryletIds
@@ -35,10 +35,18 @@ export function useGameOrchestrator() {
 
   // Reactive evaluation when relevant state changes (using v2 stores)
   useEffect(() => {
+    // Safe comparison for Maps
+    const compareMapLike = (a: any, b: any) => {
+      if (a instanceof Map && b instanceof Map) {
+        return JSON.stringify(Array.from(a.entries())) === JSON.stringify(Array.from(b.entries()));
+      }
+      return JSON.stringify(a) === JSON.stringify(b);
+    };
+    
     const hasChanged = (
       JSON.stringify(previousValuesRef.current.resources) !== JSON.stringify(resources) ||
       previousValuesRef.current.day !== day ||
-      JSON.stringify(previousValuesRef.current.storyletFlags) !== JSON.stringify(storyletFlags) ||
+      !compareMapLike(previousValuesRef.current.storyletFlags, storyletFlags) ||
       JSON.stringify(previousValuesRef.current.skills) !== JSON.stringify(skills) ||
       JSON.stringify(previousValuesRef.current.activeStoryletIds) !== JSON.stringify(activeStoryletIds) ||
       JSON.stringify(previousValuesRef.current.completedStoryletIds) !== JSON.stringify(completedStoryletIds)
@@ -51,7 +59,7 @@ export function useGameOrchestrator() {
       previousValuesRef.current = {
         resources: { ...resources },
         day,
-        storyletFlags: new Map(storyletFlags), // Handle Map serialization
+        storyletFlags: storyletFlags instanceof Map ? new Map(storyletFlags) : storyletFlags,
         skills: { ...skills },
         activeStoryletIds: [...activeStoryletIds],
         completedStoryletIds: [...completedStoryletIds]

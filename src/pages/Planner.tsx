@@ -23,8 +23,9 @@ const Planner: React.FC = () => {
   const narrativeStore = useNarrativeStore();
   const socialStore = useSocialStore();
   
-  const { player, character, world, skills } = coreStore;
+  const { player, character, world, skills, activeCharacter } = coreStore;
   const { storylets } = narrativeStore;
+  const { saves } = socialStore;
 
   // Resource management hook
   const resourceManager = useResourceManager();
@@ -108,11 +109,12 @@ const Planner: React.FC = () => {
     evaluateStorylets();
   }, []);
 
+
   return (
     <div className="page-container min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
-        <header className="mb-6">
+        <header className="mb-4">
           <div className="flex justify-between items-start mb-4">
             {/* Play Controls & Date */}
             <div className="flex flex-col items-start">
@@ -132,6 +134,24 @@ const Planner: React.FC = () => {
                 Day {world.day}
               </div>
               
+              {/* Player Name Input */}
+              <div className="mt-2">
+                <input
+                  type="text"
+                  placeholder="Character name"
+                  value={
+                    character?.name || 
+                    saves.saveSlots[saves.currentSaveId]?.characterName || 
+                    ''
+                  }
+                  onChange={(e) => {
+                    coreStore.updateCharacter({ name: e.target.value });
+                  }}
+                  className="text-red-500 text-sm bg-transparent border-none outline-none placeholder-red-400"
+                  style={{ width: 'auto', minWidth: '150px' }}
+                />
+              </div>
+              
               {!timeSimulation.canPlay && !timeSimulation.isPlaying && (
                 <div className="text-xs text-gray-500 mt-2 max-w-xs">
                   {!validation.canAllocate ? 'Reduce allocations to ≤ 100% before playing' : 
@@ -144,11 +164,6 @@ const Planner: React.FC = () => {
             
             {/* Title & Level Progress */}
             <div className="text-right">
-              {character && character.name && (
-                <div className="text-xl font-semibold text-gray-700 mb-2">
-                  {character.name}
-                </div>
-              )}
               <h1 className="text-4xl font-bold text-teal-800 mb-4">
                 Planner
               </h1>
@@ -171,13 +186,13 @@ const Planner: React.FC = () => {
           {/* Validation Messages */}
           <div className="text-center">
             {validation.allocationValidation.message && (
-              <div className={`mb-3 text-sm font-medium ${getValidationMessageClass()}`}>
+              <div className={`mb-2 text-sm font-medium ${getValidationMessageClass()}`}>
                 {validation.allocationValidation.message}
               </div>
             )}
             
             {crashRecovery.state.crashCheck.message && crashRecovery.state.crashCheck.type !== 'success' && (
-              <div className={`mb-3 text-sm font-medium ${getCrashCheckClass()}`}>
+              <div className={`mb-2 text-sm font-medium ${getCrashCheckClass()}`}>
                 {crashRecovery.state.crashCheck.message}
               </div>
             )}
@@ -185,7 +200,7 @@ const Planner: React.FC = () => {
         </header>
 
         {/* Three-Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           <div className="lg:col-span-1">
             <TimeAllocationPanel disabled={timeSimulation.isPlaying || crashRecovery.state.isCrashRecovery} />
           </div>
@@ -199,7 +214,7 @@ const Planner: React.FC = () => {
           </div>
         </div>
         
-        <div className="mb-8">
+        <div className="mb-6">
           <SkillsPanel />
         </div>
         

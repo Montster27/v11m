@@ -406,6 +406,10 @@ export const useNarrativeStore = create<NarrativeState>()(
           case 'resource':
             return get().evaluateResourceTrigger(storylet.trigger, coreGameStore);
           
+          case 'manual':
+            // Manual triggers are only activated by explicit user action, never by automatic evaluation
+            return false;
+          
           default:
             console.warn(`V2 Unsupported trigger type: ${storylet.trigger.type}`);
             return false;

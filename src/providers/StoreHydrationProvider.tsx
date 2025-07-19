@@ -63,7 +63,7 @@ export function StoreHydrationProvider({ children }: StoreHydrationProviderProps
         console.warn('⚠️ Store hydration timeout, rendering app anyway');
         setIsHydrated(true);
       }
-    }, 5000); // 5 second timeout
+    }, 8000); // 8 second timeout (increased for slower devices)
 
     return () => clearTimeout(timeout);
   }, [isHydrated]);
