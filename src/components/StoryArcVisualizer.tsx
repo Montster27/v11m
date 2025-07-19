@@ -48,9 +48,19 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   
   // Filter state
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
   const [filterTriggerType, setFilterTriggerType] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showFilters, setShowFilters] = useState<boolean>(false);
+  
+  // Debounce search input for better performance
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState<boolean>(false);
   
@@ -121,9 +131,9 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     onClose();
   }, [exportToMainStore, onClose]);
 
-  // Use filtering hook
+  // Use filtering hook with debounced search for better performance
   const filterOptions: FilterOptions = {
-    searchQuery,
+    searchQuery: debouncedSearchQuery,
     triggerType: filterTriggerType,
     status: filterStatus
   };
@@ -181,7 +191,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
 
 
 
-  const handleNodeClick = (nodeId: string) => {
+  const handleNodeClick = useCallback((nodeId: string) => {
     // Use our store's selected storylet management
     const currentSelectedId = useArcVisualizerStore.getState().selectedStoryletId;
     const newSelectedId = nodeId === currentSelectedId ? null : nodeId;
@@ -230,9 +240,9 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     } else {
       setHighlightedPath([]);
     }
-  };
+  }, [edges, setSelectedStorylet]);
 
-  const handleNodeDoubleClick = (nodeId: string) => {
+  const handleNodeDoubleClick = useCallback((nodeId: string) => {
     // Don't handle double clicks if we're in zoom mode
     if (viewport.isZooming) {
       return;
@@ -275,7 +285,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
         setTriggerConditionsText(JSON.stringify(formData.trigger?.conditions || {}, null, 2));
       }
     }, 200); // 200ms delay to allow zoom to settle
-  };
+  }, [viewport.isZooming, setEditingStorylet]);
 
   const handleSaveEdit = useCallback(() => {
     if (editingStorylet && editFormData.id && editFormData.name && editFormData.description) {
@@ -314,13 +324,13 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     }
   }, [editingStorylet, editFormData, updateStorylet]);
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = useCallback(() => {
     setEditingStorylet(null);
     setEditFormData({});
     setTriggerConditionsText('{}');
-  };
+  }, [setEditingStorylet]);
 
-  const addChoice = () => {
+  const addChoice = useCallback(() => {
     setEditFormData({
       ...editFormData,
       choices: [
@@ -332,7 +342,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
         }
       ]
     });
-  };
+  }, [editFormData]);
 
   const updateChoice = (index: number, field: keyof Choice, value: string | undefined) => {
     const choices = [...(editFormData.choices || [])];
@@ -437,8 +447,8 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   };
 
 
-  // Connection validation
-  const validateConnections = () => {
+  // Connection validation - memoized for performance
+  const connectionIssues = useMemo(() => {
     const issues: Array<{type: string, nodeId: string, message: string}> = [];
     
     nodes.forEach(node => {
@@ -511,18 +521,21 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     });
     
     return issues;
-  };
-
-  const connectionIssues = validateConnections();
+  }, [nodes, edges]);
   
   // Auto-save functionality (disabled for now to prevent edit panel from disappearing)
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(true); // Enabled by default
   
-  // Auto-save functionality
+  // Optimized auto-save - only save on meaningful changes
+  const hasEditChanges = useMemo(() => {
+    if (!editingStorylet || !editFormData.id) return false;
+    return JSON.stringify(editingStorylet) !== JSON.stringify(editFormData);
+  }, [editingStorylet, editFormData]);
+  
   useEffect(() => {
-    if (!autoSaveEnabled || !editingStorylet || !hasUnsavedChanges) return;
+    if (!autoSaveEnabled || !hasEditChanges) return;
     
     const autoSaveTimer = setTimeout(() => {
       if (editFormData.id && editFormData.name && editFormData.description) {
@@ -532,14 +545,19 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     }, 2000); // Auto-save after 2 seconds of inactivity
     
     return () => clearTimeout(autoSaveTimer);
-  }, [editFormData, hasUnsavedChanges, autoSaveEnabled, editingStorylet, handleSaveEdit]);
+  }, [hasEditChanges, autoSaveEnabled, handleSaveEdit, editFormData.id, editFormData.name, editFormData.description]);
   
-  // Track changes to form data
+  // Track changes to form data - use the optimized hasEditChanges
   useEffect(() => {
-    if (editingStorylet) {
-      setHasUnsavedChanges(true);
+    setHasUnsavedChanges(hasEditChanges);
+  }, [hasEditChanges]);
+
+  // Performance monitoring for development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🎨 StoryArcVisualizer render - nodes:', nodes.length, 'edges:', edges.length);
     }
-  }, [editFormData, editingStorylet]);
+  });
 
   // Clean up is handled by the viewport hook
 
@@ -547,7 +565,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   const toggleSelectionMode = () => {
     setSelectionMode(!selectionMode);
     setSelectedNodes(new Set());
-    setSelectedNode(null);
+    setSelectedStorylet(null);
     setHighlightedPath([]);
     setIsDragSelecting(false);
     setDragSelection(null);
@@ -728,9 +746,12 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     }
   }, [contextMenu.visible]);
 
-  const viewBox = nodes.length > 0 && viewport.zoom > 0
-    ? `${-viewport.panX / viewport.zoom} ${-viewport.panY / viewport.zoom} ${Math.max(1200, Math.max(...nodes.map(n => n.x)) + 250) / viewport.zoom} ${Math.max(600, Math.max(...nodes.map(n => n.y)) + 150) / viewport.zoom}`
-    : '0 0 1200 600';
+  // Memoized ViewBox calculation for performance
+  const viewBox = useMemo(() => {
+    return nodes.length > 0 && viewport.zoom > 0
+      ? `${-viewport.panX / viewport.zoom} ${-viewport.panY / viewport.zoom} ${Math.max(1200, Math.max(...nodes.map(n => n.x)) + 250) / viewport.zoom} ${Math.max(600, Math.max(...nodes.map(n => n.y)) + 150) / viewport.zoom}`
+      : '0 0 1200 600';
+  }, [nodes, viewport.panX, viewport.panY, viewport.zoom]);
 
   return (
     <Card className="fixed inset-0 z-50 bg-white p-6 overflow-auto">
