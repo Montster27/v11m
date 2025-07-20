@@ -480,12 +480,13 @@ export const runQuickMinigameTest = async (): Promise<void> => {
 };
 
 // Initialize and expose test functions
+import { exposeToWindow } from '../../utils/debug';
+
 const tester = new MinigameIntegrationTester();
 
-if (typeof window !== 'undefined') {
-  window.runMinigameIntegrationTests = () => tester.runAllTests();
-  window.runQuickMinigameTest = runQuickMinigameTest;
-}
+// Expose test functions to window for development use
+exposeToWindow('runMinigameIntegrationTests', () => tester.runAllTests());
+exposeToWindow('runQuickMinigameTest', runQuickMinigameTest);
 
 export default tester;
 export { MinigameIntegrationTester, type TestResult, type TestSuite };

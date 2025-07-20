@@ -1,0 +1,88 @@
+{
+  "env": {
+    "browser": true,
+    "es2021": true,
+    "node": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "@typescript-eslint/recommended",
+    "plugin:react/recommended",
+    "plugin:react-hooks/recommended"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaFeatures": {
+      "jsx": true
+    },
+    "ecmaVersion": 12,
+    "sourceType": "module"
+  },
+  "plugins": [
+    "react",
+    "@typescript-eslint",
+    "react-hooks"
+  ],
+  "rules": {
+    // V2 Migration Enforcement Rules
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["**/useAppStore", "**/store/useAppStore"],
+            "message": "❌ MIGRATION: useAppStore is deprecated. Use useCoreGameStore from './stores/v2' instead."
+          },
+          {
+            "group": ["**/useStoryletStore", "**/store/useStoryletStore"],
+            "message": "❌ MIGRATION: useStoryletStore is deprecated. Use useNarrativeStore from './stores/v2' instead."
+          },
+          {
+            "group": ["**/useClueStore", "**/store/useClueStore"],
+            "message": "❌ MIGRATION: useClueStore is deprecated. Use useNarrativeStore from './stores/v2' instead."
+          },
+          {
+            "group": ["**/useMinigameStore", "**/store/useMinigameStore"],
+            "message": "❌ MIGRATION: useMinigameStore is deprecated. Use useCoreGameStore from './stores/v2' instead."
+          },
+          {
+            "group": ["**/useNPCStore", "**/store/useNPCStore"],
+            "message": "❌ MIGRATION: useNPCStore is deprecated. Use useSocialStore from './stores/v2' instead."
+          },
+          {
+            "group": ["**/useStoryletCatalogStore", "**/store/useStoryletCatalogStore"],
+            "message": "❌ MIGRATION: useStoryletCatalogStore is deprecated. Use useNarrativeStore from './stores/v2' instead."
+          },
+          {
+            "group": ["**/useSaveStoreV2", "**/store/useSaveStoreV2"],
+            "message": "❌ MIGRATION: useSaveStoreV2 is deprecated. Use useSocialStore from './stores/v2' instead."
+          },
+          {
+            "group": ["**/useCharacterStore", "**/store/useCharacterStore"],
+            "message": "❌ MIGRATION: useCharacterStore is deprecated. Use useCoreGameStore from './stores/v2' instead."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "src/stores/**/*",
+        "src/test/**/*",
+        "src/**/*.test.ts",
+        "src/**/*.test.tsx",
+        "deprecated/**/*",
+        ".githooks/**/*"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ],
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
+  }
+}

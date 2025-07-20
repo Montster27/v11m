@@ -30,7 +30,14 @@
     "test:ui": "vitest --ui",
     "cleanup:orphaned": "npx ts-node scripts/removeOrphanedFiles.ts",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "validate:health": "npm run audit:ci && npm run lint:no-console && npm run check:stores && npm run check:types && npm run test",
+    "audit:ci": "npm audit --audit-level=high",
+    "lint:no-console": "eslint . --ext .ts,.tsx --quiet --rule 'no-console: [\"error\", { \"allow\": [\"warn\", \"error\"] }]'",
+    "check:stores": "! find src -type d -name 'store' | grep -v 'stores' | grep .",
+    "check:types": "tsc --noEmit",
+    "check:window": "! grep -r 'window\\.' src/ | grep -v 'exposeToWindow' | grep .",
+    "check:debug": "! grep -r 'console\\.log' src/ | grep ."
   },
   "build": {
     "appId": "com.montysharma.v11m2",

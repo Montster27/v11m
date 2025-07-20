@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Game Image Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .image-item {
+            text-align: center;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .image-item img {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: white;
+        }
+        .image-item .name {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #666;
+            word-break: break-word;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🃏 Memory Game Image Test</h1>
+        <p>Testing if all memory game images load correctly from: <code>/images/memory-game/</code></p>
+        
+        <div id="status" class="status info">Loading images...</div>
+        
+        <div class="image-grid" id="imageGrid">
+            <!-- Images will be loaded here -->
+        </div>
+    </div>
+
+    <script>
+        // Expected image files from MemoryCardGame.tsx
+        const expectedImages = [
+            'cassette.png',
+            'coffee_mug.png',
+            'flyer.png',
+            'id_card.png',
+            'lava_lamp.png',
+            'notebook.png',
+            'socks.png',
+            'walkman.png',
+            'beer.png',
+            'rock_band.png',
+            'Girl_hair.png',
+            'police.png',
+            'blondie.png',
+            'Clash.png',
+            'VHS.png',
+            'milk_crate.png',
+            'c64.png'
+        ];
+
+        let loadedCount = 0;
+        let errorCount = 0;
+        const total = expectedImages.length;
+
+        function updateStatus() {
+            const statusEl = document.getElementById('status');
+            if (loadedCount + errorCount === total) {
+                if (errorCount === 0) {
+                    statusEl.className = 'status success';
+                    statusEl.textContent = `✅ All ${total} images loaded successfully!`;
+                } else {
+                    statusEl.className = 'status error';
+                    statusEl.textContent = `❌ ${errorCount} images failed to load. ${loadedCount} loaded successfully.`;
+                }
+            } else {
+                statusEl.textContent = `Loading... ${loadedCount} loaded, ${errorCount} errors`;
+            }
+        }
+
+        function testImage(imageName) {
+            const container = document.getElementById('imageGrid');
+            const imageItem = document.createElement('div');
+            imageItem.className = 'image-item';
+            
+            const img = document.createElement('img');
+            const label = document.createElement('div');
+            label.className = 'name';
+            label.textContent = imageName;
+            
+            img.onload = function() {
+                loadedCount++;
+                imageItem.style.borderColor = '#28a745';
+                imageItem.style.backgroundColor = '#d4edda';
+                updateStatus();
+                console.log(`✅ Loaded: ${imageName}`);
+            };
+            
+            img.onerror = function() {
+                errorCount++;
+                img.alt = '❌ Failed to load';
+                img.style.background = '#f8d7da';
+                imageItem.style.borderColor = '#dc3545';
+                imageItem.style.backgroundColor = '#f8d7da';
+                updateStatus();
+                console.error(`❌ Failed to load: ${imageName}`);
+            };
+            
+            img.src = `/images/memory-game/${imageName}`;
+            img.alt = imageName;
+            
+            imageItem.appendChild(img);
+            imageItem.appendChild(label);
+            container.appendChild(imageItem);
+        }
+
+        // Test all images
+        expectedImages.forEach(testImage);
+        
+        console.log('🃏 Testing memory game images...');
+        console.log('Expected images:', expectedImages);
+        console.log('Loading from path: /images/memory-game/');
+    </script>
+</body>
+</html>
