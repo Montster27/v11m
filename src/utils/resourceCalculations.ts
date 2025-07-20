@@ -1,6 +1,6 @@
 // /Users/montysharma/V11M2/src/utils/resourceCalculations.ts
 
-import type { Character } from '../store/characterStore';
+import type { Character } from '../stores/characterStore';
 import type { IntegratedCharacter, DomainKey } from '../types/integratedCharacter';
 
 export interface ResourceDeltas {

@@ -1,6 +1,6 @@
 // Arc Progress Display Component
 import React from 'react';
-import { useStoryletStore } from '../store/useStoryletStore';
+import { useStoryletStore } from '../stores/useStoryletStore';
 import { Card, ProgressBar } from './ui';
 
 interface ArcProgressDisplayProps {

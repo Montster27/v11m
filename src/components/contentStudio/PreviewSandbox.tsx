@@ -1,8 +1,8 @@
 // /Users/montysharma/V11M2/src/components/contentStudio/PreviewSandbox.tsx
 
 import React, { useState } from 'react';
-import { useAppStore } from '../../store/useAppStore';
-import { useStoryletStore } from '../../store/useStoryletStore';
+import { useAppStore } from '../../stores/useAppStore';
+import { useStoryletStore } from '../../stores/useStoryletStore';
 import { UndoRedoAction } from '../../hooks/useUndoRedo';
 import HelpTooltip from '../ui/HelpTooltip';
 

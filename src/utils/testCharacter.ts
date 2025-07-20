@@ -1,7 +1,7 @@
 // /Users/montysharma/V11M2/src/utils/testCharacter.ts
 
-import { useCharacterStore } from '../store/characterStore';
-import { useAppStore } from '../store/useAppStore';
+import { useCharacterStore } from '../stores/characterStore';
+import { useAppStore } from '../stores/useAppStore';
 
 // Create a test character for development
 export const createTestCharacter = () => {

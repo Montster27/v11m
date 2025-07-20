@@ -1,6 +1,8 @@
 // /Users/montysharma/V11M2/src/test-integration.ts
 // Integration Test Script - Run in browser console
 
+import { exposeToWindow } from './utils/debug';
+
 declare global {
   interface Window {
     useAppStore: any;
@@ -221,7 +223,5 @@ export const resetGameState = () => {
 };
 
 // Make functions available globally
-if (typeof window !== 'undefined') {
-  window.testIntegration = testIntegration;
-  window.resetGameState = resetGameState;
-}
+exposeToWindow('testIntegration', testIntegration);
+exposeToWindow('resetGameState', resetGameState);

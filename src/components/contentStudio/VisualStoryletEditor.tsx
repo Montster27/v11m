@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { UndoRedoAction } from '../../hooks/useUndoRedo';
-import { useStoryletStore } from '../../store/useStoryletStore';
+import { useStoryletStore } from '../../stores/useStoryletStore';
 import type { Storylet } from '../../types/storylet';
 import HelpTooltip from '../ui/HelpTooltip';
 

@@ -1,6 +1,6 @@
 // /Users/montysharma/V11M2/src/components/CharacterCreation/Step1_Name.tsx
 import React, { useState, useEffect } from 'react';
-import { useCharacterStore } from '../../store/characterStore';
+import { useCharacterStore } from '../../stores/characterStore';
 import { Card, Button } from '../ui';
 
 const Step1_Name: React.FC = () => {

@@ -1,7 +1,7 @@
 // Test utility for creating storylets with clue discovery effects for arc testing
 import type { Storylet } from '../types/storylet';
-import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
-import { useClueStore } from '../store/useClueStore';
+import { useStoryletCatalogStore } from '../stores/useStoryletCatalogStore';
+import { useClueStore } from '../stores/useClueStore';
 
 /**
  * Creates test storylets with clue discovery effects for testing arc functionality

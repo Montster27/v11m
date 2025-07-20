@@ -4,10 +4,10 @@
 // NOTE: This migration file intentionally uses legacy stores (useClueStore, useNPCStore, useStoryletCatalogStore)
 // as it needs to read from them during the migration process. Legacy store usage here is by design.
 
-import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
-import { useNPCStore } from '../store/useNPCStore';
-import { useClueStore } from '../store/useClueStore';
-import { useStoryArcStore } from '../store/useStoryArcStore';
+import { useStoryletCatalogStore } from '../stores/useStoryletCatalogStore';
+import { useNPCStore } from '../stores/useNPCStore';
+import { useClueStore } from '../stores/useClueStore';
+import { useStoryArcStore } from '../stores/useStoryArcStore';
 import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
 import { useSocialStore } from '../stores/v2/useSocialStore';
 import { useCoreGameStore } from '../stores/v2/useCoreGameStore';

@@ -1,8 +1,8 @@
 // /Users/montysharma/V11M2/src/components/StoryletProgress.tsx
 
 import React, { useState } from 'react';
-import { useSaveStoreV2 } from '../store/useSaveStoreV2';
-import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
+import { useSaveStoreV2 } from '../stores/useSaveStoreV2';
+import { useStoryletCatalogStore } from '../stores/useStoryletCatalogStore';
 import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
 import type { StoryletCompletion } from '../types/save';
 import Button from './ui/Button';

@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore } from '../stores/useAppStore';
 import { useAvailableStorylets } from '../hooks/useAvailableStorylets';
 import { Button, Card } from '../components/ui';
 import StoryletPanel from '../components/StoryletPanel';

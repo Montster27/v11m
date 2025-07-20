@@ -1,8 +1,8 @@
 // /Users/montysharma/V11M2/src/components/contentStudio/AdvancedStoryletCreator.tsx
 
 import React, { useState, useEffect } from 'react';
-import { useStoryletStore } from '../../store/useStoryletStore';
-import { useClueStore } from '../../store/useClueStore';
+import { useStoryletStore } from '../../stores/useStoryletStore';
+import { useClueStore } from '../../stores/useClueStore';
 import { UndoRedoAction } from '../../hooks/useUndoRedo';
 import type { Storylet } from '../../types/storylet';
 import HelpTooltip from '../ui/HelpTooltip';

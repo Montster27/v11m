@@ -1,6 +1,6 @@
 // /Users/montysharma/V11M2/src/components/QuestManager.tsx
 import React, { useState, useMemo } from 'react';
-import { useAppStore, Quest } from '../store/useAppStore';
+import { useAppStore, Quest } from '../stores/useAppStore';
 import { Button, Card } from './ui';
 import QuestEditor from './QuestEditor';
 import QuestFilters from './QuestFilters';

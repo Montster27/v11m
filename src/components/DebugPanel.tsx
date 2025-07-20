@@ -1,7 +1,7 @@
 // /Users/montysharma/V11M2/src/components/DebugPanel.tsx
 
 import React, { useState, useEffect } from 'react';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore } from '../stores/useAppStore';
 import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
 import ClueManagementPanel from './ClueManagementPanel';
 import BalanceTestingPanel from './BalanceTestingPanel';

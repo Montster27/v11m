@@ -1,8 +1,8 @@
 // /Users/montysharma/V11M2/src/components/Navigation.tsx
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useAppStore } from '../store/useAppStore';
-import { useCharacterStore } from '../store/characterStore';
+import { useAppStore } from '../stores/useAppStore';
+import { useCharacterStore } from '../stores/characterStore';
 import { ProgressBadge } from './ui';
 import SaveManager from './SaveManager';
 import StoryletProgress from './StoryletProgress';

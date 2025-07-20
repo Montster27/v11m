@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { Card, Slider } from './ui';
-import { useAppStore } from '../store/useAppStore';
-import { useCharacterStore } from '../store/characterStore';
+import { useAppStore } from '../stores/useAppStore';
+import { useCharacterStore } from '../stores/characterStore';
 import { getActivityStats, percentToHoursPerWeek, percentToHoursPerDay } from '../utils/resourceCalculations';
 import { validateSleepHours } from '../utils/validation';
 

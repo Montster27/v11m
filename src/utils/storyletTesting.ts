@@ -1,7 +1,7 @@
 // /Users/montysharma/V11M2/src/utils/storyletTesting.ts
 
-import { useAppStore } from '../store/useAppStore';
-import { useStoryletStore } from '../store/useStoryletStore';
+import { useAppStore } from '../stores/useAppStore';
+import { useStoryletStore } from '../stores/useStoryletStore';
 
 export const testStoryletSystem = () => {
   console.log('🧪 ===== STORYLET SYSTEM TEST =====');

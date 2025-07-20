@@ -24,6 +24,14 @@
     "react-hooks"
   ],
   "rules": {
+    // Phase 1: Console.log prevention
+    "no-console": [
+      "error",
+      {
+        "allow": ["warn", "error"]
+      }
+    ],
+    
     // V2 Migration Enforcement Rules
     "no-restricted-imports": [
       "error",

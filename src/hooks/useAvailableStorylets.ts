@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
-import { useCharacterConcernsStore } from '../store/useCharacterConcernsStore';
+import { useCharacterConcernsStore } from '../stores/useCharacterConcernsStore';
 import { useCoreGameStore } from '../stores/v2';
 import { generateAllFlags, getFlagGeneratorStats } from '../utils/flagGenerator';
 import type { Storylet } from '../types/storylet';

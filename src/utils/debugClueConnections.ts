@@ -1,6 +1,6 @@
 // Debug utility to check and fix clue connections in the Story Arc Visualizer
-import { useClueStore } from '../store/useClueStore';
-import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
+import { useClueStore } from '../stores/useClueStore';
+import { useStoryletCatalogStore } from '../stores/useStoryletCatalogStore';
 
 export function debugClueConnections() {
   console.log('🔍 Debugging Clue Connections...');

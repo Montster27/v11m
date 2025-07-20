@@ -1,8 +1,8 @@
 // /Users/montysharma/V11M2/src/components/StoryletManagementPanel.tsx
 import React, { useState, useEffect } from 'react';
-import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
-import { useClueStore } from '../store/useClueStore';
-import { useNPCStore } from '../store/useNPCStore';
+import { useStoryletCatalogStore } from '../stores/useStoryletCatalogStore';
+import { useClueStore } from '../stores/useClueStore';
+import { useNPCStore } from '../stores/useNPCStore';
 import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
 import { useSocialStore } from '../stores/v2/useSocialStore';
 import { Button, Card } from './ui';

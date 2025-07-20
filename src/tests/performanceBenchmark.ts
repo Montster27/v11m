@@ -5,7 +5,7 @@ import { generateConcernFlags, getFlagGeneratorStats } from '../utils/flagGenera
 import { useAvailableStorylets } from '../hooks/useAvailableStorylets';
 import { saveManager } from '../utils/saveManager';
 import { useCharacterConcernsStore } from '../stores/useCharacterConcernsStore';
-import { useStoryletStore } from '../store/useStoryletStore';
+import { useStoryletStore } from '../stores/useStoryletStore';
 import { useCoreGameStore, useNarrativeStore } from '../stores/v2';
 import subscriptionManager from '../utils/subscriptionManager';
 import { memoryLeakDetector } from '../utils/memoryLeakDetector';

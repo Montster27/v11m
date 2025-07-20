@@ -2,8 +2,8 @@
 // Refactored AdvancedStoryletCreator using shared foundation - PRESERVES ALL ARC FUNCTIONALITY
 
 import React, { useState, useEffect } from 'react';
-import { useStoryletStore } from '../../store/useStoryletStore';
-import { useClueStore } from '../../store/useClueStore';
+import { useStoryletStore } from '../../stores/useStoryletStore';
+import { useClueStore } from '../../stores/useClueStore';
 import type { Storylet } from '../../types/storylet';
 import { safeParseJSON } from '../../utils/validation';
 

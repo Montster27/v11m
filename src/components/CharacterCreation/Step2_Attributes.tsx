@@ -1,6 +1,6 @@
 // /Users/montysharma/V11M2/src/components/CharacterCreation/Step2_Attributes.tsx
 import React, { useEffect, useState } from 'react';
-import { useCharacterStore } from '../../store/characterStore';
+import { useCharacterStore } from '../../stores/characterStore';
 import { Card, Button } from '../ui';
 
 // Helper functions to improve readability

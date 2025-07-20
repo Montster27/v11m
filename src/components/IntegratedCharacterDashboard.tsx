@@ -2,7 +2,7 @@
 // New character dashboard for the integrated 7-domain system
 
 import React, { useState } from 'react';
-import { useIntegratedCharacterStore } from '../store/integratedCharacterStore';
+import { useIntegratedCharacterStore } from '../stores/integratedCharacterStore';
 import { 
   DomainKey, 
   DOMAIN_DISPLAY_INFO, 

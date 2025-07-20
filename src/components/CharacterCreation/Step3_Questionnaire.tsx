@@ -1,6 +1,6 @@
 // /Users/montysharma/V11M2/src/components/CharacterCreation/Step3_Questionnaire.tsx
 import React, { useState } from 'react';
-import { useCharacterStore, questionnaireData } from '../../store/characterStore';
+import { useCharacterStore, questionnaireData } from '../../stores/characterStore';
 import { Card, Button } from '../ui';
 import { Character } from '../../types/character';
 

@@ -2,7 +2,7 @@
 // Development component to test save/load migration functionality
 
 import React, { useState, useEffect } from 'react';
-import { useSaveStoreV2 } from '../../store/useSaveStoreV2';
+import { useSaveStoreV2 } from '../../stores/useSaveStoreV2';
 import { 
   detectSaveFiles, 
   migrateAllLegacySaves, 

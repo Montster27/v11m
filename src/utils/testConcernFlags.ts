@@ -1,6 +1,6 @@
 // Test utility for character concerns and storylet flag integration
-import { useStoryletStore } from '../store/useStoryletStore';
-import { useCharacterConcernsStore } from '../store/useCharacterConcernsStore';
+import { useStoryletStore } from '../stores/useStoryletStore';
+import { useCharacterConcernsStore } from '../stores/useCharacterConcernsStore';
 
 export const createTestConcernStorylets = () => {
   const storyletStore = useStoryletStore.getState();

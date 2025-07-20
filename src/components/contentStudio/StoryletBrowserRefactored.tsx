@@ -2,8 +2,8 @@
 // Refactored StoryletBrowser using shared foundation - preserves all functionality
 
 import React, { useState, useMemo } from 'react';
-import { useStoryletStore } from '../../store/useStoryletStore';
-import { useStoryletCatalogStore } from '../../store/useStoryletCatalogStore';
+import { useStoryletStore } from '../../stores/useStoryletStore';
+import { useStoryletCatalogStore } from '../../stores/useStoryletCatalogStore';
 import type { Storylet } from '../../types/storylet';
 
 // Shared foundation imports

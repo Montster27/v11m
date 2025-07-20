@@ -3,7 +3,7 @@
 // Handles migration between legacy and V2 save formats
 
 import type { SaveData, SaveSlot } from '../types/save';
-import type { SaveDataV2 } from '../store/useSaveStoreV2';
+import type { SaveDataV2 } from '../stores/useSaveStoreV2';
 
 export interface MigrationResult {
   success: boolean;

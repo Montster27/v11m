@@ -1,6 +1,6 @@
 // /Users/montysharma/V11M2/src/components/CharacterCreation/Step4_Review.tsx
 import React, { useState } from 'react';
-import { useCharacterStore } from '../../store/characterStore';
+import { useCharacterStore } from '../../stores/characterStore';
 import { Card, Button } from '../ui';
 import RadarChart from './RadarChart';
 

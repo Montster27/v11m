@@ -3,8 +3,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { ArcTester, type ArcTestSession, type PlaythroughStep, type ArcTestResults, type ArcIssue } from '../../utils/arcTesting';
-import { useStoryletStore } from '../../store/useStoryletStore';
-import { useStoryletCatalogStore } from '../../store/useStoryletCatalogStore';
+import { useStoryletStore } from '../../stores/useStoryletStore';
+import { useStoryletCatalogStore } from '../../stores/useStoryletCatalogStore';
 import type { Storylet, Choice, MinigameType } from '../../types/storylet';
 import MinigameManager from '../minigames/MinigameManager';
 

@@ -1,5 +1,5 @@
 // Global Type Definitions for Window Extensions
-import { StoryletState } from '../store/useStoryletStore';
+import { StoryletState } from '../stores/useStoryletStore';
 import type { Storylet, Choice } from './storylet';
 import type { IntegratedCharacter } from './integratedCharacter';
 import type { Clue } from './clue';

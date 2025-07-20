@@ -1,6 +1,6 @@
 // /Users/montysharma/V11M2/src/components/StoryArcVisualizer.tsx
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useArcVisualizerStore, useArcStorylets, useSelectedStorylet, useEditingStorylet } from '../store/useArcVisualizerStore';
+import { useArcVisualizerStore, useArcStorylets, useSelectedStorylet, useEditingStorylet } from '../stores/useArcVisualizerStore';
 import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
 import { Button, Card } from './ui';
 import { Storylet, Choice, Effect, StoryletDeploymentStatus } from '../types/storylet';
@@ -9,6 +9,7 @@ import { calculateGraphLayout, Node, Edge, LayoutConfig } from '../utils/graphLa
 import { useStoryletFilter, FilterOptions } from '../hooks/useStoryletFilter';
 import { useViewport, useViewportDrag } from '../hooks/useViewport';
 import { formatConditionValue, formatStoryletName, formatTriggerSummary, formatEffectSummary, getStatusColor, getTriggerTypeColor } from '../utils/displayFormatters';
+import { devLog } from '../utils/debug';
 
 interface StoryArcVisualizerProps {
   arcName: string;
@@ -83,8 +84,8 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   
   // Initialize and reactively update when catalog changes or arc changes
   useEffect(() => {
-    console.log(`🏛️ Loading Arc Visualizer for "${arcName}"`);
-    console.log(`📦 Catalog has ${Object.keys(catalogStorylets).length} total storylets`);
+    devLog(`🏛️ Loading Arc Visualizer for "${arcName}"`);
+    devLog(`📦 Catalog has ${Object.keys(catalogStorylets).length} total storylets`);
     
     // Update last accessed time for this arc
     updateArcLastAccessed(arcName);
@@ -93,7 +94,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     const arcStorylets = Object.values(catalogStorylets).filter(
       storylet => storylet.storyArc === arcName
     );
-    console.log(`📚 Found ${arcStorylets.length} storylets for arc "${arcName}":`, arcStorylets.map(s => s.id));
+    devLog(`📚 Found ${arcStorylets.length} storylets for arc "${arcName}":`, arcStorylets.map(s => s.id));
     
     // Import them into our dedicated store
     importFromMainStore(arcStorylets, arcName);
@@ -102,11 +103,11 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
 
   // Handle closing the visualizer and sync back to main store
   const handleClose = useCallback(() => {
-    console.log('🚪 Closing Arc Visualizer, syncing data back to main store...');
+    devLog('🚪 Closing Arc Visualizer, syncing data back to main store...');
     
     // Export storylets back to main catalog store
     const exportedStorylets = exportToMainStore();
-    console.log(`📤 Exported ${exportedStorylets.length} storylets back to main store`);
+    devLog(`📤 Exported ${exportedStorylets.length} storylets back to main store`);
     
     // Actually save them to the V2 narrative store
     const { addUserStorylet, updateUserStorylet, getAllStorylets } = useNarrativeStore.getState();
@@ -114,12 +115,12 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     const existingIds = new Set(existingStorylets.map(s => s.id));
     
     exportedStorylets.forEach(storylet => {
-      console.log(`💾 Saving storylet to V2 store: ${storylet.id} - ${storylet.name}`);
+      devLog(`💾 Saving storylet to V2 store: ${storylet.id} - ${storylet.name}`);
       if (existingIds.has(storylet.id)) {
-        console.log(`📝 Updating existing storylet: ${storylet.id}`);
+        devLog(`📝 Updating existing storylet: ${storylet.id}`);
         updateUserStorylet(storylet.id, storylet);
       } else {
-        console.log(`🆕 Adding new storylet: ${storylet.id}`);
+        devLog(`🆕 Adding new storylet: ${storylet.id}`);
         addUserStorylet(storylet);
       }
     });
@@ -145,12 +146,12 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
 
   // Calculate graph layout using extracted utility
   const { nodes, edges } = useMemo(() => {
-    console.log(`🎨 Arc Visualizer: Calculating layout for ${filteredStorylets.length} storylets`);
-    console.log(`🎨 Filtered storylets:`, filteredStorylets.map(s => ({ id: s.id, name: s.name, arc: s.storyArc })));
+    devLog(`🎨 Arc Visualizer: Calculating layout for ${filteredStorylets.length} storylets`);
+    devLog(`🎨 Filtered storylets:`, filteredStorylets.map(s => ({ id: s.id, name: s.name, arc: s.storyArc })));
     
     // Filter clues that belong to this arc or are associated with storylets in this arc
-    console.log(`🔍 ALL CLUES COUNT: ${clues.length}`);
-    console.log(`🔍 All clues available:`, clues.map(c => ({ id: c.id, title: c.title, arc: c.storyArc, associated: c.associatedStorylets })));
+    devLog(`🔍 ALL CLUES COUNT: ${clues.length}`);
+    devLog(`🔍 All clues available:`, clues.map(c => ({ id: c.id, title: c.title, arc: c.storyArc, associated: c.associatedStorylets })));
     
     const arcClues = clues.filter(clue => 
       clue.storyArc === arcName || 
@@ -159,25 +160,25 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
       ))
     );
     
-    console.log(`🔍 Filtered clues for arc "${arcName}":`, arcClues.map(c => ({ id: c.id, title: c.title, outcomes: { pos: c.positiveOutcomeStorylet, neg: c.negativeOutcomeStorylet } })));
+    devLog(`🔍 Filtered clues for arc "${arcName}":`, arcClues.map(c => ({ id: c.id, title: c.title, outcomes: { pos: c.positiveOutcomeStorylet, neg: c.negativeOutcomeStorylet } })));
     
     const layout = calculateGraphLayout(filteredStorylets, arcClues);
-    console.log(`🎨 Generated ${layout.nodes.length} nodes and ${layout.edges.length} edges`);
-    console.log(`🎨 Using ${arcClues.length} clues for outcome connections`);
+    devLog(`🎨 Generated ${layout.nodes.length} nodes and ${layout.edges.length} edges`);
+    devLog(`🎨 Using ${arcClues.length} clues for outcome connections`);
     
     // Debug: Log edge types to see if clue connections are present
     const edgesByType = layout.edges.reduce((acc, edge) => {
       acc[edge.edgeType || 'choice'] = (acc[edge.edgeType || 'choice'] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-    console.log(`🎨 Edge types breakdown:`, edgesByType);
+    devLog(`🎨 Edge types breakdown:`, edgesByType);
     
     // Debug: Log clue-related edges specifically
     const clueEdges = layout.edges.filter(edge => edge.edgeType?.includes('clue'));
     if (clueEdges.length > 0) {
-      console.log(`🎨 Clue edges found:`, clueEdges.map(e => `${e.from} -> ${e.to} (${e.edgeType})`));
+      devLog(`🎨 Clue edges found:`, clueEdges.map(e => `${e.from} -> ${e.to} (${e.edgeType})`));
     } else {
-      console.log(`⚠️ No clue edges found despite ${arcClues.length} clues`);
+      devLog(`⚠️ No clue edges found despite ${arcClues.length} clues`);
     }
     
     return layout;
@@ -260,7 +261,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
         return;
       }
       
-      console.log(`✏️ Opening edit mode for storylet: ${nodeId}`);
+      devLog(`✏️ Opening edit mode for storylet: ${nodeId}`);
       
       // Use our dedicated store to set editing mode
       setEditingStorylet(nodeId);
@@ -289,8 +290,8 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
 
   const handleSaveEdit = useCallback(() => {
     if (editingStorylet && editFormData.id && editFormData.name && editFormData.description) {
-      console.log('💾 Saving storylet with form data:', editFormData);
-      console.log('💾 Choices being saved:', editFormData.choices);
+      devLog('💾 Saving storylet with form data:', editFormData);
+      devLog('💾 Choices being saved:', editFormData.choices);
       
       const updatedStorylet: Storylet = {
         ...editingStorylet,
@@ -304,7 +305,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
         storyArc: editFormData.storyArc
       };
       
-      console.log('💾 Final storylet being saved:', updatedStorylet);
+      devLog('💾 Final storylet being saved:', updatedStorylet);
       updateStorylet(updatedStorylet);
       
       // Clear unsaved changes and update save time
@@ -313,9 +314,9 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
       
       // Don't close edit panel - keep it open for continued editing
       // Users can manually close it when they're done
-      console.log('✅ Storylet saved, keeping edit mode open for continued editing');
+      devLog('✅ Storylet saved, keeping edit mode open for continued editing');
     } else {
-      console.log('❌ Save failed - missing required fields:', {
+      devLog('❌ Save failed - missing required fields:', {
         editingStorylet: !!editingStorylet,
         id: editFormData.id,
         name: editFormData.name,
@@ -425,12 +426,12 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   };
 
   const updateEffect = (choiceIndex: number, effectIndex: number, effect: Effect) => {
-    console.log('🔧 Updating effect:', { choiceIndex, effectIndex, effect });
+    devLog('🔧 Updating effect:', { choiceIndex, effectIndex, effect });
     const choices = [...(editFormData.choices || [])];
     if (choiceIndex >= 0 && choiceIndex < choices.length && effectIndex >= 0 && effectIndex < choices[choiceIndex].effects.length) {
       choices[choiceIndex].effects[effectIndex] = effect;
       setEditFormData({ ...editFormData, choices });
-      console.log('📝 Updated choices:', choices);
+      devLog('📝 Updated choices:', choices);
     }
   };
 
@@ -539,7 +540,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     
     const autoSaveTimer = setTimeout(() => {
       if (editFormData.id && editFormData.name && editFormData.description) {
-        console.log('🔄 Auto-saving storylet...');
+        devLog('🔄 Auto-saving storylet...');
         handleSaveEdit();
       }
     }, 2000); // Auto-save after 2 seconds of inactivity
@@ -555,7 +556,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   // Performance monitoring for development
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      console.log('🎨 StoryArcVisualizer render - nodes:', nodes.length, 'edges:', edges.length);
+      devLog('🎨 StoryArcVisualizer render - nodes:', nodes.length, 'edges:', edges.length);
     }
   });
 
@@ -585,7 +586,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
     const confirmed = window.confirm(`Are you sure you want to delete ${selectedNodes.size} storylet(s)?`);
     if (confirmed) {
       selectedNodes.forEach(nodeId => {
-        console.log('Deleting storylet:', nodeId);
+        devLog('Deleting storylet:', nodeId);
       });
       setSelectedNodes(new Set());
     }
@@ -725,7 +726,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
   };
 
   const createNewStorylet = (template?: 'basic' | 'choice_hub' | 'branch_point') => {
-    console.log(`🆕 Creating new ${template || 'basic'} storylet in arc "${arcName}"`);
+    devLog(`🆕 Creating new ${template || 'basic'} storylet in arc "${arcName}"`);
     
     // Use our dedicated store's createStorylet function
     const newStoryletId = createStorylet(template || 'basic', arcName);
@@ -1486,7 +1487,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                   <select
                     value={editFormData.trigger?.type || 'time'}
                     onChange={(e) => {
-                      console.log('🎯 Trigger type changed to:', e.target.value);
+                      devLog('🎯 Trigger type changed to:', e.target.value);
                       const triggerType = e.target.value as 'time' | 'flag' | 'resource';
                       
                       // Provide appropriate default conditions for each trigger type
@@ -1504,7 +1505,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                         conditions: defaultConditions 
                       };
                       
-                      console.log('🎯 New trigger created:', newTrigger);
+                      devLog('🎯 New trigger created:', newTrigger);
                       setEditFormData({
                         ...editFormData,
                         trigger: newTrigger
@@ -1724,20 +1725,20 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                       value={triggerConditionsText}
                       onChange={(e) => {
                         const newText = e.target.value;
-                        console.log('🎯 Trigger conditions text changed to:', newText);
+                        devLog('🎯 Trigger conditions text changed to:', newText);
                         setTriggerConditionsText(newText);
                         
                         // Try to parse JSON and update form data if valid
                         const conditions = safeParseJSON(newText, null);
                         if (conditions !== null) {
-                          console.log('🎯 Parsed conditions:', conditions);
+                          devLog('🎯 Parsed conditions:', conditions);
                           const validatedConditions = validateTriggerConditions(conditions);
                           setEditFormData({
                             ...editFormData,
                             trigger: { ...editFormData.trigger!, conditions: validatedConditions }
                           });
                         } else {
-                          console.log('🎯 Invalid JSON in trigger conditions (will not update form)');
+                          devLog('🎯 Invalid JSON in trigger conditions (will not update form)');
                           // Invalid JSON, don't update form data but allow text editing
                         }
                       }}
@@ -1887,7 +1888,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                 <select
                                   value={effect.type}
                                   onChange={(e) => {
-                                    console.log('🔄 Effect type changed to:', e.target.value);
+                                    devLog('🔄 Effect type changed to:', e.target.value);
                                     let newEffect: Effect = { type: e.target.value as Effect['type'] } as Effect;
                                     if (e.target.value === 'resource') {
                                       newEffect = { type: 'resource', key: 'energy', delta: 0 };
@@ -1898,7 +1899,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                     } else if (e.target.value === 'arcJump') {
                                       newEffect = { type: 'arcJump', destinationArc: '', targetStoryletId: '', unlockStorylets: [] };
                                     }
-                                    console.log('🔄 New effect created:', newEffect);
+                                    devLog('🔄 New effect created:', newEffect);
                                     updateEffect(choiceIndex, effectIndex, newEffect);
                                   }}
                                   className="text-xs border rounded px-1 py-0.5"
@@ -1917,7 +1918,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                         type="text"
                                         value={resourceEffect.key || ''}
                                         onChange={(e) => {
-                                          console.log('💰 Resource key changed to:', e.target.value);
+                                          devLog('💰 Resource key changed to:', e.target.value);
                                           updateEffect(choiceIndex, effectIndex, { 
                                             type: 'resource', 
                                             key: e.target.value, 
@@ -1931,7 +1932,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                         type="number"
                                         value={resourceEffect.delta || 0}
                                         onChange={(e) => {
-                                          console.log('💰 Resource delta changed to:', e.target.value);
+                                          devLog('💰 Resource delta changed to:', e.target.value);
                                           updateEffect(choiceIndex, effectIndex, { 
                                             type: 'resource', 
                                             key: resourceEffect.key, 
@@ -1952,7 +1953,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                         type="text"
                                         value={flagEffect.key || ''}
                                         onChange={(e) => {
-                                          console.log('🏁 Flag key changed to:', e.target.value);
+                                          devLog('🏁 Flag key changed to:', e.target.value);
                                           updateEffect(choiceIndex, effectIndex, { 
                                             type: 'flag', 
                                             key: e.target.value, 
@@ -1965,7 +1966,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                       <select
                                         value={flagEffect.value ? 'true' : 'false'}
                                         onChange={(e) => {
-                                          console.log('🏁 Flag value changed to:', e.target.value);
+                                          devLog('🏁 Flag value changed to:', e.target.value);
                                           updateEffect(choiceIndex, effectIndex, { 
                                             type: 'flag', 
                                             key: flagEffect.key, 
@@ -1987,7 +1988,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                     <select
                                       value={clueEffect.clueId || ''}
                                       onChange={(e) => {
-                                        console.log('🔍 Clue changed to:', e.target.value);
+                                        devLog('🔍 Clue changed to:', e.target.value);
                                         updateEffect(choiceIndex, effectIndex, { 
                                           ...clueEffect,
                                           clueId: e.target.value
@@ -2017,7 +2018,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                       <select
                                         value={arcJumpEffect.destinationArc || ''}
                                         onChange={(e) => {
-                                          console.log('🚀 Destination arc changed to:', e.target.value);
+                                          devLog('🚀 Destination arc changed to:', e.target.value);
                                           updateEffect(choiceIndex, effectIndex, { 
                                             ...arcJumpEffect,
                                             destinationArc: e.target.value,
@@ -2039,7 +2040,7 @@ const StoryArcVisualizer: React.FC<StoryArcVisualizerProps> = ({ arcName, onClos
                                         <select
                                           value={arcJumpEffect.targetStoryletId || ''}
                                           onChange={(e) => {
-                                            console.log('🎯 Target storylet changed to:', e.target.value);
+                                            devLog('🎯 Target storylet changed to:', e.target.value);
                                             updateEffect(choiceIndex, effectIndex, { 
                                               ...arcJumpEffect,
                                               targetStoryletId: e.target.value || undefined

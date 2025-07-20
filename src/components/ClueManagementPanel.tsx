@@ -1,7 +1,7 @@
 // /Users/montysharma/V11M2/src/components/ClueManagementPanel.tsx
 import React, { useState } from 'react';
-import { useClueStore } from '../store/useClueStore';
-import { useStoryletStore } from '../store/useStoryletStore';
+import { useClueStore } from '../stores/useClueStore';
+import { useStoryletStore } from '../stores/useStoryletStore';
 import { Button, Card } from './ui';
 import { Clue, ClueFormData, StoryArc } from '../types/clue';
 

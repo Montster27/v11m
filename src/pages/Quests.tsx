@@ -1,6 +1,6 @@
 // /Users/montysharma/V11M2/src/pages/Quests.tsx
 import React from 'react';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore } from '../stores/useAppStore';
 import { Card } from '../components/ui';
 import QuestManager from '../components/QuestManager';
 

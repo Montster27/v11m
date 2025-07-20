@@ -3,9 +3,9 @@
 // The original file can be gradually migrated to use these patterns
 
 import React, { useState, useEffect } from 'react';
-import { useStoryletStore } from '../store/useStoryletStore';
-import { useClueStore } from '../store/useClueStore';
-import { useNPCStore } from '../store/useNPCStore';
+import { useStoryletStore } from '../stores/useStoryletStore';
+import { useClueStore } from '../stores/useClueStore';
+import { useNPCStore } from '../stores/useNPCStore';
 import { Button, Card } from './ui';
 import { StoryletDeploymentStatus, Storylet } from '../types/storylet';
 import { StoryletOverview } from './StoryletOverview';

@@ -7,6 +7,7 @@ import { globalTimeoutManager } from '../utils/timeoutManager';
 import { getAppState, getNPCStore, isAppStoreAvailable, isNPCStoreAvailable, isIntegratedCharacterStoreAvailable, isSkillSystemV2StoreAvailable, isSaveStoreAvailable } from '../types/global';
 import { debounce, AsyncQueue } from '../utils/debounce';
 import { useStoryletCatalogStore } from './useStoryletCatalogStore';
+import { devLog } from '../utils/debug';
 
 // Arc progression types
 interface ArcProgress {
@@ -134,14 +135,14 @@ const shouldSkipStorylet = (storylet: Storylet, state: any, appState: any) => {
 
 const evaluateTimeTrigger = (trigger: any, appState: any) => {
   if (!appState) {
-    console.log('❌ No app state for time trigger evaluation');
+    devLog('❌ No app state for time trigger evaluation');
     return false;
   }
   
   const currentDay = appState.day;
   const conditions = trigger.conditions;
   
-  console.log('⏰ Evaluating time trigger:', {
+  devLog('⏰ Evaluating time trigger:', {
     currentDay,
     conditions,
     dayCondition: conditions.day,
@@ -151,7 +152,7 @@ const evaluateTimeTrigger = (trigger: any, appState: any) => {
   // Check day-based trigger (exact day match)
   if (conditions.day !== undefined) {
     const meets = currentDay >= conditions.day;
-    console.log(`📅 Day trigger: current=${currentDay}, required=${conditions.day}, meets=${meets}`);
+    devLog(`📅 Day trigger: current=${currentDay}, required=${conditions.day}, meets=${meets}`);
     return meets;
   }
   
@@ -159,11 +160,11 @@ const evaluateTimeTrigger = (trigger: any, appState: any) => {
   if (conditions.week !== undefined) {
     const requiredDay = conditions.week * 7;
     const meets = currentDay >= requiredDay;
-    console.log(`📅 Week trigger: current=${currentDay}, required=${requiredDay} (week ${conditions.week}), meets=${meets}`);
+    devLog(`📅 Week trigger: current=${currentDay}, required=${requiredDay} (week ${conditions.week}), meets=${meets}`);
     return meets;
   }
   
-  console.log('❌ No time conditions found');
+  devLog('❌ No time conditions found');
   return false;
 };
 
@@ -303,7 +304,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     const catalogStore = useStoryletCatalogStore.getState();
     const currentStorylets = catalogStore.allStorylets;
     
-    console.log('🔄 Syncing storylets from catalog store:', Object.keys(currentStorylets).length);
+    devLog('🔄 Syncing storylets from catalog store:', Object.keys(currentStorylets).length);
     
     set((state) => ({
       allStorylets: currentStorylets
@@ -327,8 +328,8 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     const newActiveIds: string[] = [];
     
     if (process.env.NODE_ENV === 'development') {
-      console.log('🎭 ===== EVALUATING STORYLETS =====');
-      console.log('📊 Current state:', {
+      devLog('🎭 ===== EVALUATING STORYLETS =====');
+      devLog('📊 Current state:', {
         currentDay: appState?.day,
         resources: appState?.resources,
         activeFlags: state.activeFlags,
@@ -340,11 +341,11 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     
     Object.values(state.allStorylets).forEach((storylet) => {
       if (process.env.NODE_ENV === 'development') {
-        console.log(`\n🔍 Checking storylet: ${storylet.id} (${storylet.name})`);
+        devLog(`\n🔍 Checking storylet: ${storylet.id} (${storylet.name})`);
         
         // Special logging for Starting storylets
         if (storylet.storyArc === 'Starting') {
-          console.log(`🎯 STARTING STORYLET: ${storylet.id}`, {
+          devLog(`🎯 STARTING STORYLET: ${storylet.id}`, {
             trigger: storylet.trigger,
             deploymentStatus: storylet.deploymentStatus,
             currentDay: appState?.day
@@ -358,7 +359,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       
       if (!shouldShowByDeployment) {
         if (process.env.NODE_ENV === 'development') {
-          console.log(`🚫 Skipping ${storylet.id} due to deployment filter:`, {
+          devLog(`🚫 Skipping ${storylet.id} due to deployment filter:`, {
             storyletStatus,
             currentFilter: Array.from(state.deploymentFilter)
           });
@@ -368,7 +369,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       
       if (shouldSkipStorylet(storylet, state, appState)) {
         if (process.env.NODE_ENV === 'development') {
-          console.log(`⏭️ Skipping ${storylet.id}:`, {
+          devLog(`⏭️ Skipping ${storylet.id}:`, {
             alreadyActive: state.activeStoryletIds.includes(storylet.id),
             onCooldown: state.storyletCooldowns[storylet.id] && appState && appState.day < state.storyletCooldowns[storylet.id],
             alreadyCompleted: state.completedStoryletIds.includes(storylet.id) && storylet.trigger.type !== 'resource',
@@ -422,17 +423,17 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
           };
         }
         
-        console.log(`📝 ${storylet.id} evaluation:`, triggerDetails);
+        devLog(`📝 ${storylet.id} evaluation:`, triggerDetails);
       }
       
       if (canTrigger) {
         newActiveIds.push(storylet.id);
         if (process.env.NODE_ENV === 'development') {
-          console.log(`✅ 🎉 UNLOCKING STORYLET: ${storylet.id} - ${storylet.name}`);
+          devLog(`✅ 🎉 UNLOCKING STORYLET: ${storylet.id} - ${storylet.name}`);
         }
       } else {
         if (process.env.NODE_ENV === 'development') {
-          console.log(`❌ Cannot trigger ${storylet.id}`);
+          devLog(`❌ Cannot trigger ${storylet.id}`);
         }
       }
     });
@@ -440,13 +441,13 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     // Add newly unlocked storylets to active list
     if (newActiveIds.length > 0) {
       if (process.env.NODE_ENV === 'development') {
-        console.log(`🎆 Activating ${newActiveIds.length} new storylets:`, newActiveIds);
+        devLog(`🎆 Activating ${newActiveIds.length} new storylets:`, newActiveIds);
       }
       set((state) => ({
         activeStoryletIds: [...state.activeStoryletIds, ...newActiveIds]
       }));
     } else if (process.env.NODE_ENV === 'development') {
-      console.log('😴 No new storylets activated');
+      devLog('😴 No new storylets activated');
     }
   },
   
@@ -485,8 +486,8 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     
     // Log the storylet choice event
     if (process.env.NODE_ENV === 'development') {
-      console.log(`🎭 StoryletChoice: ${storylet.name} → ${choice.text}`);
-      console.log('📋 Effects to apply:', choice.effects);
+      devLog(`🎭 StoryletChoice: ${storylet.name} → ${choice.text}`);
+      devLog('📋 Effects to apply:', choice.effects);
     }
     
     // Record storylet completion in save system
@@ -505,7 +506,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       // Find and launch the minigame, but don't complete the storylet yet
       const minigameEffect = choice.effects.find(effect => effect.type === 'minigame');
       if (minigameEffect) {
-        console.log(`🎮 Launching minigame: ${minigameEffect.gameId} from storylet ${storyletId}`);
+        devLog(`🎮 Launching minigame: ${minigameEffect.gameId} from storylet ${storyletId}`);
         get().launchMinigame(minigameEffect.gameId as MinigameType, minigameEffect, storyletId, choiceId);
         
         // Apply non-minigame effects immediately
@@ -527,7 +528,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       // Find and launch the clue discovery, potentially with minigame
       const clueEffect = choice.effects.find(effect => effect.type === 'clueDiscovery');
       if (clueEffect) {
-        console.log(`🔍 Triggering clue discovery: ${clueEffect.clueId} from storylet ${storyletId}`);
+        devLog(`🔍 Triggering clue discovery: ${clueEffect.clueId} from storylet ${storyletId}`);
         get().launchClueDiscovery(clueEffect, storyletId, choiceId);
         
         // Apply non-clue-discovery effects immediately
@@ -594,7 +595,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   // Apply an individual effect
   applyEffect: (effect: Effect, context?: { storyletId?: string; choiceId?: string }) => {
     if (process.env.NODE_ENV === 'development') {
-      console.log(`⚙️ Applying effect:`, effect);
+      devLog(`⚙️ Applying effect:`, effect);
     }
     
     switch (effect.type) {
@@ -713,7 +714,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
             const npcStore = (window as any).useNPCStore.getState();
             npcStore.adjustRelationship(effect.npcId, effect.delta, effect.reason || 'Storylet interaction');
             if (process.env.NODE_ENV === 'development') {
-              console.log(`💝 Adjusted ${effect.npcId} relationship by ${effect.delta}`);
+              devLog(`💝 Adjusted ${effect.npcId} relationship by ${effect.delta}`);
             }
           }
         } catch (error) {
@@ -729,7 +730,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
             const choiceId = context?.choiceId || 'unknown_choice';
             npcStore.addMemory(effect.npcId, effect.memory, storyletId, choiceId);
             if (process.env.NODE_ENV === 'development') {
-              console.log(`🧠 Added memory to ${effect.npcId}: ${effect.memory.description}`);
+              devLog(`🧠 Added memory to ${effect.npcId}: ${effect.memory.description}`);
             }
           }
         } catch (error) {
@@ -743,7 +744,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
             const npcStore = (window as any).useNPCStore.getState();
             npcStore.setNPCFlag(effect.npcId, effect.flag, effect.value);
             if (process.env.NODE_ENV === 'development') {
-              console.log(`🏷️ Set ${effect.npcId} flag ${effect.flag} to ${effect.value}`);
+              devLog(`🏷️ Set ${effect.npcId} flag ${effect.flag} to ${effect.value}`);
             }
           }
         } catch (error) {
@@ -757,7 +758,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
             const npcStore = (window as any).useNPCStore.getState();
             npcStore.updateNPCMood(effect.npcId, effect.mood, effect.duration);
             if (process.env.NODE_ENV === 'development') {
-              console.log(`😊 Set ${effect.npcId} mood to ${effect.mood}${effect.duration ? ` for ${effect.duration}s` : ''}`);
+              devLog(`😊 Set ${effect.npcId} mood to ${effect.mood}${effect.duration ? ` for ${effect.duration}s` : ''}`);
             }
           }
         } catch (error) {
@@ -771,7 +772,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
             const npcStore = (window as any).useNPCStore.getState();
             npcStore.updateNPCAvailability(effect.npcId, effect.availability, effect.duration);
             if (process.env.NODE_ENV === 'development') {
-              console.log(`📍 Set ${effect.npcId} availability to ${effect.availability}${effect.duration ? ` for ${effect.duration}s` : ''}`);
+              devLog(`📍 Set ${effect.npcId} availability to ${effect.availability}${effect.duration ? ` for ${effect.duration}s` : ''}`);
             }
           }
         } catch (error) {
@@ -782,7 +783,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       case 'arcJump':
         try {
           if (process.env.NODE_ENV === 'development') {
-            console.log(`🚀 Arc Jump: Transitioning to "${effect.destinationArc}"${effect.targetStoryletId ? ` → ${effect.targetStoryletId}` : ''}`);
+            devLog(`🚀 Arc Jump: Transitioning to "${effect.destinationArc}"${effect.targetStoryletId ? ` → ${effect.targetStoryletId}` : ''}`);
           }
           
           // Get storylets from destination arc
@@ -799,7 +800,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
             if (targetStorylet) {
               get().unlockStorylet(effect.targetStoryletId);
               if (process.env.NODE_ENV === 'development') {
-                console.log(`🎯 Unlocked target storylet "${effect.targetStoryletId}" in arc "${effect.destinationArc}"`);
+                devLog(`🎯 Unlocked target storylet "${effect.targetStoryletId}" in arc "${effect.destinationArc}"`);
               }
             } else {
               console.warn(`Target storylet "${effect.targetStoryletId}" not found in arc "${effect.destinationArc}"`);
@@ -812,7 +813,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
               if (arcStorylets.some(s => s.id === storyletId)) {
                 get().unlockStorylet(storyletId);
                 if (process.env.NODE_ENV === 'development') {
-                  console.log(`✨ Unlocked storylet "${storyletId}" in arc "${effect.destinationArc}"`);
+                  devLog(`✨ Unlocked storylet "${storyletId}" in arc "${effect.destinationArc}"`);
                 }
               } else {
                 console.warn(`Storylet "${storyletId}" not found in arc "${effect.destinationArc}"`);
@@ -831,7 +832,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
               if (isSimpleTrigger) {
                 get().unlockStorylet(storylet.id);
                 if (process.env.NODE_ENV === 'development') {
-                  console.log(`✨ Auto-unlocked storylet "${storylet.id}" from arc "${effect.destinationArc}"`);
+                  devLog(`✨ Auto-unlocked storylet "${storylet.id}" from arc "${effect.destinationArc}"`);
                 }
               }
             });
@@ -863,7 +864,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   
   // Add a new storylet to the catalog
   addStorylet: (storylet: Storylet) => {
-    console.log(`🎯 addStorylet called with:`, storylet);
+    devLog(`🎯 addStorylet called with:`, storylet);
     
     // Add to catalog store (source of truth)
     const catalogStore = useStoryletCatalogStore.getState();
@@ -872,10 +873,10 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     // Sync from catalog store to update local state
     get().syncFromCatalogStore();
     
-    console.log(`🎯 After set, allStorylets keys:`, Object.keys(get().allStorylets));
+    devLog(`🎯 After set, allStorylets keys:`, Object.keys(get().allStorylets));
     
     if (process.env.NODE_ENV === 'development') {
-      console.log(`✅ Added new storylet: ${storylet.id}`);
+      devLog(`✅ Added new storylet: ${storylet.id}`);
     }
   },
 
@@ -889,7 +890,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     get().syncFromCatalogStore();
     
     if (process.env.NODE_ENV === 'development') {
-      console.log(`✏️ Updated storylet: ${storylet.id}`);
+      devLog(`✏️ Updated storylet: ${storylet.id}`);
     }
   },
 
@@ -912,7 +913,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     get().syncFromCatalogStore();
     
     if (process.env.NODE_ENV === 'development') {
-      console.log(`🗑️ Deleted storylet: ${storyletId}`);
+      devLog(`🗑️ Deleted storylet: ${storyletId}`);
     }
   },
 
@@ -937,7 +938,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     });
     
     if (process.env.NODE_ENV === 'development') {
-      console.log(`📚 Added story arc: ${arcName}`);
+      devLog(`📚 Added story arc: ${arcName}`);
     }
   },
 
@@ -967,7 +968,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     });
     
     if (process.env.NODE_ENV === 'development') {
-      console.log(`🗑️ Removed story arc: ${arcName}`);
+      devLog(`🗑️ Removed story arc: ${arcName}`);
     }
   },
 
@@ -1110,7 +1111,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   
   // Reset storylets for testing
   resetStorylets: () => {
-    console.log('🔄 Resetting storylet store...');
+    devLog('🔄 Resetting storylet store...');
     set({
       activeFlags: {},
       activeStoryletIds: [],
@@ -1122,12 +1123,12 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     
     // Note: Re-evaluation after reset is handled reactively by useGameOrchestrator hook
     
-    console.log('✅ Storylet store reset complete');
+    devLog('✅ Storylet store reset complete');
   },
   
   // Launch a minigame
   launchMinigame: (gameId: MinigameType, effect: Effect, storyletId: string, choiceId: string) => {
-    console.log(`🎮 Launching minigame: ${gameId}`);
+    devLog(`🎮 Launching minigame: ${gameId}`);
     
     // Pause time when launching minigame
     try {
@@ -1157,7 +1158,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       return;
     }
     
-    console.log(`🎮 Minigame completed: ${success ? 'SUCCESS' : 'FAILURE'}`, stats);
+    devLog(`🎮 Minigame completed: ${success ? 'SUCCESS' : 'FAILURE'}`, stats);
     
     const { effect, storyletId, choiceId } = minigameContext;
     
@@ -1177,7 +1178,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
           const clueResult = (window as any).triggerClueDiscovery(effect.gameId, storyletId, characterId);
           
           if (clueResult) {
-            console.log(`🔍 Clue discovered: ${clueResult.clue.title}`);
+            devLog(`🔍 Clue discovered: ${clueResult.clue.title}`);
             
             // Show notification
             if (typeof window !== 'undefined' && (window as any).showClueNotification) {
@@ -1260,7 +1261,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   closeMinigame: () => {
     const { minigameContext, activeStoryletIds, completedStoryletIds, allStorylets } = get();
     
-    console.log('🎮 Minigame closed');
+    devLog('🎮 Minigame closed');
     
     // Complete the storylet even if minigame was closed (treat as cancellation)
     if (minigameContext && minigameContext.storyletId && minigameContext.choiceId) {
@@ -1302,11 +1303,11 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       return;
     }
 
-    console.log(`🔍 Launching clue discovery: ${effect.clueId}`);
+    devLog(`🔍 Launching clue discovery: ${effect.clueId}`);
     
     // Check if clue discovery includes a minigame
     if (effect.minigameType) {
-      console.log(`🎮 Clue discovery includes minigame: ${effect.minigameType}`);
+      devLog(`🎮 Clue discovery includes minigame: ${effect.minigameType}`);
       
       // Pause time when launching minigame
       try {
@@ -1345,7 +1346,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
           
           if (discoveryResult) {
             const discoveredClue = clueStore.getClueById(effect.clueId);
-            console.log(`🔍 Clue discovered directly: ${discoveredClue?.title || effect.clueId}`);
+            devLog(`🔍 Clue discovered directly: ${discoveredClue?.title || effect.clueId}`);
             
             // Show notification if available
             if (typeof window !== 'undefined' && (window as any).showClueNotification) {
@@ -1394,7 +1395,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   completeClueDiscovery: (success: boolean, clueId: string) => {
     const { minigameContext, activeStoryletIds, completedStoryletIds, allStorylets } = get();
     
-    console.log(`🔍 Clue discovery completed: ${success ? 'SUCCESS' : 'FAILURE'} for clue ${clueId}`);
+    devLog(`🔍 Clue discovery completed: ${success ? 'SUCCESS' : 'FAILURE'} for clue ${clueId}`);
     
     // If this was triggered by a minigame, handle the minigame completion
     if (minigameContext && minigameContext.effect.type === 'clueDiscovery') {
@@ -1418,7 +1419,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
             
             if (discoveryResult) {
               const discoveredClue = clueStore.getClueById(clueId);
-              console.log(`🔍 Clue discovered via minigame: ${discoveredClue?.title || clueId}`);
+              devLog(`🔍 Clue discovered via minigame: ${discoveredClue?.title || clueId}`);
               
               // Show notification
               if (typeof window !== 'undefined' && (window as any).showClueNotification) {
@@ -1509,7 +1510,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   
   // Development actions
   setDeploymentFilter: (filter: Set<'live' | 'stage' | 'dev'>) => {
-    console.log(`🔧 Setting deployment filter to: ${Array.from(filter).join(', ')}`);
+    devLog(`🔧 Setting deployment filter to: ${Array.from(filter).join(', ')}`);
     set({ deploymentFilter: new Set(filter) });
     
     // Note: Re-evaluation with new filter is handled reactively by useGameOrchestrator hook
@@ -1530,7 +1531,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       newFilter.add('live');
     }
     
-    console.log(`🔧 Toggled ${status}, new filter: ${Array.from(newFilter).join(', ')}`);
+    devLog(`🔧 Toggled ${status}, new filter: ${Array.from(newFilter).join(', ')}`);
     set({ deploymentFilter: newFilter });
     
     // Note: Re-evaluation with new filter is handled reactively by useGameOrchestrator hook
@@ -1541,7 +1542,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     const storylet = allStorylets[storyletId];
     
     if (storylet) {
-      console.log(`🔧 Updating ${storyletId} deployment status to: ${status}`);
+      devLog(`🔧 Updating ${storyletId} deployment status to: ${status}`);
       
       set({
         allStorylets: {
@@ -1593,9 +1594,9 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       ...currentState.allStorylets,
       ...(persistedState?.allStorylets || {})
     };
-    console.log('🔄 Merging state - Current storylets:', Object.keys(currentState.allStorylets).length);
-    console.log('🔄 Merging state - Persisted storylets:', Object.keys(persistedState?.allStorylets || {}).length);
-    console.log('🔄 Merging state - Final storylets:', Object.keys(mergedStorylets).length);
+    devLog('🔄 Merging state - Current storylets:', Object.keys(currentState.allStorylets).length);
+    devLog('🔄 Merging state - Persisted storylets:', Object.keys(persistedState?.allStorylets || {}).length);
+    devLog('🔄 Merging state - Final storylets:', Object.keys(mergedStorylets).length);
     
     return {
       ...currentState,
@@ -1616,15 +1617,15 @@ if (typeof window !== 'undefined') {
   
   (window as any).testStorylets = () => {
     const store = useStoryletStore.getState();
-    console.log('Current storylet state:');
-    console.log('Active flags:', store.activeFlags);
-    console.log('Active storylets:', store.activeStoryletIds);
-    console.log('Completed storylets:', store.completedStoryletIds);
-    console.log('Current storylet:', store.getCurrentStorylet()?.name || 'None');
+    devLog('Current storylet state:');
+    devLog('Active flags:', store.activeFlags);
+    devLog('Active storylets:', store.activeStoryletIds);
+    devLog('Completed storylets:', store.completedStoryletIds);
+    devLog('Current storylet:', store.getCurrentStorylet()?.name || 'None');
     
     // Force evaluation
     store.evaluateStorylets();
-    console.log('After evaluation - Active storylets:', store.activeStoryletIds);
+    devLog('After evaluation - Active storylets:', store.activeStoryletIds);
     
     return store;
   };
@@ -1632,7 +1633,7 @@ if (typeof window !== 'undefined') {
   (window as any).resetStorylets = () => {
     const store = useStoryletStore.getState();
     store.resetStorylets();
-    console.log('Storylets reset!');
+    devLog('Storylets reset!');
     return store;
   };
 }

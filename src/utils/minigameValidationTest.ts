@@ -3,6 +3,7 @@
 
 import MinigameRegistry from '../components/minigames/core/MinigameRegistry';
 import { registerAllPlugins } from '../components/minigames/plugins';
+import { exposeToWindow } from './debug';
 
 interface ValidationResult {
   pluginId: string;
@@ -221,11 +222,9 @@ declare global {
   }
 }
 
-if (typeof window !== 'undefined') {
-  window.validateAllMinigamePlugins = validateAllMinigamePlugins;
-  window.quickMinigameValidationTest = quickMinigameValidationTest;
-  window.validateSinglePlugin = validateSinglePlugin;
-}
+exposeToWindow('validateAllMinigamePlugins', validateAllMinigamePlugins);
+exposeToWindow('quickMinigameValidationTest', quickMinigameValidationTest);
+exposeToWindow('validateSinglePlugin', validateSinglePlugin);
 
 export default {
   validateAllMinigamePlugins,

@@ -2,9 +2,9 @@
 
 import React, { useMemo } from 'react';
 import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
-import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
-import { useSaveStoreV2 } from '../store/useSaveStoreV2';
-import { useAppStore } from '../store/useAppStore';
+import { useStoryletCatalogStore } from '../stores/useStoryletCatalogStore';
+import { useSaveStoreV2 } from '../stores/useSaveStoreV2';
+import { useAppStore } from '../stores/useAppStore';
 import { useCoreGameStore } from '../stores/v2';
 import type { Storylet, Effect } from '../types/storylet';
 

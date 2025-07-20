@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Card, Button } from './ui';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore } from '../stores/useAppStore';
 
 interface EventChoice {
   id: string;

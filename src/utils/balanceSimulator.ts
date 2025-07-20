@@ -3,7 +3,7 @@
 
 import { calculateResourceDeltas, calculateDomainResourceEffects } from './resourceCalculations';
 import { IntegratedCharacter, DomainKey } from '../types/integratedCharacter';
-import type { Character } from '../store/characterStore';
+import type { Character } from '../stores/characterStore';
 
 // Player archetype definitions for simulation
 export interface ResourceState {

@@ -1,5 +1,6 @@
 // /Users/montysharma/V11M2/src/App.tsx
 import React, { useState, useEffect } from 'react';
+import { devLog } from './utils/debug';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navigation from './components/Navigation';
 import MinigameManager from './components/minigames/MinigameManager';
@@ -58,11 +59,11 @@ if (process.env.NODE_ENV === 'development') {
   
   import('../test/v2/v2IntegrationTests').then(module => {
     (window as any).runV2IntegrationTests = module.runV2IntegrationTests;
-    console.log('🏪 V2 Store Tests loaded successfully');
+    devLog('🏪 V2 Store Tests loaded successfully');
   });
   import('../test/v2/componentIntegrationTests').then(module => {
     (window as any).runComponentIntegrationTests = module.runComponentIntegrationTests;
-    console.log('🧩 V2 Component Tests loaded successfully');
+    devLog('🧩 V2 Component Tests loaded successfully');
   });
   import('./test/characterFlow/performanceTests'); // Import performance tests
   import('./test/characterFlow/edgeCaseTests'); // Import edge case tests
@@ -130,18 +131,18 @@ if (process.env.NODE_ENV === 'development') {
     (window as any).useCoreGameStore = module.useCoreGameStore;
     (window as any).useNarrativeStore = module.useNarrativeStore;
     (window as any).useSocialStore = module.useSocialStore;
-    console.log('🏪 Consolidated stores exposed globally for console access');
+    devLog('🏪 Consolidated stores exposed globally for console access');
   });
   
   // Expose SaveManager and auto-save functions globally for testing
   import('./utils/saveManager').then(module => {
     (window as any).saveManager = module.saveManager;
-    console.log('💾 SaveManager exposed globally for console access');
+    devLog('💾 SaveManager exposed globally for console access');
   });
   
   import('./hooks/useAutoSave').then(module => {
     (window as any).AUTO_SAVE_CONFIG = module.AUTO_SAVE_CONFIG;
-    console.log('🔄 Auto-save config exposed globally for console access');
+    devLog('🔄 Auto-save config exposed globally for console access');
   });
   
   // Expose flag generator functions globally for testing
@@ -152,7 +153,7 @@ if (process.env.NODE_ENV === 'development') {
     (window as any).getFlagGeneratorStats = module.getFlagGeneratorStats;
     (window as any).warmUpFlagCache = module.warmUpFlagCache;
     (window as any).optimizeFlagCache = module.optimizeFlagCache;
-    console.log('🏷️ Flag generator functions exposed globally for console access');
+    devLog('🏷️ Flag generator functions exposed globally for console access');
   });
 }
 
@@ -171,25 +172,25 @@ function App() {
   const activeMinigame = getActiveMinigame();
   
   // Debug: Log app state on startup
-  console.log('🚀 App startup - Current state:', { day, userLevel, experience, activeCharacter });
+  devLog('🚀 App startup - Current state:', { day, userLevel, experience, activeCharacter });
   
   // CRITICAL FIX: Check if we have unexpected state on startup (only once)
   useEffect(() => {
     if (!showSplash && !orphanedStateChecked && (day > 1 || userLevel > 1 || experience > 0)) {
-      console.log('⚠️ Detected unexpected persisted state on startup');
-      console.log('📦 localStorage keys:', Object.keys(localStorage));
+      devLog('⚠️ Detected unexpected persisted state on startup');
+      devLog('📦 localStorage keys:', Object.keys(localStorage));
       
       // Check if we have a valid currentSaveId that justifies this state
       const saveStore = (window as any).useSaveStore?.getState();
       const currentSaveId = saveStore?.currentSaveId;
       
       if (!currentSaveId && !activeCharacter) {
-        console.log('🚨 No currentSaveId and no active character - forcing reset');
+        devLog('🚨 No currentSaveId and no active character - forcing reset');
         // Force reset to initial state if no active save justifies the persisted data
         const coreStore = useCoreGameStore.getState();
         coreStore.resetGame();
       } else {
-        console.log('ℹ️ State justified by:', { currentSaveId, activeCharacter: activeCharacter?.name });
+        devLog('ℹ️ State justified by:', { currentSaveId, activeCharacter: activeCharacter?.name });
       }
       
       setOrphanedStateChecked(true);
@@ -199,7 +200,7 @@ function App() {
   // Initialize V2 stores with data migration
   useEffect(() => {
     if (!orphanedStateChecked) {
-      console.log('🔄 Initializing V2 stores and migrating data...');
+      devLog('🔄 Initializing V2 stores and migrating data...');
       migrateFromLegacyStores();
     }
   }, [orphanedStateChecked, migrateFromLegacyStores]);
@@ -282,7 +283,7 @@ function App() {
             clueId={clueDiscoveryRequest.clueId}
             minigameType={clueDiscoveryRequest.minigameType as any}
             onComplete={(success, clue) => {
-              console.log(`🔍 Clue discovery completed: ${success ? 'SUCCESS' : 'FAILURE'}`, { clue });
+              devLog(`🔍 Clue discovery completed: ${success ? 'SUCCESS' : 'FAILURE'}`, { clue });
               
               // Trigger the legacy storylet store's completion handler for now
               // TODO: Migrate clue discovery to V2 stores
@@ -303,7 +304,7 @@ function App() {
               }
             }}
             onClose={() => {
-              console.log('🔍 Clue discovery cancelled by user');
+              devLog('🔍 Clue discovery cancelled by user');
               clearClueDiscoveryRequest();
             }}
           />

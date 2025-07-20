@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useNPCStore } from '../store/useNPCStore';
+import { useNPCStore } from '../stores/useNPCStore';
 import type { NPC, NPCPersonality, NPCBackground, NPCStatus, RelationshipType } from '../types/npc';
 import { Button, Card } from './ui';
 import { sampleNPCs } from '../data/sampleNPCs';

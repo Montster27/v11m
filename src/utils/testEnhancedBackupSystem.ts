@@ -1,6 +1,8 @@
 // Enhanced Backup System Test Runner
 // Simplified test runner for browser environment
 
+import { exposeToWindow } from './debug';
+
 console.log('🧪 Enhanced Backup System - Feature Validation');
 console.log('============================================');
 
@@ -148,12 +150,12 @@ if (failedTests === 0) {
 }
 
 // Export for browser usage
-if (typeof window !== 'undefined') {
-  window.testEnhancedBackupSystem = () => {
-    console.log('Enhanced Backup System test completed. Check console for details.');
-    return {
-      passed: failedTests === 0,
-      summary: { total: totalTests, passed: passedTests, failed: failedTests }
-    };
+const testEnhancedBackupSystem = () => {
+  console.log('Enhanced Backup System test completed. Check console for details.');
+  return {
+    passed: failedTests === 0,
+    summary: { total: totalTests, passed: passedTests, failed: failedTests }
   };
-}
+};
+
+exposeToWindow('testEnhancedBackupSystem', testEnhancedBackupSystem);

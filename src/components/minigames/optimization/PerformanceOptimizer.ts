@@ -1,6 +1,8 @@
 // /Users/montysharma/V11M2/src/components/minigames/optimization/PerformanceOptimizer.ts
 // Performance optimization utilities for minigame system
 
+import { exposeToWindow } from '../../../utils/debug';
+
 interface PerformanceMetrics {
   frameRate: number;
   memoryUsage: number;
@@ -265,11 +267,9 @@ declare global {
   }
 }
 
-if (typeof window !== 'undefined') {
-  window.getMinigamePerformanceReport = getPerformanceReport;
-  window.enableMinigameAutoOptimization = enableAutoOptimization;
-  window.resetMinigamePerformanceMetrics = resetPerformanceMetrics;
-}
+exposeToWindow('getMinigamePerformanceReport', getPerformanceReport);
+exposeToWindow('enableMinigameAutoOptimization', enableAutoOptimization);
+exposeToWindow('resetMinigamePerformanceMetrics', resetPerformanceMetrics);
 
 export default performanceOptimizer;
 export { PerformanceOptimizer, type PerformanceMetrics, type OptimizationSuggestion };

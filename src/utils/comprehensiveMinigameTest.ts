@@ -4,6 +4,7 @@
 import MinigameRegistry from '../components/minigames/core/MinigameRegistry';
 import MinigameEngine from '../components/minigames/core/MinigameEngine';
 import { useMinigameStore } from '../stores/useMinigameStore';
+import { exposeToWindow } from './debug';
 
 interface ComprehensiveTestResult {
   testName: string;
@@ -371,8 +372,6 @@ declare global {
   }
 }
 
-if (typeof window !== 'undefined') {
-  window.runComprehensiveMinigameTest = runComprehensiveMinigameTest;
-}
+exposeToWindow('runComprehensiveMinigameTest', runComprehensiveMinigameTest);
 
 export default comprehensiveTest;

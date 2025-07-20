@@ -1,6 +1,6 @@
 // /Users/montysharma/V11M2/src/components/QuestEditor.tsx
 import React, { useState, useEffect } from 'react';
-import { useAppStore, Quest } from '../store/useAppStore';
+import { useAppStore, Quest } from '../stores/useAppStore';
 import { Button, Card } from './ui';
 
 interface QuestEditorProps {

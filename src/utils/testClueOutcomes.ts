@@ -1,6 +1,6 @@
 // Test utility for creating clues with outcome storylets in the Main Story arc
-import { useClueStore } from '../store/useClueStore';
-import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
+import { useClueStore } from '../stores/useClueStore';
+import { useStoryletCatalogStore } from '../stores/useStoryletCatalogStore';
 
 export function createTestClueOutcomes() {
   const clueStore = useClueStore.getState();

@@ -2,7 +2,7 @@
 // Node palette component for dragging nodes onto the canvas
 
 import React from 'react';
-import { useStoryletStore } from '../../../store/useStoryletStore';
+import { useStoryletStore } from '../../../stores/useStoryletStore';
 import { NodeType, FlowNode } from './types';
 import type { Storylet } from '../../../types/storylet';
 

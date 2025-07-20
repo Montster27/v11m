@@ -2,7 +2,7 @@
 // Refactored Visual Storylet Editor with complete arc functionality preservation
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { useStoryletStore } from '../../store/useStoryletStore';
+import { useStoryletStore } from '../../stores/useStoryletStore';
 import type { Storylet } from '../../types/storylet';
 
 // Shared foundation imports

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useSkillSystemV2Store } from '../store/useSkillSystemV2Store';
+import { useSkillSystemV2Store } from '../stores/useSkillSystemV2Store';
 import Button from './ui/Button';
 import Card from './ui/Card';
 import ProgressBar from './ui/ProgressBar';

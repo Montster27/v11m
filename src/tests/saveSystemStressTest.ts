@@ -3,7 +3,7 @@
 
 import { useCoreGameStore, useNarrativeStore, useSocialStore } from '../stores/v2';
 import { useCharacterConcernsStore } from '../stores/useCharacterConcernsStore';
-import { useStoryletStore } from '../store/useStoryletStore';
+import { useStoryletStore } from '../stores/useStoryletStore';
 import { saveManager } from '../utils/saveManager';
 import { generateConcernFlags } from '../utils/flagGenerator';
 

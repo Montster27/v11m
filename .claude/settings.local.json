@@ -52,7 +52,11 @@
       "Bash(npm test:*)",
       "Bash(git restore:*)",
       "Bash(npm audit:*)",
-      "Bash(touch:*)"
+      "Bash(touch:*)",
+      "Bash(git reset:*)",
+      "Bash(npx depcheck:*)",
+      "Bash(chmod:*)",
+      "Bash(./update-store-imports.sh:*)"
     ],
     "deny": []
   },

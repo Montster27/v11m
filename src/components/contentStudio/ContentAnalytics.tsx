@@ -1,7 +1,7 @@
 // /Users/montysharma/V11M2/src/components/contentStudio/ContentAnalytics.tsx
 
 import React, { useState, useEffect } from 'react';
-import { useStoryletStore } from '../../store/useStoryletStore';
+import { useStoryletStore } from '../../stores/useStoryletStore';
 import HelpTooltip from '../ui/HelpTooltip';
 
 interface ContentMetrics {

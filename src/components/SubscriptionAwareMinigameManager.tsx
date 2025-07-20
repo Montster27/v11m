@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSubscriptionCleanup, useRenderTracking } from '../utils/memoryLeakDetector';
-import { useStoryletStore } from '../store/useStoryletStore';
+import { useStoryletStore } from '../stores/useStoryletStore';
 import { useCoreGameStore } from '../stores/v2';
 
 interface MinigameManagerProps {

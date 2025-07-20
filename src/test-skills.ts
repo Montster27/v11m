@@ -1,7 +1,7 @@
 // /Users/montysharma/V11M2/src/test-skills.ts
 // Simple test file to verify skill system works
 
-import { useAppStore } from './store/useAppStore';
+import { useAppStore } from './stores/useAppStore';
 import { getLevelFromXp } from './utils/skillCalculations';
 
 // Test the skill calculations

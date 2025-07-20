@@ -1,7 +1,7 @@
 // /Users/montysharma/V11M2/src/components/SkillsPanel.tsx
 
 import React, { useState, useEffect } from 'react';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore } from '../stores/useAppStore';
 import { ProgressBar } from './ui';
 import { getCurrentLevelXpRange } from '../utils/skillCalculations';
 

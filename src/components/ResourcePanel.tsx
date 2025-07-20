@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Card, ProgressBar } from './ui';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore } from '../stores/useAppStore';
 
 // Helper functions to reduce cognitive complexity
 const getResourceConfig = (resources: any) => [

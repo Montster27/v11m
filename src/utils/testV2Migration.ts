@@ -1,6 +1,8 @@
 // V2 Migration Diagnostic Test
 // Tests the storylet migration fix
 
+import { exposeToWindow } from './debug';
+
 console.log('🔍 V2 Migration Diagnostic Test');
 console.log('==============================');
 
@@ -89,9 +91,9 @@ for (const testCase of edgeCases) {
 console.log('\n✨ Migration fix verification complete!');
 
 // Export for browser
-if (typeof window !== 'undefined') {
-  window.testV2Migration = () => {
-    console.log('V2 Migration test completed. Check console for details.');
-    return { success: true };
-  };
-}
+const testV2Migration = () => {
+  console.log('V2 Migration test completed. Check console for details.');
+  return { success: true };
+};
+
+exposeToWindow('testV2Migration', testV2Migration);
