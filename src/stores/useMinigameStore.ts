@@ -155,9 +155,60 @@ export const useMinigameStore = create<MinigameStore>()(
           if (result.success) {
             gameStats.totalWins++;
             gameStats.currentStreak++;
+            
+            // DYNAMIC DIFFICULTY: Increase difficulty on win
+            const difficultyProgression: Record<MinigameDifficulty, MinigameDifficulty> = {
+              'easy': 'medium',
+              'medium': 'hard', 
+              'hard': 'expert',
+              'expert': 'expert' // Stay at expert
+            };
+            
+            const oldDifficulty = gameStats.currentDifficulty;
+            const newDifficulty = difficultyProgression[oldDifficulty] || oldDifficulty;
+            
+            if (newDifficulty !== oldDifficulty) {
+              // Record difficulty change
+              gameStats.difficultyHistory.push({
+                difficulty: oldDifficulty,
+                timestamp: Date.now(),
+                performance: 1 // Won
+              });
+              
+              gameStats.currentDifficulty = newDifficulty;
+              console.log(`📈 Difficulty increased for ${gameId}: ${oldDifficulty} → ${newDifficulty}`);
+            }
           } else {
             gameStats.totalLosses++;
             gameStats.currentStreak = 0;
+            
+            // DYNAMIC DIFFICULTY: Decrease difficulty after multiple losses
+            const recentLosses = gameStats.recentResults
+              .slice(-3)
+              .filter(r => !r.success).length;
+            
+            if (recentLosses >= 2 && gameStats.currentDifficulty !== 'easy') { // 3 losses including current
+              const difficultyRegression: Record<MinigameDifficulty, MinigameDifficulty> = {
+                'expert': 'hard',
+                'hard': 'medium',
+                'medium': 'easy',
+                'easy': 'easy'
+              };
+              
+              const oldDifficulty = gameStats.currentDifficulty;
+              const newDifficulty = difficultyRegression[oldDifficulty] || oldDifficulty;
+              
+              if (newDifficulty !== oldDifficulty) {
+                gameStats.difficultyHistory.push({
+                  difficulty: oldDifficulty,
+                  timestamp: Date.now(),
+                  performance: 0 // Lost
+                });
+                
+                gameStats.currentDifficulty = newDifficulty;
+                console.log(`📉 Difficulty decreased for ${gameId}: ${oldDifficulty} → ${newDifficulty} (3 losses)`);
+              }
+            }
           }
 
           // Update streak records

@@ -1,10 +1,9 @@
 // /Users/montysharma/V11M2/src/components/ContentStudio.tsx
 
 import React, { useState, useEffect } from 'react';
-import { useAppStore } from '../store/useAppStore';
-import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
 import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
 import { useSocialStore } from '../stores/v2/useSocialStore';
+import { useCoreGameStore } from '../stores/v2/useCoreGameStore';
 import { useUndoRedo } from '../hooks/useUndoRedo';
 import AdvancedStoryletCreator from './contentStudio/AdvancedStoryletCreator';
 import StoryletBrowser from './contentStudio/StoryletBrowser';
@@ -17,6 +16,13 @@ import ClueManager from './contentStudio/ClueManager';
 import SafetyManager from './contentStudio/SafetyManager';
 import HelpTooltip from './ui/HelpTooltip';
 import ConfirmationDialog from './ui/ConfirmationDialog';
+import StorageMigration from './contentStudio/StorageMigration';
+import { StorageMigrationService } from '../services/storage/StorageMigrationService';
+import { StorageAdapter } from '../services/storage/StorageAdapter';
+import { LocalStorageAdapter } from '../services/storage/LocalStorageAdapter';
+import { IndexedDBAdapter } from '../services/storage/IndexedDBAdapter';
+import { ContentExportService } from '../services/ContentExportService';
+import { v2Migration } from '../migrations/v2StoreMigration';
 import type { Storylet } from '../types/storylet';
 
 type ContentStudioTab = 'advanced' | 'browse' | 'visual' | 'arc-manager' | 'clue-manager' | 'characters' | 'preview' | 'analytics';
@@ -29,7 +35,14 @@ const ContentStudio: React.FC<ContentStudioProps> = ({ onBackupCreate }) => {
   // V2 Store access
   const narrativeStore = useNarrativeStore();
   const socialStore = useSocialStore();
-  const catalogStore = useStoryletCatalogStore();
+  const coreGameStore = useCoreGameStore();
+  
+  // Storage management
+  const [storageAdapter, setStorageAdapter] = useState<StorageAdapter | null>(null);
+  const [migrationService] = useState(() => new StorageMigrationService());
+  const [showMigration, setShowMigration] = useState(false);
+  
+  // UI State
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<ContentStudioTab>('advanced');
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -40,6 +53,63 @@ const ContentStudio: React.FC<ContentStudioProps> = ({ onBackupCreate }) => {
     message: string;
     type: 'warning' | 'danger';
   } | null>(null);
+
+  // Storage initialization and migration check
+  useEffect(() => {
+    const initializeStorage = async () => {
+      try {
+        // Check V2 store migration status first
+        const v2Status = v2Migration.getMigrationStatus();
+        if (v2Status.canMigrate && !v2Status.isComplete) {
+          console.log('🔄 Running V2 store migration...');
+          try {
+            const result = await v2Migration.runV2Migration({
+              validateMigration: true,
+              backupBeforeMigration: true
+            });
+            if (result.success) {
+              console.log('✅ V2 migration completed:', result.migratedData);
+            } else {
+              console.error('❌ V2 migration failed:', result.errors);
+            }
+          } catch (error) {
+            console.error('❌ V2 migration error:', error);
+          }
+        }
+
+        const migrationStatus = migrationService.getMigrationStatus();
+        
+        if (migrationStatus.isMigrated) {
+          // Use IndexedDB
+          const adapter = new IndexedDBAdapter({
+            dbName: 'ContentStudioDB',
+            storeName: 'backups',
+            version: 1
+          });
+          await adapter.initialize();
+          setStorageAdapter(adapter);
+          console.log('✅ Using IndexedDB storage');
+        } else {
+          // Check if migration should be offered
+          const shouldMigrate = await migrationService.shouldMigrate();
+          if (shouldMigrate && migrationStatus.canMigrate) {
+            setShowMigration(true);
+            return; // Don't set storage adapter yet
+          }
+          
+          // Use localStorage
+          setStorageAdapter(new LocalStorageAdapter());
+          console.log('✅ Using localStorage storage');
+        }
+      } catch (error) {
+        console.error('Storage initialization failed:', error);
+        // Fallback to localStorage
+        setStorageAdapter(new LocalStorageAdapter());
+      }
+    };
+
+    initializeStorage();
+  }, [migrationService]);
 
   // Navigation event listeners for ArcManager
   useEffect(() => {
@@ -73,18 +143,52 @@ const ContentStudio: React.FC<ContentStudioProps> = ({ onBackupCreate }) => {
     redoStackSize
   } = useUndoRedo(20);
 
-  // Auto-backup before destructive actions (V2 Enhanced)
-  const createBackup = () => {
+  // Auto-backup before destructive actions (V2 Enhanced with unified export)
+  const createBackup = async () => {
     try {
       const timestamp = new Date().toISOString();
+
+      // Use new unified export service if storage adapter is available
+      if (storageAdapter) {
+        try {
+          const exportService = new ContentExportService(storageAdapter);
+          const exportPackage = await exportService.exportProject({
+            format: 'json',
+            includeMetadata: true,
+            validateDependencies: false, // Skip for quick backups
+            includePreferences: true
+          });
+
+          const backupKey = `content_backup_v2_${timestamp}`;
+          await storageAdapter.setItem(backupKey, JSON.stringify(exportPackage));
+
+          // Keep only last 5 V2 backups
+          const allKeys = await storageAdapter.getKeys();
+          const backupKeys = allKeys.filter(key => key.startsWith('content_backup_v2_'));
+          if (backupKeys.length > 5) {
+            const sortedKeys = backupKeys.sort().slice(0, -5);
+            for (const key of sortedKeys) {
+              await storageAdapter.removeItem(key);
+            }
+          }
+
+          console.log('✅ V2 Auto-backup created:', backupKey);
+          onBackupCreate?.();
+          return true;
+        } catch (exportError) {
+          console.warn('⚠️ V2 backup failed, falling back to legacy backup:', exportError);
+          // Fall through to legacy backup
+        }
+      }
+
+      // Legacy backup method (for backward compatibility)
       const gameState = {
-        app: useAppStore.getState(),
         // V2 stores
         narrative: narrativeStore,
         social: socialStore,
-        catalog: catalogStore,
-        // Legacy for backwards compatibility
-        storylets: catalogStore, // Use catalog store as legacy storylets backup
+        core: coreGameStore,
+        // Legacy format compatibility (using V2 data)
+        storylets: narrativeStore.getStorylets(), // Use V2 narrative store for storylets
         timestamp,
         version: '2.0' // Updated version for V2 backups
       };
@@ -98,7 +202,7 @@ const ContentStudio: React.FC<ContentStudioProps> = ({ onBackupCreate }) => {
         allKeys.sort().slice(0, -5).forEach(key => localStorage.removeItem(key));
       }
       
-      console.log('✅ Auto-backup created:', backupKey);
+      console.log('✅ Legacy auto-backup created:', backupKey);
       onBackupCreate?.();
       return true;
     } catch (error) {
@@ -180,6 +284,49 @@ const ContentStudio: React.FC<ContentStudioProps> = ({ onBackupCreate }) => {
       description: 'View engagement and performance data'
     }
   ];
+
+  // Migration event handlers
+  const handleMigrationComplete = async () => {
+    setShowMigration(false);
+    
+    // Initialize IndexedDB adapter
+    const adapter = new IndexedDBAdapter({
+      dbName: 'ContentStudioDB',
+      storeName: 'backups',
+      version: 1
+    });
+    await adapter.initialize();
+    setStorageAdapter(adapter);
+    console.log('✅ Migration complete, now using IndexedDB storage');
+  };
+
+  const handleMigrationSkip = () => {
+    setShowMigration(false);
+    setStorageAdapter(new LocalStorageAdapter());
+    console.log('✅ Migration skipped, continuing with localStorage');
+  };
+
+  // Show migration UI if needed
+  if (showMigration) {
+    return (
+      <StorageMigration
+        onMigrationComplete={handleMigrationComplete}
+        onSkip={handleMigrationSkip}
+      />
+    );
+  }
+
+  // Don't render main UI until storage is initialized
+  if (!storageAdapter) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="text-gray-600">Initializing Content Studio...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (process.env.NODE_ENV !== 'development') {
     return null;

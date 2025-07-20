@@ -73,9 +73,15 @@ export class DifficultyManager {
 
     // Check if player has played this game before
     const gameStats = playerStats[gameId];
-    if (!gameStats || gameStats.totalPlays < this.minGamesForAdjustment) {
-      console.log(`🎯 Insufficient data for ${gameId}, using default: medium`);
-      return 'medium'; // Default for new players
+    if (!gameStats) {
+      console.log(`🎯 No previous data for ${gameId}, using default: easy`);
+      return 'easy'; // Default for first-time players
+    }
+
+    // If not enough games for analysis, use stored difficulty
+    if (gameStats.totalPlays < this.minGamesForAdjustment) {
+      console.log(`🎯 Insufficient games for analysis (${gameStats.totalPlays}), using stored difficulty: ${gameStats.currentDifficulty}`);
+      return gameStats.currentDifficulty;
     }
 
     // Calculate performance metrics

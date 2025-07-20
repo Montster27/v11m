@@ -3,6 +3,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { UndoRedoAction } from '../../../hooks/useUndoRedo';
+import { StorageAdapter } from '../../../services/storage/StorageAdapter';
+import { StorageFactory } from '../../../services/storage/StorageFactory';
 
 interface PersistenceConfig<T> {
   // Auto-save configuration
@@ -13,6 +15,7 @@ interface PersistenceConfig<T> {
   // Storage configuration
   storageKey?: string;
   useLocalStorage?: boolean;
+  storageAdapter?: StorageAdapter; // New option for custom storage adapter
   
   // Persistence callbacks
   onSave?: (data: T) => Promise<void> | void;
@@ -88,6 +91,7 @@ export function useStudioPersistence<T>(
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [backupCount, setBackupCount] = useState(0);
+  const [storageAdapter, setStorageAdapter] = useState<StorageAdapter | null>(null);
   
   // Refs for debouncing and intervals
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -95,6 +99,30 @@ export function useStudioPersistence<T>(
   const backupIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastDataRef = useRef<T>(initialData);
   const autoSaveEnabledRef = useRef(finalConfig.autoSaveEnabled);
+
+  // Initialize storage adapter
+  useEffect(() => {
+    const initializeStorage = async () => {
+      try {
+        if (finalConfig.storageAdapter) {
+          // Use provided adapter
+          setStorageAdapter(finalConfig.storageAdapter);
+        } else {
+          // Create adapter using factory
+          const adapter = await StorageFactory.createAdapter({
+            type: 'auto',
+            fallbackToLocalStorage: true
+          });
+          setStorageAdapter(adapter);
+        }
+      } catch (error) {
+        console.error('Failed to initialize storage adapter:', error);
+        setSaveError('Storage initialization failed');
+      }
+    };
+
+    initializeStorage();
+  }, [finalConfig.storageAdapter]);
 
   // Storage key generation
   const getStorageKey = useCallback((suffix = '') => {
@@ -141,16 +169,16 @@ export function useStudioPersistence<T>(
         await finalConfig.onSave(data);
       }
 
-      // Local storage backup
-      if (finalConfig.useLocalStorage) {
+      // Storage adapter backup
+      if (finalConfig.useLocalStorage && storageAdapter) {
         try {
-          localStorage.setItem(getStorageKey(), JSON.stringify({
+          await storageAdapter.setItem(getStorageKey(), JSON.stringify({
             data,
             timestamp: new Date().toISOString(),
             version: '1.0'
           }));
         } catch (storageError) {
-          console.warn('Local storage save failed:', storageError);
+          console.warn('Storage adapter save failed:', storageError);
         }
       }
 
@@ -171,7 +199,7 @@ export function useStudioPersistence<T>(
     } finally {
       setIsSaving(false);
     }
-  }, [finalConfig, hasChanged, getStorageKey]);
+  }, [finalConfig, hasChanged, getStorageKey, storageAdapter]);
 
   // Auto-save operation
   const performAutoSave = useCallback(async (data: T) => {
@@ -202,9 +230,9 @@ export function useStudioPersistence<T>(
         return data;
       }
 
-      // Fallback to local storage
-      if (finalConfig.useLocalStorage) {
-        const stored = localStorage.getItem(getStorageKey());
+      // Fallback to storage adapter
+      if (finalConfig.useLocalStorage && storageAdapter) {
+        const stored = await storageAdapter.getItem(getStorageKey());
         if (stored) {
           const parsed = JSON.parse(stored);
           lastDataRef.current = parsed.data;
@@ -220,7 +248,7 @@ export function useStudioPersistence<T>(
     } finally {
       setIsLoading(false);
     }
-  }, [finalConfig.onLoad, finalConfig.useLocalStorage, getStorageKey]);
+  }, [finalConfig.onLoad, finalConfig.useLocalStorage, getStorageKey, storageAdapter]);
 
   // Backup management
   const createBackup = useCallback(async (data: T, label?: string): Promise<boolean> => {
@@ -234,12 +262,14 @@ export function useStudioPersistence<T>(
         size: JSON.stringify(data).length
       };
 
-      // Store backup
-      localStorage.setItem(getStorageKey(`backup_${backupId}`), JSON.stringify(backupData));
+      // Store backup using storage adapter
+      if (storageAdapter) {
+        await storageAdapter.setItem(getStorageKey(`backup_${backupId}`), JSON.stringify(backupData));
 
-      // Update backup list
-      const backupListKey = getStorageKey('backup_list');
-      const existingList = JSON.parse(localStorage.getItem(backupListKey) || '[]');
+        // Update backup list
+        const backupListKey = getStorageKey('backup_list');
+        const existingListData = await storageAdapter.getItem(backupListKey);
+        const existingList = JSON.parse(existingListData || '[]');
       existingList.push({
         id: backupId,
         label: backupData.label,
@@ -247,16 +277,17 @@ export function useStudioPersistence<T>(
         size: backupData.size
       });
 
-      // Limit number of backups
-      if (existingList.length > finalConfig.maxBackups!) {
-        const toDelete = existingList.splice(0, existingList.length - finalConfig.maxBackups!);
-        toDelete.forEach((backup: any) => {
-          localStorage.removeItem(getStorageKey(`backup_${backup.id}`));
-        });
-      }
+        // Limit number of backups
+        if (existingList.length > finalConfig.maxBackups!) {
+          const toDelete = existingList.splice(0, existingList.length - finalConfig.maxBackups!);
+          for (const backup of toDelete) {
+            await storageAdapter.removeItem(getStorageKey(`backup_${backup.id}`));
+          }
+        }
 
-      localStorage.setItem(backupListKey, JSON.stringify(existingList));
-      setBackupCount(existingList.length);
+        await storageAdapter.setItem(backupListKey, JSON.stringify(existingList));
+        setBackupCount(existingList.length);
+      }
 
       console.log(`💾 Content Studio: Backup created - ${backupData.label}`);
       return true;
@@ -264,11 +295,15 @@ export function useStudioPersistence<T>(
       console.error('Backup creation failed:', error);
       return false;
     }
-  }, [finalConfig.maxBackups, getStorageKey]);
+  }, [finalConfig.maxBackups, getStorageKey, storageAdapter]);
 
   const restoreBackup = useCallback(async (backupId: string): Promise<T | null> => {
     try {
-      const backupData = localStorage.getItem(getStorageKey(`backup_${backupId}`));
+      if (!storageAdapter) {
+        throw new Error('Storage adapter not initialized');
+      }
+
+      const backupData = await storageAdapter.getItem(getStorageKey(`backup_${backupId}`));
       if (!backupData) {
         throw new Error('Backup not found');
       }
@@ -280,26 +315,34 @@ export function useStudioPersistence<T>(
       console.error('Backup restore failed:', error);
       return null;
     }
-  }, [getStorageKey]);
+  }, [getStorageKey, storageAdapter]);
 
-  const listBackups = useCallback(() => {
+  const listBackups = useCallback(async () => {
     try {
-      const backupList = localStorage.getItem(getStorageKey('backup_list'));
+      if (!storageAdapter) {
+        return [];
+      }
+      const backupList = await storageAdapter.getItem(getStorageKey('backup_list'));
       return backupList ? JSON.parse(backupList) : [];
     } catch {
       return [];
     }
-  }, [getStorageKey]);
+  }, [getStorageKey, storageAdapter]);
 
   const deleteBackup = useCallback(async (backupId: string): Promise<boolean> => {
     try {
-      localStorage.removeItem(getStorageKey(`backup_${backupId}`));
+      if (!storageAdapter) {
+        return false;
+      }
+
+      await storageAdapter.removeItem(getStorageKey(`backup_${backupId}`));
       
       const backupListKey = getStorageKey('backup_list');
-      const existingList = JSON.parse(localStorage.getItem(backupListKey) || '[]');
+      const existingListData = await storageAdapter.getItem(backupListKey);
+      const existingList = JSON.parse(existingListData || '[]');
       const updatedList = existingList.filter((backup: any) => backup.id !== backupId);
       
-      localStorage.setItem(backupListKey, JSON.stringify(updatedList));
+      await storageAdapter.setItem(backupListKey, JSON.stringify(updatedList));
       setBackupCount(updatedList.length);
       
       return true;
@@ -307,7 +350,7 @@ export function useStudioPersistence<T>(
       console.error('Backup deletion failed:', error);
       return false;
     }
-  }, [getStorageKey]);
+  }, [getStorageKey, storageAdapter]);
 
   // Auto-save setup
   const setupAutoSave = useCallback((data: T) => {
@@ -345,18 +388,21 @@ export function useStudioPersistence<T>(
   
   const hasUnsavedChanges = useCallback(() => isDirty, [isDirty]);
 
-  const getStorageInfo = useCallback(() => {
-    if ('storage' in navigator && 'estimate' in navigator.storage) {
-      navigator.storage.estimate().then(estimate => {
+  const getStorageInfo = useCallback(async () => {
+    try {
+      if (storageAdapter) {
+        const info = await storageAdapter.getStorageInfo();
         return {
-          used: estimate.usage || 0,
-          quota: estimate.quota || 0,
-          available: (estimate.quota || 0) - (estimate.usage || 0)
+          used: info.usage,
+          quota: info.quota,
+          available: info.available
         };
-      });
+      }
+    } catch (error) {
+      console.warn('Failed to get storage info:', error);
     }
     return { used: 0, quota: 0, available: 0 };
-  }, []);
+  }, [storageAdapter]);
 
   // Setup intervals
   useEffect(() => {
@@ -387,7 +433,11 @@ export function useStudioPersistence<T>(
 
   // Initialize backup count
   useEffect(() => {
-    setBackupCount(listBackups().length);
+    const initBackupCount = async () => {
+      const backups = await listBackups();
+      setBackupCount(backups.length);
+    };
+    initBackupCount();
   }, [listBackups]);
 
   return {

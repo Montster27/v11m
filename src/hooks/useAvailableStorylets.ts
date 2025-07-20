@@ -2,7 +2,6 @@
 // Optimized hook for batched storylet evaluation with memoized flag generation
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useStoryletCatalogStore } from '../store/useStoryletCatalogStore';
 import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
 import { useCharacterConcernsStore } from '../store/useCharacterConcernsStore';
 import { useCoreGameStore } from '../stores/v2';
@@ -96,7 +95,7 @@ export function useAvailableStorylets(options: StoryletEvaluationOptions = {}): 
   const [evaluationTime, setEvaluationTime] = useState(0);
 
   // Store hooks
-  const allStorylets = Object.values(useStoryletCatalogStore(state => state.allStorylets));
+  const allStorylets = useNarrativeStore(state => state.getStorylets());
   const concerns = useCharacterConcernsStore(state => state.concerns);
   const coreGameState = useCoreGameStore(state => ({
     player: state.player,

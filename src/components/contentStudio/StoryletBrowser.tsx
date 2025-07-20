@@ -1,8 +1,7 @@
 // /Users/montysharma/V11M2/src/components/contentStudio/StoryletBrowser.tsx
 
 import React, { useState, useMemo } from 'react';
-import { useStoryletStore } from '../../store/useStoryletStore';
-import { useStoryletCatalogStore } from '../../store/useStoryletCatalogStore';
+import { useNarrativeStore } from '../../stores/v2/useNarrativeStore';
 import type { Storylet } from '../../types/storylet';
 import HelpTooltip from '../ui/HelpTooltip';
 
@@ -27,16 +26,20 @@ interface SearchFilters {
 }
 
 const StoryletBrowser: React.FC<StoryletBrowserProps> = ({ onEditStorylet, onEditVisually, undoRedoSystem }) => {
-  // Use reactive subscriptions to both stores
-  const allStorylets = useStoryletCatalogStore(state => state.allStorylets);
-  const {
-    activeStoryletIds,
-    completedStoryletIds,
-    storyArcs,
-    deploymentFilter,
-    deleteStorylet,
-    updateStoryletDeploymentStatus
-  } = useStoryletStore();
+  // Use V2 narrative store
+  const narrativeStore = useNarrativeStore();
+  const allStorylets = narrativeStore.getStorylets().reduce((acc, storylet) => {
+    acc[storylet.id] = storylet;
+    return acc;
+  }, {} as Record<string, Storylet>);
+  
+  // V2 compatible story state access
+  const activeStoryletIds = [];
+  const completedStoryletIds = [];
+  const storyArcs = [];
+  const deploymentFilter = null;
+  const deleteStorylet = (id: string) => narrativeStore.removeUserStorylet(id);
+  const updateStoryletDeploymentStatus = () => {};
   
   // Debug logging
   console.log(`📚 StoryletBrowser: ${Object.keys(allStorylets).length} storylets in catalog`);
@@ -211,7 +214,7 @@ const StoryletBrowser: React.FC<StoryletBrowserProps> = ({ onEditStorylet, onEdi
       },
       undoAction: () => {
         deletedStorylets.forEach(storylet => {
-          useStoryletStore.getState().addStorylet(storylet);
+          narrativeStore.addUserStorylet(storylet);
         });
       }
     };
@@ -282,7 +285,7 @@ const StoryletBrowser: React.FC<StoryletBrowserProps> = ({ onEditStorylet, onEdi
                     </>
                   )}
                   <span>•</span>
-                  <span>Trigger: {storylet.trigger.type}</span>
+                  <span>Trigger: {storylet.trigger?.type || 'none'}</span>
                 </div>
               </div>
             </div>
@@ -299,7 +302,7 @@ const StoryletBrowser: React.FC<StoryletBrowserProps> = ({ onEditStorylet, onEdi
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <span>{storylet.choices.length} choice(s)</span>
-              {storylet.trigger.type === 'time' && storylet.trigger.conditions?.day && (
+              {storylet.trigger?.type === 'time' && storylet.trigger.conditions?.day && (
                 <>
                   <span>•</span>
                   <span>Day {formatConditionValue(storylet.trigger.conditions.day)}</span>
@@ -336,7 +339,7 @@ const StoryletBrowser: React.FC<StoryletBrowserProps> = ({ onEditStorylet, onEdi
                       },
                       undoAction: () => {
                         console.log(`↩️ Undo: Restoring storylet ${storylet.id}`);
-                        useStoryletStore.getState().addStorylet(storylet);
+                        narrativeStore.addUserStorylet(storylet);
                       }
                     };
                     undoRedoSystem.executeAction(undoAction);
@@ -424,7 +427,7 @@ const StoryletBrowser: React.FC<StoryletBrowserProps> = ({ onEditStorylet, onEdi
                     },
                     undoAction: () => {
                       console.log(`↩️ Undo: Restoring storylet ${storylet.id}`);
-                      useStoryletStore.getState().addStorylet(storylet);
+                      narrativeStore.addUserStorylet(storylet);
                     }
                   };
                   undoRedoSystem.executeAction(undoAction);
