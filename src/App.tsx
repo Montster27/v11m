@@ -121,9 +121,9 @@ if (process.env.NODE_ENV === 'development') {
   import('../test/consistency/crossStoreTests'); // Import cross-store consistency test suite
   import('../test/parity/featureParityTests'); // Import feature parity test suite
   // Enable Phase 3 imports one by one to debug
-  import('./dev/storeInspector'); // Import Phase 3: Store Inspector utilities
-  import('./store/middleware/optimisticUpdates'); // Import Phase 3: Optimistic Updates middleware
-  import('./dev/testRunner'); // Import Phase 3: Enhanced Test Runner
+  // import('./dev/storeInspector'); // Removed during Phase 1 cleanup
+  import('./stores/middleware/optimisticUpdates'); // Import Phase 3: Optimistic Updates middleware
+  // import('./dev/testRunner'); // Removed during Phase 1 cleanup
   import('./test/storeTestUtils'); // Import Phase 3: Store Test Utilities
   
   // Expose consolidated stores globally for console access

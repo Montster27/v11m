@@ -7,8 +7,8 @@ import { useOptimizedNarrativeStore } from '../../src/stores/v2/optimizedNarrati
 import { useOptimizedSocialStore } from '../../src/stores/v2/optimizedSocialStore';
 import { useOptimizedCoreGameStore } from '../../src/stores/v2/optimizedCoreGameStore';
 import { benchmarkStorePerformance, generatePerformanceReport } from '../../src/stores/v2/optimizedStoreMigration';
-import { useStoryletCatalogStore } from '../../src/store/useStoryletCatalogStore';
-import { useAppStore } from '../../src/store/useAppStore';
+import { useStoryletCatalogStore } from '../../src/stores/useStoryletCatalogStore';
+import { useAppStore } from '../../src/stores/useAppStore';
 import type { Storylet, Choice, Effect } from '../../src/types/storylet';
 import type { Clue } from '../../src/types/clue';
 

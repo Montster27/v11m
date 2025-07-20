@@ -6,8 +6,8 @@ import React from 'react';
 
 // Import V2 stores for testing
 import { useCoreGameStore, useNarrativeStore, useSocialStore } from '../../src/stores/v2';
-import { useStoryletCatalogStore } from '../../src/store/useStoryletCatalogStore';
-import { useAppStore } from '../../src/store/useAppStore';
+import { useStoryletCatalogStore } from '../../src/stores/useStoryletCatalogStore';
+import { useAppStore } from '../../src/stores/useAppStore';
 
 // Import components to test
 import StoryletPanel from '../../src/components/StoryletPanel';

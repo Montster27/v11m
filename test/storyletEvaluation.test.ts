@@ -11,11 +11,11 @@ import { generateConcernFlags, clearFlagCache } from '../src/utils/flagGenerator
 import type { Storylet } from '../src/types/storylet';
 
 // Mock stores
-jest.mock('../src/store/useStoryletStore', () => ({
+jest.mock('../src/stores/useStoryletStore', () => ({
   useStoryletStore: jest.fn()
 }));
 
-jest.mock('../src/store/useCharacterConcernsStore', () => ({
+jest.mock('../src/stores/useCharacterConcernsStore', () => ({
   useCharacterConcernsStore: jest.fn()
 }));
 
@@ -23,8 +23,8 @@ jest.mock('../src/stores/v2', () => ({
   useCoreGameStore: jest.fn()
 }));
 
-const mockUseStoryletStore = require('../src/store/useStoryletStore').useStoryletStore;
-const mockUseCharacterConcernsStore = require('../src/store/useCharacterConcernsStore').useCharacterConcernsStore;
+const mockUseStoryletStore = require('../src/stores/useStoryletStore').useStoryletStore;
+const mockUseCharacterConcernsStore = require('../src/stores/useCharacterConcernsStore').useCharacterConcernsStore;
 const mockUseCoreGameStore = require('../src/stores/v2').useCoreGameStore;
 
 describe('Storylet Evaluation Performance Tests', () => {
