@@ -58,7 +58,12 @@
       "Bash(chmod:*)",
       "Bash(./update-store-imports.sh:*)",
       "Bash(sed:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(for store in *.ts)",
+      "Bash(do if [ \"$store\" != \"index.ts\" ])",
+      "Bash(then echo \"=== Checking $store ===\")",
+      "Bash(fi)",
+      "Bash(done)"
     ],
     "deny": []
   },

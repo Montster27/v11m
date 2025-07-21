@@ -147,7 +147,7 @@ const Planner: React.FC = () => {
                   onChange={(e) => {
                     coreStore.updateCharacter({ name: e.target.value });
                   }}
-                  className="text-red-500 text-sm bg-transparent border-none outline-none placeholder-red-400"
+                  className="text-blue-600 text-base bg-transparent border-none outline-none placeholder-blue-400"
                   style={{ width: 'auto', minWidth: '150px' }}
                 />
               </div>

@@ -1,33 +1,65 @@
-// Game Testing Utilities
-// Provides helper functions for setting up and testing game state
+// Game Testing Utilities - V2 Edition
+// Provides helper functions for setting up and testing V2 game state
 
 import { renderHook } from '@testing-library/react'
-import { useAppStore } from '../../stores/useAppStore'
-import { useStoryletStore } from '../../stores/useStoryletStore'
-import { useStoryletCatalogStore } from '../../stores/useStoryletCatalogStore'
+import { useCoreGameStore } from '../../stores/v2/useCoreGameStore'
+import { useNarrativeStore } from '../../stores/v2/useNarrativeStore'
+import { useSocialStore } from '../../stores/v2/useSocialStore'
+import { setupV2Test, createV2TestStorylet, createV2TestScenario, resetAllV2Stores } from '../v2-setup'
 import type { Storylet } from '../../types/storylet'
 
+// Re-export V2 setup utilities for backward compatibility
+export {
+  setupV2Test,
+  createV2TestStorylet as createTestStorylet,
+  createV2TestScenario as setupTestScenario,
+  resetAllV2Stores as resetAllStores
+}
+
 /**
- * Setup a basic game state for testing
+ * Setup a basic V2 game state for testing
  */
 export const setupGameState = (overrides = {}) => {
   const defaultState = {
-    day: 1,
-    resources: {
-      energy: 75,
-      stress: 25,
-      money: 20,
-      knowledge: 100,
-      social: 200
+    player: {
+      level: 1,
+      experience: 0,
+      skillPoints: 0,
+      resources: {
+        energy: 75,
+        stress: 25,
+        money: 20,
+        knowledge: 100,
+        social: 200
+      }
     },
-    activeCharacter: {
-      id: 'test-char',
-      name: 'Test Character'
+    character: {
+      name: 'Test Character',
+      background: 'test_background',
+      attributes: {},
+      developmentStats: {}
+    },
+    world: {
+      day: 1,
+      timeAllocation: {},
+      isTimePaused: false,
+      gameState: 'playing',
+      playtime: 0
     },
     ...overrides
   }
   
-  useAppStore.setState(defaultState)
+  // Update V2 stores
+  if (defaultState.player) {
+    useCoreGameStore.getState().updatePlayer(defaultState.player)
+  }
+  if (defaultState.character) {
+    useCoreGameStore.getState().updateCharacter(defaultState.character)
+  }
+  if (defaultState.world) {
+    useCoreGameStore.getState().updateWorld(defaultState.world)
+  }
+  
   return defaultState
 }
 
@@ -35,6 +67,10 @@ export const setupGameState = (overrides = {}) => {
  * Wait for storylet evaluation async queue to process
  */
 export const waitForStoryletEvaluation = async () => {
+  // In test environment, evaluation is synchronous so no need to wait
+  if (process.env.NODE_ENV === 'test') {
+    return;
+  }
   // Wait for the async queue to process
   await new Promise(resolve => setTimeout(resolve, 50))
 }
@@ -47,60 +83,28 @@ export const waitForStoreUpdate = async () => {
 }
 
 /**
- * Ensure window stores are available for storylet evaluation
+ * Ensure window stores are available for storylet evaluation (V2)
  */
 export const setupWindowStores = () => {
   if (typeof window !== 'undefined') {
-    if (!window.useAppStore) {
-      window.useAppStore = require('../../stores/useAppStore').useAppStore
+    if (!window.useCoreGameStore) {
+      window.useCoreGameStore = require('../../stores/v2/useCoreGameStore').useCoreGameStore
+    }
+    if (!window.useNarrativeStore) {
+      window.useNarrativeStore = require('../../stores/v2/useNarrativeStore').useNarrativeStore
+    }
+    if (!window.useSocialStore) {
+      window.useSocialStore = require('../../stores/v2/useSocialStore').useSocialStore
     }
   }
 }
 
 /**
- * Create a test storylet with sensible defaults that matches the Storylet interface
- */
-export const createTestStorylet = (overrides = {}): Storylet => {
-  const baseStorylet = {
-    id: `test-storylet-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    name: 'Test Storylet',
-    description: 'A test storylet for testing purposes',
-    trigger: { 
-      type: 'flag' as const, 
-      conditions: { flags: ['test_flag'] } 
-    },
-    choices: [{
-      id: 'choice1',
-      text: 'Test Choice',
-      effects: []
-    }],
-    deploymentStatus: 'dev' as const,
-    // Optional fields can be added through overrides
-    ...overrides
-  };
-
-  // Ensure trigger structure is always valid
-  if (overrides.trigger) {
-    baseStorylet.trigger = {
-      type: overrides.trigger.type || 'flag',
-      conditions: overrides.trigger.conditions || {}
-    };
-  }
-
-  // Ensure choices array is always valid
-  if (overrides.choices) {
-    baseStorylet.choices = Array.isArray(overrides.choices) ? overrides.choices : [baseStorylet.choices[0]];
-  }
-
-  return baseStorylet;
-}
-
-/**
- * Create multiple test storylets quickly
+ * Create multiple test storylets quickly (V2 compatible)
  */
 export const createTestStorylets = (count: number, baseOverrides = {}) => {
   return Array.from({ length: count }, (_, i) => 
-    createTestStorylet({
+    createV2TestStorylet({
       id: `test-storylet-batch-${i}`,
       name: `Test Storylet ${i + 1}`,
       ...baseOverrides
@@ -109,213 +113,260 @@ export const createTestStorylets = (count: number, baseOverrides = {}) => {
 }
 
 /**
- * Setup a complete test scenario with character, storylets, and game state
- */
-export const setupTestScenario = (scenarioName = 'default') => {
-  switch (scenarioName) {
-    case 'early-game':
-      return {
-        gameState: setupGameState({
-          day: 3,
-          resources: { energy: 80, stress: 20, money: 30, knowledge: 120, social: 180 }
-        }),
-        storylets: createTestStorylets(5, {
-          trigger: { type: 'time', conditions: { day: 3 } }
-        })
-      }
-    
-    case 'mid-game':
-      return {
-        gameState: setupGameState({
-          day: 30,
-          resources: { energy: 60, stress: 40, money: 150, knowledge: 300, social: 250 }
-        }),
-        storylets: createTestStorylets(10, {
-          trigger: { type: 'resource', conditions: { resources: { knowledge: 250 } } }
-        })
-      }
-    
-    case 'late-game':
-      return {
-        gameState: setupGameState({
-          day: 80,
-          resources: { energy: 70, stress: 30, money: 500, knowledge: 600, social: 400 }
-        }),
-        storylets: createTestStorylets(15)
-      }
-    
-    default:
-      return {
-        gameState: setupGameState(),
-        storylets: createTestStorylets(3)
-      }
-  }
-}
-
-/**
- * Helper to test storylet trigger conditions
+ * Helper to test storylet trigger conditions (V2)
  */
 export const testTriggerCondition = (storylet: Storylet, gameState: any = null) => {
-  if (!gameState) {
-    gameState = useAppStore.getState()
-  }
+  const coreState = gameState || useCoreGameStore.getState()
+  const narrativeState = useNarrativeStore.getState()
   
-  const storyletState = useStoryletStore.getState()
-  
-  switch (storylet.trigger.type) {
+  switch (storylet.trigger?.type) {
     case 'time':
       const dayCondition = storylet.trigger.conditions?.day
-      return dayCondition ? gameState.day === dayCondition : false
+      return dayCondition ? coreState.world.day >= dayCondition : false
     
     case 'flag':
       const flags = storylet.trigger.conditions?.flags || []
-      return flags.every((flag: string) => storyletState.activeFlags[flag])
+      return flags.every((flag: string) => {
+        // Check V2 flag system
+        return narrativeState.getStoryletFlag(flag) || false
+      })
     
     case 'resource':
       const resources = storylet.trigger.conditions?.resources || {}
-      return Object.entries(resources).every(([key, minValue]) => 
-        gameState.resources[key] >= minValue
-      )
+      return Object.entries(resources).every(([key, minValue]) => {
+        const currentValue = coreState.player.resources[key] || 0
+        return typeof minValue === 'number' ? currentValue >= minValue : true
+      })
+    
+    case 'manual':
+      // Manual triggers require explicit activation
+      return false
     
     default:
       return false
   }
 }
 
-
 /**
- * Reset all stores to clean state
- */
-export const resetAllStores = () => {
-  // Setup window stores first
-  setupWindowStores();
-
-  // Clear app store
-  useAppStore.setState({
-    day: 1,
-    resources: {
-      energy: 100,
-      stress: 0,
-      money: 50,
-      knowledge: 100,
-      social: 150
-    },
-    activeCharacter: null
-  });
-
-  // Clear storylet store completely with test mode
-  useStoryletStore.setState({
-    allStorylets: {},
-    activeStoryletIds: [],
-    completedStoryletIds: [],
-    activeFlags: {},
-    storyletCooldowns: {},
-    // Include dev storylets in tests
-    deploymentFilter: new Set(['live', 'dev']),
-    // Disable catalog syncing in tests
-    _testMode: true
-  });
-
-  // Also clear the catalog store to prevent storylet accumulation
-  useStoryletCatalogStore.setState({
-    allStorylets: {},
-    lastLoaded: 0,
-    isLoading: false
-  });
-
-  // Clear any persistent storage
-  localStorage.clear()
-  sessionStorage.clear()
-}
-
-/**
- * Create a minimal character for testing
+ * Create a minimal character for testing (V2 compatible)
  */
 export const createTestCharacter = (overrides = {}) => ({
-  id: `test-char-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
   name: 'Test Character',
   background: 'academic',
-  track: 'college',
-  concerns: {
-    academics: 20,
-    socialFitting: 15,
-    financial: 10,
-    isolation: 5,
-    genderIssues: 0,
-    raceIssues: 0,
-    classIssues: 0
+  attributes: {
+    intelligence: 10,
+    charisma: 10,
+    resilience: 10
   },
+  developmentStats: {},
   ...overrides
 })
 
 /**
- * Add storylets to catalog and sync to main store with proper timing
+ * Add storylets to V2 narrative store
  */
-export const addStoryletsToTest = async (storylets: Record<string, Storylet>) => {
-  useStoryletCatalogStore.setState({
-    allStorylets: storylets,
-    lastLoaded: Date.now(),
-    isLoading: false
-  });
+export const addStoryletsToTest = async (storylets: Storylet[]) => {
+  const narrativeStore = useNarrativeStore.getState()
   
-  await waitForStoreUpdate();
+  storylets.forEach(storylet => {
+    narrativeStore.addUserStorylet(storylet)
+  })
   
-  useStoryletStore.getState().syncFromCatalogStore();
-  await waitForStoreUpdate();
+  await waitForStoreUpdate()
 }
 
 /**
- * Evaluate storylets and wait for completion
+ * Evaluate storylets and wait for completion (V2)
  */
 export const evaluateAndWait = async () => {
-  useStoryletStore.getState().evaluateStorylets();
-  await waitForStoryletEvaluation();
+  useNarrativeStore.getState().evaluateStorylets()
+  await waitForStoryletEvaluation()
 }
 
 /**
- * Test that a storylet activates under given conditions
+ * Test that a storylet activates under given conditions (V2)
  */
 export const expectStoryletToActivate = async (storylet: Storylet, gameState = null) => {
   if (gameState) {
-    useAppStore.setState(gameState)
+    if (gameState.player) {
+      useCoreGameStore.getState().updatePlayer(gameState.player)
+    }
+    if (gameState.world) {
+      useCoreGameStore.getState().updateWorld(gameState.world)
+    }
     await waitForStoreUpdate()
   }
   
-  useStoryletStore.getState().addStorylet(storylet)
+  // Add storylet to narrative store
+  useNarrativeStore.getState().addUserStorylet(storylet)
   await waitForStoreUpdate()
   
-  useStoryletStore.getState().evaluateStorylets()
+  // Evaluate storylets
+  useNarrativeStore.getState().evaluateStorylets()
   await waitForStoryletEvaluation()
   
-  const activeIds = useStoryletStore.getState().activeStoryletIds
+  // Check if storylet is active
+  const narrativeState = useNarrativeStore.getState()
+  const activeIds = narrativeState.storylets.active
+  
   if (!activeIds.includes(storylet.id)) {
     throw new Error(`Expected storylet "${storylet.id}" to be active, but it was not. Active IDs: ${activeIds.join(', ')}`)
   }
 }
 
 /**
- * Helper to simulate game progression
+ * Helper to simulate game progression (V2)
  */
 export const simulateGameProgress = async (days: number) => {
-  const appStore = useAppStore.getState()
-  const storyletStore = useStoryletStore.getState()
+  const coreStore = useCoreGameStore.getState()
+  const narrativeStore = useNarrativeStore.getState()
   
   for (let i = 0; i < days; i++) {
     // Advance day
-    appStore.incrementDay?.()
+    const currentWorld = coreStore.world
+    coreStore.updateWorld({
+      ...currentWorld,
+      day: currentWorld.day + 1
+    })
     
     // Evaluate storylets
-    storyletStore.evaluateStorylets()
+    narrativeStore.evaluateStorylets()
     await waitForStoryletEvaluation()
     
     // Simulate some resource changes
-    const currentResources = useAppStore.getState().resources
-    useAppStore.setState({
+    const currentPlayer = coreStore.player
+    coreStore.updatePlayer({
+      ...currentPlayer,
       resources: {
-        ...currentResources,
-        energy: Math.max(0, currentResources.energy - Math.random() * 10),
-        stress: Math.min(100, currentResources.stress + Math.random() * 5)
+        ...currentPlayer.resources,
+        energy: Math.max(0, (currentPlayer.resources.energy || 100) - Math.random() * 10),
+        stress: Math.min(100, (currentPlayer.resources.stress || 0) + Math.random() * 5)
       }
     })
+    
+    await waitForStoreUpdate()
+  }
+}
+
+/**
+ * Set up test concerns in V2 narrative store
+ */
+export const setupTestConcerns = (concerns: Record<string, number>) => {
+  useNarrativeStore.getState().updateConcerns(concerns)
+}
+
+/**
+ * Set storylet flags in V2 narrative store
+ */
+export const setTestFlags = (flags: Record<string, any>) => {
+  const narrativeStore = useNarrativeStore.getState()
+  Object.entries(flags).forEach(([key, value]) => {
+    narrativeStore.setStoryletFlag(key, value)
+  })
+}
+
+/**
+ * Get current V2 store states for debugging
+ */
+export const getStoreStates = () => ({
+  core: useCoreGameStore.getState(),
+  narrative: useNarrativeStore.getState(),
+  social: useSocialStore.getState()
+})
+
+/**
+ * Assert that storylets exist in V2 narrative store
+ */
+export const expectStoryletsInStore = (storyletIds: string[]) => {
+  const narrativeStore = useNarrativeStore.getState()
+  const allStorylets = narrativeStore.getAllStorylets()
+  
+  storyletIds.forEach(id => {
+    const storylet = allStorylets.find(s => s.id === id)
+    if (!storylet) {
+      throw new Error(`Expected storylet ${id} to exist in narrative store, but it doesn't`)
+    }
+  })
+}
+
+/**
+ * Assert that storylets are active in V2 narrative store
+ */
+export const expectStoryletsActive = (storyletIds: string[]) => {
+  const narrativeStore = useNarrativeStore.getState()
+  const activeIds = narrativeStore.storylets.active
+  
+  storyletIds.forEach(id => {
+    if (!activeIds.includes(id)) {
+      throw new Error(`Expected storylet ${id} to be active, but active IDs are: ${activeIds.join(', ')}`)
+    }
+  })
+}
+
+/**
+ * Complete a storylet in V2 narrative store
+ */
+export const completeStorylet = (storyletId: string, choiceId: string = 'default') => {
+  const narrativeStore = useNarrativeStore.getState()
+  narrativeStore.recordStoryletCompletion(storyletId, choiceId)
+}
+
+/**
+ * Create test data for a complete game scenario (V2)
+ */
+export const createCompleteTestScenario = (scenarioType: 'early' | 'mid' | 'late' = 'early') => {
+  resetAllV2Stores()
+  
+  const scenarios = {
+    early: {
+      day: 3,
+      player: {
+        level: 1,
+        resources: { energy: 80, stress: 20, money: 30, knowledge: 120, social: 180 }
+      },
+      concerns: { academic: 20, social: 15, financial: 5 }
+    },
+    mid: {
+      day: 30,
+      player: {
+        level: 3,
+        resources: { energy: 60, stress: 40, money: 150, knowledge: 300, social: 250 }
+      },
+      concerns: { academic: 25, social: 20, financial: 15, career: 10 }
+    },
+    late: {
+      day: 80,
+      player: {
+        level: 5,
+        resources: { energy: 70, stress: 30, money: 500, knowledge: 600, social: 400 }
+      },
+      concerns: { career: 30, financial: 20, academic: 15, social: 10 }
+    }
+  }
+  
+  const config = scenarios[scenarioType]
+  
+  // Set up core game state
+  useCoreGameStore.getState().updateWorld({ day: config.day })
+  useCoreGameStore.getState().updatePlayer(config.player)
+  
+  // Set up concerns
+  useNarrativeStore.getState().updateConcerns(config.concerns)
+  
+  // Create some relevant storylets
+  const storylets = createTestStorylets(5, {
+    requirements: {
+      resources: { energy: 10 },
+      flags: Object.keys(config.concerns).map(c => `concern_${c}`)
+    }
+  })
+  
+  storylets.forEach(storylet => {
+    useNarrativeStore.getState().addUserStorylet(storylet)
+  })
+  
+  return {
+    scenario: config,
+    storylets
   }
 }

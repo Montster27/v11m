@@ -52,6 +52,9 @@ describe('Store Interactions Integration', () => {
     it('should handle migration with partial data', () => {
       const coreGameStore = useCoreGameStore.getState();
 
+      // Check initial state before setting partial data
+      console.log('Core store before partial data setup:', { level: coreGameStore.player.level });
+
       // Set up partial v1 data
       useAppStore.setState({
         day: 7,
@@ -65,11 +68,15 @@ describe('Store Interactions Integration', () => {
         // Missing userLevel and experience
       });
 
+      const appState = useAppStore.getState();
+      console.log('App store state:', { userLevel: appState.userLevel, experience: appState.experience });
+
       // Trigger migration
       coreGameStore.migrateFromLegacyStores();
 
       // Should handle missing data gracefully
       const v2State = useCoreGameStore.getState();
+      console.log('Core store after migration:', { level: v2State.player.level, experience: v2State.player.experience });
       expect(v2State.world.day).toBe(7);
       expect(v2State.player.level).toBe(1); // Default value
       expect(v2State.player.experience).toBe(0); // Default value
@@ -507,6 +514,9 @@ describe('Store Interactions Integration', () => {
         });
       }
 
+      // Get fresh reference to check state
+      const updatedSocialStore = useSocialStore.getState();
+
       const finalMemory = (performance as any).memory?.usedJSHeapSize || 0;
       const memoryGrowth = finalMemory - initialMemory;
 
@@ -514,8 +524,8 @@ describe('Store Interactions Integration', () => {
       expect(memoryGrowth).toBeLessThan(5 * 1024 * 1024); // Less than 5MB growth
 
       // Verify operations completed
-      expect(Object.keys(socialStore.npcs.relationships)).toHaveLength(50);
-      expect(Object.keys(socialStore.npcs.interactionHistory)).toHaveLength(50);
+      expect(Object.keys(updatedSocialStore.npcs.relationships)).toHaveLength(50);
+      expect(Object.keys(updatedSocialStore.npcs.interactionHistory)).toHaveLength(50);
     });
   });
 });

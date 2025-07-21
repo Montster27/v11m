@@ -1,10 +1,11 @@
 // /Users/montysharma/V11M2/src/components/StoryletManagementPanel.tsx
 import React, { useState, useEffect } from 'react';
-import { useStoryletCatalogStore } from '../stores/useStoryletCatalogStore';
-import { useClueStore } from '../stores/useClueStore';
-import { useNPCStore } from '../stores/useNPCStore';
+import { useStoryletCatalogStore } from '../stores/useStoryletCatalogStore'; // Temporary for storylet CRUD until V2 implementation
 import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
 import { useSocialStore } from '../stores/v2/useSocialStore';
+// TODO: Migrate away from V1 stores once V2 equivalents are implemented
+// import { useClueStore } from '../stores/useClueStore';
+// import { useNPCStore } from '../stores/useNPCStore';
 import { Button, Card } from './ui';
 import { StoryletDeploymentStatus, Storylet, Choice, Effect } from '../types/storylet';
 import StoryArcVisualizer from './StoryArcVisualizer';
@@ -136,10 +137,13 @@ const StoryletManagementPanel: React.FC = () => {
     return getStoryletsForArc(arcName);
   };
 
-  const { getAllNPCs } = useNPCStore();
-  const allNPCs = getAllNPCs();
+  // TODO: Replace with V2 store equivalents when available
+  // const { getAllNPCs } = useNPCStore();
+  // const allNPCs = getAllNPCs();
+  const allNPCs: any[] = []; // Placeholder until V2 NPC store
   
-  const { clues } = useClueStore();
+  // const { clues } = useClueStore();
+  const clues: any[] = []; // Placeholder until V2 clue store
 
   // Debug testingArc changes
   useEffect(() => {

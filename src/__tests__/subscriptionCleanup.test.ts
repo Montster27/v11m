@@ -22,8 +22,8 @@ describe('Subscription Cleanup System', () => {
 
   describe('SubscriptionManager', () => {
     it('should track subscriptions correctly', () => {
-      const unsubscribe1 = jest.fn();
-      const unsubscribe2 = jest.fn();
+      const unsubscribe1 = vi.fn();
+      const unsubscribe2 = vi.fn();
 
       subscriptionManager.add('component1', unsubscribe1, {
         type: 'store',
@@ -42,8 +42,8 @@ describe('Subscription Cleanup System', () => {
     });
 
     it('should cleanup subscriptions properly', () => {
-      const unsubscribe1 = jest.fn();
-      const unsubscribe2 = jest.fn();
+      const unsubscribe1 = vi.fn();
+      const unsubscribe2 = vi.fn();
 
       subscriptionManager.add('component1', unsubscribe1);
       subscriptionManager.add('component2', unsubscribe2);
@@ -61,7 +61,7 @@ describe('Subscription Cleanup System', () => {
     it('should detect potential memory leaks', () => {
       // Create many subscriptions for the same component
       for (let i = 0; i < 15; i++) {
-        subscriptionManager.add(`leak-component`, jest.fn(), {
+        subscriptionManager.add(`leak-component`, vi.fn(), {
           type: 'store',
           target: 'TestStore'
         });
@@ -79,9 +79,9 @@ describe('Subscription Cleanup System', () => {
     });
 
     it('should provide accurate statistics', () => {
-      subscriptionManager.add('comp1', jest.fn(), { type: 'store', target: 'Store1' });
-      subscriptionManager.add('comp1', jest.fn(), { type: 'store', target: 'Store2' });
-      subscriptionManager.add('comp2', jest.fn(), { type: 'event', target: 'window' });
+      subscriptionManager.add('comp1', vi.fn(), { type: 'store', target: 'Store1' });
+      subscriptionManager.add('comp1', vi.fn(), { type: 'store', target: 'Store2' });
+      subscriptionManager.add('comp2', vi.fn(), { type: 'event', target: 'window' });
 
       const stats = subscriptionManager.getStats();
       expect(stats.totalSubscriptions).toBe(3);
@@ -95,7 +95,7 @@ describe('Subscription Cleanup System', () => {
 
   describe('useSubscriptionCleanup Hook', () => {
     it('should register and cleanup subscriptions automatically', () => {
-      const unsubscribe = jest.fn();
+      const unsubscribe = vi.fn();
 
       const { result, unmount } = renderHook(() =>
         useSubscriptionCleanup('test-component')
@@ -115,8 +115,8 @@ describe('Subscription Cleanup System', () => {
     });
 
     it('should handle dependency changes correctly', () => {
-      const unsubscribe1 = jest.fn();
-      const unsubscribe2 = jest.fn();
+      const unsubscribe1 = vi.fn();
+      const unsubscribe2 = vi.fn();
 
       let deps = ['dep1'];
       const { result, rerender } = renderHook(() =>
@@ -150,8 +150,8 @@ describe('Subscription Cleanup System', () => {
       expect(result.current.getSubscriptionCount()).toBe(0);
 
       act(() => {
-        result.current.addSubscription(jest.fn(), 'store', 'Store1');
-        result.current.addSubscription(jest.fn(), 'event', 'window');
+        result.current.addSubscription(vi.fn(), 'store', 'Store1');
+        result.current.addSubscription(vi.fn(), 'event', 'window');
       });
 
       expect(result.current.getSubscriptionCount()).toBe(2);
@@ -178,9 +178,9 @@ describe('Subscription Cleanup System', () => {
 
     it('should generate comprehensive memory reports', () => {
       // Setup test subscriptions
-      subscriptionManager.add('component1', jest.fn(), { type: 'store', target: 'Store1' });
-      subscriptionManager.add('component1', jest.fn(), { type: 'event', target: 'window' });
-      subscriptionManager.add('component2', jest.fn(), { type: 'store', target: 'Store2' });
+      subscriptionManager.add('component1', vi.fn(), { type: 'store', target: 'Store1' });
+      subscriptionManager.add('component1', vi.fn(), { type: 'event', target: 'window' });
+      subscriptionManager.add('component2', vi.fn(), { type: 'store', target: 'Store2' });
 
       // Simulate renders
       memoryLeakDetector.trackRender('component1');
@@ -222,7 +222,7 @@ describe('Subscription Cleanup System', () => {
     it('should identify subscription leaks', () => {
       // Create excessive subscriptions
       for (let i = 0; i < 12; i++) {
-        subscriptionManager.add('leak-component', jest.fn());
+        subscriptionManager.add('leak-component', vi.fn());
       }
 
       const report = memoryLeakDetector.generateReport();
@@ -240,7 +240,7 @@ describe('Subscription Cleanup System', () => {
     it('should handle reset correctly', () => {
       memoryLeakDetector.trackRender('component1');
       memoryLeakDetector.trackRender('component2');
-      subscriptionManager.add('component1', jest.fn());
+      subscriptionManager.add('component1', vi.fn());
 
       expect(memoryLeakDetector.generateReport().totalComponents).toBe(2);
       expect(subscriptionManager.getStats().totalSubscriptions).toBe(1);
@@ -262,7 +262,7 @@ describe('Subscription Cleanup System', () => {
         renderTracker('integration-test');
         
         React.useEffect(() => {
-          const unsubscribe = jest.fn();
+          const unsubscribe = vi.fn();
           addSubscription(unsubscribe, 'store', 'TestStore');
         }, [addSubscription]);
         
@@ -288,7 +288,7 @@ describe('Subscription Cleanup System', () => {
           
           React.useEffect(() => {
             for (let i = 0; i < subscriptionCount; i++) {
-              addSubscription(jest.fn(), 'store', `Store${i}`);
+              addSubscription(vi.fn(), 'store', `Store${i}`);
             }
           }, [addSubscription]);
           
@@ -328,7 +328,7 @@ describe('Subscription Cleanup System', () => {
 
   describe('Error Handling', () => {
     it('should handle subscription errors gracefully', () => {
-      const faultyUnsubscribe = jest.fn(() => {
+      const faultyUnsubscribe = vi.fn(() => {
         throw new Error('Unsubscribe failed');
       });
 
@@ -353,7 +353,7 @@ describe('Subscription Cleanup System', () => {
     });
 
     it('should handle duplicate component cleanup', () => {
-      const unsubscribe = jest.fn();
+      const unsubscribe = vi.fn();
       subscriptionManager.add('test-component', unsubscribe);
 
       subscriptionManager.cleanup('test-component');

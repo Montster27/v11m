@@ -52,7 +52,6 @@ const serializeConcerns = (concerns: CharacterConcerns): string => {
  */
 const _generateConcernFlags = (concerns: CharacterConcerns): Record<string, boolean> => {
   const startTime = performance.now();
-  console.log('[FlagGenerator] Computing flags for concerns:', Object.keys(concerns));
   
   const flags: Record<string, boolean> = {};
 
@@ -60,6 +59,8 @@ const _generateConcernFlags = (concerns: CharacterConcerns): Record<string, bool
     console.warn('[FlagGenerator] Invalid concerns object provided');
     return flags;
   }
+  
+  console.log('[FlagGenerator] Computing flags for concerns:', Object.keys(concerns));
 
   // Generate individual concern flags
   Object.entries(concerns).forEach(([key, value]) => {
@@ -127,7 +128,6 @@ const _generateConcernFlags = (concerns: CharacterConcerns): Record<string, bool
 
   const endTime = performance.now();
   stats.lastGenerationTime = endTime - startTime;
-  stats.cacheMisses++;
   
   console.log(`[FlagGenerator] Generated ${Object.keys(flags).length} flags in ${stats.lastGenerationTime.toFixed(2)}ms`);
   
@@ -138,18 +138,35 @@ const _generateConcernFlags = (concerns: CharacterConcerns): Record<string, bool
  * Memoized version of flag generation for performance optimization
  * Uses lodash memoize with custom resolver for stable cache keys
  */
-export const generateConcernFlags = _.memoize(
-  _generateConcernFlags,
-  (concerns: CharacterConcerns) => {
+// Simple cache using Map
+const _flagCache = new Map<string, Record<string, boolean>>();
+
+export const generateConcernFlags = Object.assign(
+  (concerns: CharacterConcerns): Record<string, boolean> => {
     const key = serializeConcerns(concerns);
     
-    // Check if this is a cache hit
-    if (generateConcernFlags.cache.has(key)) {
+    // Check if this will be a cache hit
+    if (_flagCache.has(key)) {
       stats.cacheHits++;
       console.log('[FlagGenerator] Cache hit for key:', key.substring(0, 50) + '...');
+      return _flagCache.get(key)!;
+    } else {
+      stats.cacheMisses++;
+      console.log('[FlagGenerator] Cache miss for key:', key.substring(0, 50) + '...');
+      const result = _generateConcernFlags(concerns);
+      _flagCache.set(key, result);
+      return result;
     }
-    
-    return key;
+  },
+  {
+    get cache() { 
+      // Convert Map to object for compatibility
+      const obj: Record<string, Record<string, boolean>> = {};
+      for (const [key, value] of _flagCache.entries()) {
+        obj[key] = value;
+      }
+      return obj;
+    }
   }
 );
 
@@ -157,12 +174,14 @@ export const generateConcernFlags = _.memoize(
  * Generate flags from multiple sources efficiently
  * Combines concern flags with game flags
  */
-export const generateAllFlags = _.memoize(
-  (
-    concerns: CharacterConcerns, 
-    gameFlags: Record<string, any> = {}, 
-    playerStats: Record<string, any> = {}
-  ): Record<string, boolean> => {
+// Cache for generateAllFlags
+const _allFlagsCache = new Map<string, Record<string, boolean>>();
+
+const _generateAllFlags = (
+  concerns: CharacterConcerns, 
+  gameFlags: Record<string, any> = {}, 
+  playerStats: Record<string, any> = {}
+): Record<string, boolean> => {
     const startTime = performance.now();
     
     // Get memoized concern flags
@@ -178,6 +197,9 @@ export const generateAllFlags = _.memoize(
         booleanGameFlags[`${key}_positive`] = value > 0;
         booleanGameFlags[`${key}_zero`] = value === 0;
         booleanGameFlags[`${key}_negative`] = value < 0;
+      } else if (typeof value === 'boolean') {
+        booleanGameFlags[`${key}_positive`] = value;
+        booleanGameFlags[`${key}_negative`] = !value;
       }
     });
     
@@ -201,9 +223,36 @@ export const generateAllFlags = _.memoize(
     console.log(`[FlagGenerator] Generated ${Object.keys(allFlags).length} total flags in ${(endTime - startTime).toFixed(2)}ms`);
     
     return allFlags;
+};
+
+export const generateAllFlags = Object.assign(
+  (
+    concerns: CharacterConcerns, 
+    gameFlags: Record<string, any> = {}, 
+    playerStats: Record<string, any> = {}
+  ): Record<string, boolean> => {
+    // Create cache key
+    const key = `${serializeConcerns(concerns)}|${JSON.stringify(gameFlags)}|${JSON.stringify(playerStats)}`;
+    
+    if (_allFlagsCache.has(key)) {
+      console.log('[FlagGenerator] AllFlags cache hit');
+      return _allFlagsCache.get(key)!;
+    } else {
+      console.log('[FlagGenerator] AllFlags cache miss');
+      const result = _generateAllFlags(concerns, gameFlags, playerStats);
+      _allFlagsCache.set(key, result);
+      return result;
+    }
   },
-  (concerns, gameFlags, playerStats) => {
-    return `${serializeConcerns(concerns)}|${JSON.stringify(gameFlags)}|${JSON.stringify(playerStats)}`;
+  {
+    get cache() {
+      // Convert Map to object for compatibility
+      const obj: Record<string, Record<string, boolean>> = {};
+      for (const [key, value] of _allFlagsCache.entries()) {
+        obj[key] = value;
+      }
+      return obj;
+    }
   }
 );
 
@@ -215,8 +264,8 @@ export const clearFlagCache = (): void => {
   console.log('[FlagGenerator] Clearing flag cache');
   
   // Clear individual caches
-  generateConcernFlags.cache.clear();
-  generateAllFlags.cache.clear();
+  _flagCache.clear();
+  _allFlagsCache.clear();
   
   // Reset stats
   stats = {
@@ -226,16 +275,17 @@ export const clearFlagCache = (): void => {
     cacheSize: 0
   };
   
-  console.log('[FlagGenerator] Cache cleared');
+  console.log('[FlagGenerator] Cache cleared, stats reset to 0,0');
 };
 
 /**
  * Get cache statistics for monitoring performance
  */
 export const getFlagGeneratorStats = (): FlagGeneratorStats => {
+  console.log(`[FlagGenerator] Stats: hits=${stats.cacheHits}, misses=${stats.cacheMisses}, concerns=${_flagCache.size}, allFlags=${_allFlagsCache.size}`);
   return {
     ...stats,
-    cacheSize: Object.keys(generateConcernFlags.cache || {}).length + Object.keys(generateAllFlags.cache || {}).length
+    cacheSize: _flagCache.size + _allFlagsCache.size
   };
 };
 
@@ -248,7 +298,7 @@ export const optimizeFlagCache = (maxEntries: number = 100): void => {
   
   // For lodash memoize, we'll clear and let it rebuild naturally
   // This is a simple approach - in production you might want LRU cache
-  const currentCacheSize = Object.keys(generateConcernFlags.cache || {}).length;
+  const currentCacheSize = _flagCache.size + _allFlagsCache.size;
   if (currentCacheSize > maxEntries) {
     console.log(`[FlagGenerator] Cache size (${currentCacheSize}) exceeds limit (${maxEntries}), clearing`);
     clearFlagCache();

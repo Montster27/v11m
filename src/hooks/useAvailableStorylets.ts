@@ -95,7 +95,7 @@ export function useAvailableStorylets(options: StoryletEvaluationOptions = {}): 
   const [evaluationTime, setEvaluationTime] = useState(0);
 
   // Store hooks
-  const allStorylets = useNarrativeStore(state => state.getStorylets());
+  const allStorylets = useNarrativeStore(state => state.getAllStorylets());
   const concerns = useCharacterConcernsStore(state => state.concerns);
   const coreGameState = useCoreGameStore(state => ({
     player: state.player,

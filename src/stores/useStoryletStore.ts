@@ -49,6 +49,8 @@ interface StoryletState {
   // Development settings
   deploymentFilter: Set<'live' | 'stage' | 'dev'>;  // which deployment statuses to show (can be multiple)
   _testMode?: boolean;                               // disable catalog syncing in tests
+  _lastCatalogSync?: number;                         // last catalog sync timestamp for caching
+  _deploymentFilterHash?: string;                    // deployment filter hash for caching
   
   // Minigame state
   activeMinigame: MinigameType | null;              // currently active minigame
@@ -170,10 +172,25 @@ const evaluateTimeTrigger = (trigger: any, appState: any) => {
 };
 
 const evaluateFlagTrigger = (trigger: any, activeFlags: any) => {
-  if (trigger.conditions.flags && Array.isArray(trigger.conditions.flags)) {
-    // Check if ANY of the flags are true (OR logic)
-    return trigger.conditions.flags.some((flagKey: string) => activeFlags[flagKey]);
+  const flags = trigger.conditions?.flags;
+  
+  // If no flags specified in conditions, it should always trigger
+  if (!flags || !Array.isArray(flags)) {
+    return true;
   }
+  
+  // If there are no flags to check, it should always trigger
+  if (flags.length === 0) {
+    return true;
+  }
+  
+  // Check if ANY of the flags are true (OR logic) - optimized loop
+  for (const flagKey of flags) {
+    if (activeFlags[flagKey]) {
+      return true;
+    }
+  }
+  
   return false;
 };
 
@@ -316,6 +333,8 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   // Development settings
   deploymentFilter: new Set(['live', 'dev']) as Set<'live' | 'stage' | 'dev'>,
   _testMode: false,
+  _lastCatalogSync: 0,
+  _deploymentFilterHash: 'dev,live',
   
   // Minigame state
   activeMinigame: null,
@@ -329,13 +348,33 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   // Sync storylets from catalog store
   syncFromCatalogStore: () => {
     const catalogStore = useStoryletCatalogStore.getState();
-    const currentStorylets = catalogStore.allStorylets;
+    const allStorylets = catalogStore.allStorylets;
+    const state = get();
     
-    devLog('🔄 Syncing storylets from catalog store:', Object.keys(currentStorylets).length);
+    // Skip if catalog hasn't changed and filter hasn't changed
+    if (catalogStore.lastLoaded === state._lastCatalogSync && 
+        state._deploymentFilterHash === Array.from(state.deploymentFilter).sort().join(',')) {
+      return;
+    }
     
-    set((state) => ({
-      allStorylets: currentStorylets
-    }));
+    // Apply deployment filter efficiently
+    const filteredStorylets: Record<string, Storylet> = {};
+    const deploymentFilter = state.deploymentFilter;
+    
+    for (const storylet of Object.values(allStorylets)) {
+      const storyletStatus = storylet.deploymentStatus || 'live';
+      if (deploymentFilter.has(storyletStatus)) {
+        filteredStorylets[storylet.id] = storylet;
+      }
+    }
+    
+    devLog('🔄 Syncing storylets from catalog store:', Object.keys(allStorylets).length, '→', Object.keys(filteredStorylets).length, 'after filtering');
+    
+    set({
+      allStorylets: filteredStorylets,
+      _lastCatalogSync: catalogStore.lastLoaded,
+      _deploymentFilterHash: Array.from(deploymentFilter).sort().join(',')
+    });
   },
 
   evaluateStorylets: () => {
@@ -345,10 +384,15 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       get().syncFromCatalogStore();
     }
     
-    // Use queue to prevent race conditions during evaluation
-    evaluationQueue.add(async () => {
-      return get()._evaluateStoryletsSync();
-    });
+    // In test mode or NODE_ENV=test, run synchronously for better performance
+    if (state._testMode || process.env.NODE_ENV === 'test') {
+      get()._evaluateStoryletsSync();
+    } else {
+      // Use queue to prevent race conditions during evaluation
+      evaluationQueue.add(async () => {
+        return get()._evaluateStoryletsSync();
+      });
+    }
   },
 
   // Internal synchronous evaluation (for queue)
@@ -369,7 +413,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
       });
     }
     
-    Object.values(state.allStorylets).forEach((storylet) => {
+    for (const storylet of Object.values(state.allStorylets)) {
       if (process.env.NODE_ENV === 'development') {
         devLog(`\n🔍 Checking storylet: ${storylet.id} (${storylet.name})`);
         
@@ -383,19 +427,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
         }
       }
       
-      // Skip storylets based on deployment status
-      const storyletStatus = storylet.deploymentStatus || 'live';
-      const shouldShowByDeployment = state.deploymentFilter.has(storyletStatus);
-      
-      if (!shouldShowByDeployment) {
-        if (process.env.NODE_ENV === 'development') {
-          devLog(`🚫 Skipping ${storylet.id} due to deployment filter:`, {
-            storyletStatus,
-            currentFilter: Array.from(state.deploymentFilter)
-          });
-        }
-        return;
-      }
+      // Note: Deployment filtering is now done at sync time for better performance
       
       if (shouldSkipStorylet(storylet, state, appState)) {
         if (process.env.NODE_ENV === 'development') {
@@ -466,7 +498,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
           devLog(`❌ Cannot trigger ${storylet.id}`);
         }
       }
-    });
+    }
     
     // Add newly unlocked storylets to active list
     if (newActiveIds.length > 0) {
@@ -1553,7 +1585,10 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   // Development actions
   setDeploymentFilter: (filter: Set<'live' | 'stage' | 'dev'>) => {
     devLog(`🔧 Setting deployment filter to: ${Array.from(filter).join(', ')}`);
-    set({ deploymentFilter: new Set(filter) });
+    set({ 
+      deploymentFilter: new Set(filter),
+      _deploymentFilterHash: '' // Reset cache to force re-sync
+    });
     
     // Note: Re-evaluation with new filter is handled reactively by useGameOrchestrator hook
   },
@@ -1574,7 +1609,10 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
     }
     
     devLog(`🔧 Toggled ${status}, new filter: ${Array.from(newFilter).join(', ')}`);
-    set({ deploymentFilter: newFilter });
+    set({ 
+      deploymentFilter: newFilter,
+      _deploymentFilterHash: '' // Reset cache to force re-sync
+    });
     
     // Note: Re-evaluation with new filter is handled reactively by useGameOrchestrator hook
   },

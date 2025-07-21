@@ -26,7 +26,7 @@ describe('Memory Leak Stress Tests', () => {
         for (let subId = 0; subId < 10; subId++) {
           subscriptionManager.add(
             `stress-component-${compId}`,
-            jest.fn(),
+            vi.fn(),
             { type: 'store', target: `Store${subId}` }
           );
         }
@@ -56,7 +56,7 @@ describe('Memory Leak Stress Tests', () => {
         for (let i = 0; i < count; i++) {
           subscriptionManager.add(
             `leak-test-${index}`,
-            jest.fn(),
+            vi.fn(),
             { type: 'store', target: `Store${i}` }
           );
         }
@@ -82,7 +82,7 @@ describe('Memory Leak Stress Tests', () => {
         for (let sub = 0; sub < subscriptionsPerCycle; sub++) {
           subscriptionManager.add(
             `cycle-component-${cycle}`,
-            jest.fn(),
+            vi.fn(),
             { type: 'event', target: 'window' }
           );
         }
@@ -176,9 +176,9 @@ describe('Memory Leak Stress Tests', () => {
         
         React.useEffect(() => {
           // Simulate multiple subscription types
-          const storeUnsub = jest.fn();
-          const eventUnsub = jest.fn();
-          const timerUnsub = jest.fn();
+          const storeUnsub = vi.fn();
+          const eventUnsub = vi.fn();
+          const timerUnsub = vi.fn();
           
           addSubscription(storeUnsub, 'store', 'TestStore');
           addSubscription(eventUnsub, 'event', 'window');
@@ -234,7 +234,7 @@ describe('Memory Leak Stress Tests', () => {
           for (let sub = 0; sub < type.subscriptions; sub++) {
             subscriptionManager.add(
               `${type.name}-${i}`,
-              jest.fn(),
+              vi.fn(),
               { type: 'store', target: `${type.name}Store` }
             );
           }
@@ -270,7 +270,7 @@ describe('Memory Leak Stress Tests', () => {
       for (let i = 0; i < excessiveSubscriptions; i++) {
         subscriptionManager.add(
           'emergency-test-component',
-          jest.fn(),
+          vi.fn(),
           { type: 'store', target: `Store${i}` }
         );
       }
@@ -295,7 +295,7 @@ describe('Memory Leak Stress Tests', () => {
         for (let j = 0; j < subscriptionCount; j++) {
           subscriptionManager.add(
             `benchmark-component-${i}`,
-            jest.fn(),
+            vi.fn(),
             { type: 'store', target: `Store${j}` }
           );
         }
@@ -347,7 +347,7 @@ describe('Memory Leak Stress Tests', () => {
         for (let sub = 0; sub < subscriptionsPerComponent; sub++) {
           subscriptionManager.add(
             `cleanup-test-${comp}`,
-            jest.fn(),
+            vi.fn(),
             { type: 'store', target: `Store${sub}` }
           );
         }
@@ -376,7 +376,7 @@ describe('Memory Leak Stress Tests', () => {
       for (let cycle = 0; cycle < 100; cycle++) {
         // Create subscriptions
         for (let i = 0; i < 50; i++) {
-          subscriptionManager.add(`cycle-${cycle}-comp-${i}`, jest.fn());
+          subscriptionManager.add(`cycle-${cycle}-comp-${i}`, vi.fn());
           memoryLeakDetector.trackRender(`cycle-${cycle}-comp-${i}`);
         }
         

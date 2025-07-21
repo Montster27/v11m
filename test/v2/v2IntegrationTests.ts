@@ -3,10 +3,6 @@
 // Tests the full V2 migration functionality and store interactions
 
 import { useCoreGameStore, useNarrativeStore, useSocialStore } from '../../src/stores/v2';
-import { useOptimizedNarrativeStore } from '../../src/stores/v2/optimizedNarrativeStore';
-import { useOptimizedSocialStore } from '../../src/stores/v2/optimizedSocialStore';
-import { useOptimizedCoreGameStore } from '../../src/stores/v2/optimizedCoreGameStore';
-import { benchmarkStorePerformance, generatePerformanceReport } from '../../src/stores/v2/optimizedStoreMigration';
 import { useStoryletCatalogStore } from '../../src/stores/useStoryletCatalogStore';
 import { useAppStore } from '../../src/stores/useAppStore';
 import type { Storylet, Choice, Effect } from '../../src/types/storylet';
@@ -29,7 +25,6 @@ export interface V2IntegrationTestSuite {
   crossStoreConsistency: V2TestResult;
   performanceMetrics: V2TestResult;
   migrationCompatibility: V2TestResult;
-  optimizedStoreComparison: V2TestResult;
 }
 
 // Test data setup
@@ -579,97 +574,82 @@ export const testMigrationCompatibility = async (): Promise<V2TestResult> => {
 };
 
 /**
- * Test optimized store performance comparison
+ * Test 8: V2 Store Performance Metrics (Simplified)
  */
-export const testOptimizedStoreComparison = async (): Promise<V2TestResult> => {
+export const testV2StorePerformance = async (): Promise<V2TestResult> => {
   const startTime = performance.now();
   const errors: string[] = [];
   const warnings: string[] = [];
   const validations: Record<string, boolean> = {};
 
   try {
-    console.log('🔬 Testing optimized store performance comparison...');
+    console.log('🔬 Testing V2 store performance...');
 
-    // Test 1: Basic functionality equivalence
     const narrativeState = useNarrativeStore.getState();
-    const optimizedNarrativeState = useOptimizedNarrativeStore.getState();
+    const socialState = useSocialStore.getState();
+    const coreState = useCoreGameStore.getState();
     
-    // Set same data in both stores
-    const testStorylet = 'performance_test_storylet';
-    narrativeState.addActiveStorylet(testStorylet);
-    optimizedNarrativeState.addActiveStorylet(testStorylet);
-    
-    validations.functionalEquivalence = 
-      narrativeState.storylets.active.includes(testStorylet) &&
-      optimizedNarrativeState.storylets.active.includes(testStorylet);
-
-    // Test 2: Performance benchmarking
-    const benchmarkResults = await benchmarkStorePerformance();
-    
-    const narrativeImprovement = benchmarkResults.narrative.improvement;
-    const socialImprovement = benchmarkResults.social.improvement;
-    const coreImprovement = benchmarkResults.core.improvement;
-    
-    validations.narrativePerformanceImprovement = narrativeImprovement > 0;
-    validations.socialPerformanceImprovement = socialImprovement > 0;
-    validations.corePerformanceImprovement = coreImprovement > 0;
-    
-    if (narrativeImprovement < 5) {
-      warnings.push(`Narrative store improvement only ${narrativeImprovement.toFixed(1)}% - expected >5%`);
-    }
-    
-    if (socialImprovement < 5) {
-      warnings.push(`Social store improvement only ${socialImprovement.toFixed(1)}% - expected >5%`);
-    }
-    
-    if (coreImprovement < 5) {
-      warnings.push(`Core store improvement only ${coreImprovement.toFixed(1)}% - expected >5%`);
-    }
-
-    // Test 3: Memory usage comparison
+    // Test 1: Store serialization performance
+    const serializeStartTime = performance.now();
     const narrativeSize = JSON.stringify(narrativeState).length;
-    const optimizedNarrativeSize = JSON.stringify(optimizedNarrativeState).length;
-    const narrativeSizeReduction = ((narrativeSize - optimizedNarrativeSize) / narrativeSize) * 100;
+    const socialSize = JSON.stringify(socialState).length;
+    const coreSize = JSON.stringify(coreState).length;
+    const serializeTime = performance.now() - serializeStartTime;
     
-    validations.memorySizeReduction = narrativeSizeReduction >= 0; // Should be at least equal or smaller
+    validations.serializationPerformance = serializeTime < 100; // Should take less than 100ms
+    validations.storesSerialized = !!(narrativeSize && socialSize && coreSize);
     
-    if (narrativeSizeReduction < 0) {
-      warnings.push(`Optimized store is ${Math.abs(narrativeSizeReduction).toFixed(1)}% larger - unexpected`);
+    if (serializeTime >= 100) {
+      warnings.push(`Serialization took ${serializeTime.toFixed(2)}ms (expected < 100ms)`);
     }
 
-    // Test 4: Performance metadata tracking
-    const optimizedMetrics = useOptimizedNarrativeStore.getState().getPerformanceMetrics();
-    validations.performanceMetadataPresent = !!(
-      optimizedMetrics.operationCount !== undefined &&
-      optimizedMetrics.cacheHits !== undefined &&
-      optimizedMetrics.cacheMisses !== undefined
-    );
-
-    // Test 5: Auto-optimization functionality
-    const beforeOptimization = useOptimizedNarrativeStore.getState()._performance.operationCount;
-    useOptimizedNarrativeStore.getState().optimizeStore();
-    const afterOptimization = useOptimizedNarrativeStore.getState()._performance.operationCount;
+    // Test 2: Memory usage is reasonable
+    const totalSize = narrativeSize + socialSize + coreSize;
+    validations.memoryUsageReasonable = totalSize < 2000000; // Less than 2MB
     
-    validations.autoOptimizationWorks = afterOptimization === 0; // Should reset to 0
+    if (totalSize >= 2000000) {
+      warnings.push(`Total store memory usage: ${(totalSize / 1000).toFixed(2)}KB (large)`);
+    }
 
-    // Test 6: Generate comprehensive performance report
-    const performanceReport = generatePerformanceReport();
-    validations.performanceReportGeneration = !!(
-      performanceReport.narrative &&
-      performanceReport.social &&
-      performanceReport.core &&
-      performanceReport.overall
-    );
+    // Test 3: Store operation performance
+    const operationStartTime = performance.now();
+    
+    // Perform typical store operations
+    narrativeState.addActiveStorylet('perf-test-storylet');
+    socialState.discoverClue({
+      id: 'perf-test-clue',
+      title: 'Performance Test Clue',
+      description: 'Test clue for performance testing',
+      content: 'Performance test content',
+      category: 'general',
+      difficulty: 'easy',
+      storyArc: 'perf-arc',
+      arcOrder: 1,
+      minigameTypes: [],
+      associatedStorylets: [],
+      isDiscovered: true,
+      discoveredAt: new Date(),
+      tags: ['test'],
+      rarity: 'common',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    
+    const operationTime = performance.now() - operationStartTime;
+    validations.operationPerformance = operationTime < 50; // Should take less than 50ms
+    
+    if (operationTime >= 50) {
+      warnings.push(`Store operations took ${operationTime.toFixed(2)}ms (expected < 50ms)`);
+    }
 
-    console.log('📊 Performance Benchmark Results:', {
-      narrative: `${narrativeImprovement.toFixed(1)}% improvement`,
-      social: `${socialImprovement.toFixed(1)}% improvement`,
-      core: `${coreImprovement.toFixed(1)}% improvement`,
-      memorySaving: `${narrativeSizeReduction.toFixed(1)}% size reduction`
+    console.log('📊 V2 Store Performance Results:', {
+      serializationTime: `${serializeTime.toFixed(1)}ms`,
+      operationTime: `${operationTime.toFixed(1)}ms`,
+      totalMemoryUsage: `${(totalSize / 1000).toFixed(1)}KB`
     });
 
   } catch (error) {
-    errors.push(`Optimized store comparison test failed: ${error}`);
+    errors.push(`V2 store performance test failed: ${error}`);
   }
 
   const duration = performance.now() - startTime;
@@ -677,7 +657,7 @@ export const testOptimizedStoreComparison = async (): Promise<V2TestResult> => {
 
   return {
     success,
-    testName: 'Optimized Store Performance Comparison',
+    testName: 'V2 Store Performance',
     duration,
     errors,
     warnings,
@@ -698,8 +678,7 @@ export const runV2IntegrationTests = async (): Promise<V2IntegrationTestSuite> =
     clueDiscoveryFlow: await testClueDiscoveryFlow(),
     crossStoreConsistency: await testCrossStoreConsistency(),
     performanceMetrics: await testPerformanceMetrics(),
-    migrationCompatibility: await testMigrationCompatibility(),
-    optimizedStoreComparison: await testOptimizedStoreComparison()
+    migrationCompatibility: await testMigrationCompatibility()
   };
 
   // Generate summary
@@ -739,7 +718,7 @@ if (typeof window !== 'undefined') {
   (window as any).testCrossStoreConsistency = testCrossStoreConsistency;
   (window as any).testPerformanceMetrics = testPerformanceMetrics;
   (window as any).testMigrationCompatibility = testMigrationCompatibility;
-  (window as any).testOptimizedStoreComparison = testOptimizedStoreComparison;
+  (window as any).testV2StorePerformance = testV2StorePerformance;
   
   console.log('🧪 V2 Integration Tests exposed globally for console access');
 }

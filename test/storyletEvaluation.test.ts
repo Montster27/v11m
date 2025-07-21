@@ -11,57 +11,47 @@ import {
 import { generateConcernFlags, clearFlagCache } from '../src/utils/flagGenerator';
 import type { Storylet } from '../src/types/storylet';
 
-// Mock stores
-vi.mock('../src/stores/useStoryletStore', () => ({
-  useStoryletStore: vi.fn()
-}));
+// Import V2 stores for testing
+import { useNarrativeStore } from '../src/stores/v2/useNarrativeStore';
+import { useCoreGameStore } from '../src/stores/v2';
+import { setupV2TestStores, resetAllV2Stores, createV2TestStorylet } from '../src/test/v2-setup';
 
+// Mock the character concerns store to avoid React update loops
 vi.mock('../src/stores/useCharacterConcernsStore', () => ({
-  useCharacterConcernsStore: vi.fn()
+  useCharacterConcernsStore: vi.fn(() => ({
+    concerns: null
+  }))
 }));
-
-vi.mock('../src/stores/v2', () => ({
-  useCoreGameStore: vi.fn()
-}));
-
-const { useStoryletStore: mockUseStoryletStore } = await import('../src/stores/useStoryletStore');
-const { useCharacterConcernsStore: mockUseCharacterConcernsStore } = await import('../src/stores/useCharacterConcernsStore');
-const { useCoreGameStore: mockUseCoreGameStore } = await import('../src/stores/v2');
 
 describe('Storylet Evaluation Performance Tests', () => {
   beforeEach(() => {
     clearFlagCache();
-    jest.clearAllMocks();
+    // Reset V2 stores to initial state
+    resetAllV2Stores();
   });
 
-  const createMockStorylet = (id: string, requirements?: any): Storylet => ({
-    id,
-    name: `Storylet ${id}`,
-    description: `Test storylet ${id}`,
-    requirements: requirements || {},
-    choices: [],
-    // Add other required Storylet properties as needed
-  } as Storylet);
-
-  const setupMockStores = (storylets: Storylet[], concerns: any, gameState: any) => {
-    mockUseStoryletStore.mockReturnValue({
-      storylets
+  const createMockStorylet = (id: string, requirements?: any): Storylet => 
+    createV2TestStorylet({
+      id,
+      name: `Storylet ${id}`,
+      description: `Test storylet ${id}`,
+      requirements: requirements || {}
     });
 
-    mockUseCharacterConcernsStore.mockReturnValue({
-      concerns
-    });
-
-    mockUseCoreGameStore.mockReturnValue({
+  const setupRealStores = (storylets: Storylet[], concerns: any, gameState: any) => {
+    // Use V2 test store setup
+    setupV2TestStores({
+      storylets,
+      concerns,
       player: gameState.player || { level: 1, resources: { energy: 100, money: 0 } },
-      world: gameState.world || { day: 1 },
-      character: gameState.character || { name: 'Test Character' }
+      character: gameState.character || { name: 'Test Character' },
+      world: gameState.world || { day: 1 }
     });
   };
 
   describe('Basic Functionality', () => {
     test('returns empty array when no concerns', async () => {
-      setupMockStores([], null, {});
+      setupRealStores([], null, {});
 
       const { result } = renderHook(() => useAvailableStorylets());
 
@@ -79,7 +69,7 @@ describe('Storylet Evaluation Performance Tests', () => {
       ];
 
       const concerns = { academic: 20, social: 5 };
-      setupMockStores(storylets, concerns, {});
+      setupRealStores(storylets, concerns, {});
 
       const { result } = renderHook(() => useAvailableStorylets());
 
@@ -113,7 +103,7 @@ describe('Storylet Evaluation Performance Tests', () => {
         financial: 10
       };
 
-      setupMockStores(storylets, concerns, {});
+      setupRealStores(storylets, concerns, {});
 
       const startTime = performance.now();
       const { result } = renderHook(() => useAvailableStorylets({
@@ -146,7 +136,7 @@ describe('Storylet Evaluation Performance Tests', () => {
       );
 
       const concerns = { academic: 20 };
-      setupMockStores(storylets, concerns, {});
+      setupRealStores(storylets, concerns, {});
 
       const { result } = renderHook(() => useAvailableStorylets({
         batchSize: 25, // Small batches
@@ -173,7 +163,7 @@ describe('Storylet Evaluation Performance Tests', () => {
       );
 
       const concerns = { academic: 15, social: 10 };
-      setupMockStores(storylets, concerns, {});
+      setupRealStores(storylets, concerns, {});
 
       // First evaluation
       const { result: result1 } = renderHook(() => useAvailableStorylets({
@@ -214,7 +204,7 @@ describe('Storylet Evaluation Performance Tests', () => {
       ];
 
       const concerns = { academic: 20, social: 10 };
-      setupMockStores(storylets, concerns, {});
+      setupRealStores(storylets, concerns, {});
 
       const { result } = renderHook(() => useStoryletAvailable('available_storylet'));
 
@@ -229,7 +219,7 @@ describe('Storylet Evaluation Performance Tests', () => {
       );
 
       const concerns = { academic: 15 };
-      setupMockStores(storylets, concerns, {});
+      setupRealStores(storylets, concerns, {});
 
       const { result } = renderHook(() => useStoryletEvaluationPerformance());
 
@@ -244,7 +234,7 @@ describe('Storylet Evaluation Performance Tests', () => {
 
   describe('Edge Cases', () => {
     test('handles empty storylet list', async () => {
-      setupMockStores([], { academic: 20 }, {});
+      setupRealStores([], { academic: 20 }, {});
 
       const { result } = renderHook(() => useAvailableStorylets());
 
@@ -263,7 +253,7 @@ describe('Storylet Evaluation Performance Tests', () => {
       ];
 
       const concerns = { academic: 20 };
-      setupMockStores(storylets, concerns, {});
+      setupRealStores(storylets, concerns, {});
 
       const { result } = renderHook(() => useAvailableStorylets());
 
@@ -282,7 +272,7 @@ describe('Storylet Evaluation Performance Tests', () => {
       );
 
       let concerns = { academic: 20 };
-      setupMockStores(storylets, concerns, {});
+      setupRealStores(storylets, concerns, {});
 
       const { result, rerender } = renderHook(() => useAvailableStorylets({
         batchSize: 10 // Small batches to allow interruption
@@ -291,7 +281,7 @@ describe('Storylet Evaluation Performance Tests', () => {
       // Change concerns while evaluation might be in progress
       setTimeout(() => {
         concerns = { academic: 0 }; // Clear academic concerns
-        setupMockStores(storylets, concerns, {});
+        setupRealStores(storylets, concerns, {});
         rerender();
       }, 10);
 
@@ -313,7 +303,7 @@ describe('Storylet Evaluation Performance Tests', () => {
       // Simulate many re-evaluations with different concerns
       for (let i = 0; i < 20; i++) {
         const concerns = { academic: i * 2, social: i };
-        setupMockStores(storylets, concerns, {});
+        setupRealStores(storylets, concerns, {});
 
         const { result, unmount } = renderHook(() => useAvailableStorylets());
 

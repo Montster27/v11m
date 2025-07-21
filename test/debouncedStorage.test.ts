@@ -61,7 +61,7 @@ describe('Debounced Storage Tests', () => {
   });
 
   it('should call save callbacks on successful write', (done) => {
-    const mockCallback = jest.fn();
+    const mockCallback = vi.fn();
     const unsubscribe = debouncedStorage.onSave(mockCallback);
     
     debouncedStorage.setItem('callback-test', 'test-value');
@@ -74,7 +74,7 @@ describe('Debounced Storage Tests', () => {
   });
 
   it('should call save callbacks on failed write', (done) => {
-    const mockCallback = jest.fn();
+    const mockCallback = vi.fn();
     const unsubscribe = debouncedStorage.onSave(mockCallback);
     
     // Mock localStorage.setItem to throw an error
@@ -106,19 +106,19 @@ describe('Debounced Storage Tests', () => {
 
   it('should track statistics correctly', () => {
     const stats = debouncedStorage.getStats();
-    const initialPendingCount = stats.pendingWrites;
+    const initialPendingCount = stats.pendingCount || 0;
     
     // Add some pending writes
     debouncedStorage.setItem('stats-test-1', 'value1');
     debouncedStorage.setItem('stats-test-2', 'value2');
     
     const updatedStats = debouncedStorage.getStats();
-    expect(updatedStats.pendingWrites).toBe(initialPendingCount + 2);
+    expect(updatedStats.pendingCount).toBe(initialPendingCount + 2);
     
     // Flush and check again
     debouncedStorage.flush();
     const finalStats = debouncedStorage.getStats();
-    expect(finalStats.pendingWrites).toBe(0);
+    expect(finalStats.pendingCount).toBe(0);
   });
 
   it('should handle getItem correctly', () => {
@@ -136,8 +136,8 @@ describe('Debounced Storage Tests', () => {
   });
 
   it('should handle multiple subscribers correctly', (done) => {
-    const callback1 = jest.fn();
-    const callback2 = jest.fn();
+    const callback1 = vi.fn();
+    const callback2 = vi.fn();
     
     const unsub1 = debouncedStorage.onSave(callback1);
     const unsub2 = debouncedStorage.onSave(callback2);

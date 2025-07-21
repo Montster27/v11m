@@ -10,7 +10,6 @@ import StoryletBrowser from './contentStudio/StoryletBrowser';
 import CharacterBuilder from './contentStudio/CharacterBuilder';
 import PreviewSandbox from './contentStudio/PreviewSandbox';
 import ContentAnalytics from './contentStudio/ContentAnalytics';
-import VisualStoryletEditor from './contentStudio/VisualStoryletEditor';
 import ArcManager from './contentStudio/ArcManager';
 import ClueManager from './contentStudio/ClueManager';
 import SafetyManager from './contentStudio/SafetyManager';
@@ -27,7 +26,7 @@ import { v2Migration } from '../migrations/v2StoreMigration';
 import { useStoryletStoreV2 } from '../stores/useStoryletStoreV2';
 import type { Storylet } from '../types/storylet';
 
-type ContentStudioTab = 'advanced' | 'browse' | 'visual' | 'arc-manager' | 'clue-manager' | 'characters' | 'preview' | 'analytics';
+type ContentStudioTab = 'advanced' | 'browse' | 'arc-manager' | 'clue-manager' | 'characters' | 'preview' | 'analytics';
 
 interface ContentStudioProps {
   onBackupCreate?: () => void;
@@ -123,8 +122,8 @@ const ContentStudio: React.FC<ContentStudioProps> = ({ onBackupCreate }) => {
   // Navigation event listeners for ArcManager
   useEffect(() => {
     const handleNavigateToVisualArcBuilder = () => {
-      setActiveTab('visual');
-      // The visual editor will detect this navigation and switch to arc mode
+      setActiveTab('arc-manager');
+      // Redirect to arc manager instead of removed visual editor
     };
     
     const handleNavigateToAdvancedCreator = () => {
@@ -216,12 +215,6 @@ const ContentStudio: React.FC<ContentStudioProps> = ({ onBackupCreate }) => {
       label: 'Browse & Edit',
       icon: '📚',
       description: 'Browse existing storylets and edit them'
-    },
-    {
-      id: 'visual' as const,
-      label: 'Visual Editor',
-      icon: '🎨',
-      description: 'Drag-and-drop flowchart editor for complex storylines'
     },
     {
       id: 'arc-manager' as const,
@@ -569,36 +562,13 @@ const ContentStudio: React.FC<ContentStudioProps> = ({ onBackupCreate }) => {
                 }}
                 onEditVisually={(storylet) => {
                   setEditingStorylet(storylet);
-                  setActiveTab('visual');
+                  setActiveTab('advanced');
                 }}
                 undoRedoSystem={{ executeAction, undo, redo, canUndo, canRedo }}
               />
             </div>
           )}
           
-          {activeTab === 'visual' && (
-            <div className="h-full overflow-hidden">
-              <VisualStoryletEditor 
-                undoRedoSystem={{ executeAction, undo, redo, canUndo, canRedo }}
-                onSave={(flowData) => {
-                  console.log('Flow saved:', flowData);
-                  // Here you would integrate with the storylet store
-                }}
-                editingStorylet={editingStorylet}
-                onStoryletSaved={() => {
-                  setEditingStorylet(null);
-                  if (editingStorylet) {
-                    setActiveTab('browse');
-                  }
-                }}
-                mode={editingStorylet ? "storylet" : "arc"}
-                onArcSaved={(arc) => {
-                  console.log('Story arc saved:', arc);
-                  // Here you would save the arc to the storylet store
-                }}
-              />
-            </div>
-          )}
           
           {activeTab === 'arc-manager' && (
             <div className="h-full overflow-hidden">

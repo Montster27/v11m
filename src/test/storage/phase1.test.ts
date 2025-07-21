@@ -173,7 +173,8 @@ describe('Phase 1: Storage Adapter Pattern', () => {
   describe('StorageFactory', () => {
     it('creates localStorage adapter by default', async () => {
       const adapter = await StorageFactory.createAdapter({
-        type: 'localStorage'
+        type: 'localStorage',
+        enableErrorHandling: false // Disable error handling wrapper to get raw adapter
       });
       
       expect(adapter.type).toBe('localStorage');
@@ -196,14 +197,23 @@ describe('Phase 1: Storage Adapter Pattern', () => {
       // Set migration flag
       localStorage.setItem('storage_migrated', 'true');
       
-      // Mock IndexedDB available
+      // Mock IndexedDB available but initialization fails
       Object.defineProperty(window, 'indexedDB', {
         value: {
-          open: vi.fn(() => ({
-            onsuccess: null,
-            onerror: null,
-            onupgradeneeded: null
-          }))
+          open: vi.fn(() => {
+            const request = {
+              onsuccess: null,
+              onerror: null,
+              onupgradeneeded: null
+            };
+            // Simulate immediate error
+            setTimeout(() => {
+              if (request.onerror) {
+                request.onerror(new Event('error'));
+              }
+            }, 0);
+            return request;
+          })
         },
         writable: true
       });

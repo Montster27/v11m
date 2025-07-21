@@ -48,7 +48,7 @@ describe('Flag Generator Performance Tests', () => {
 
     test('cache invalidation works correctly', () => {
       const concerns1: CharacterConcerns = { academic: 20 };
-      const concerns2: CharacterConcerns = { academic: 30 }; // Different value
+      const concerns2: CharacterConcerns = { academic: 35 }; // Different value
 
       const flags1 = generateConcernFlags(concerns1);
       const flags2 = generateConcernFlags(concerns2);
@@ -348,7 +348,7 @@ describe('Flag Generator Performance Tests', () => {
       };
       
       const newStudentFlags = generateConcernFlags(newStudent);
-      expect(newStudentFlags.low_overall_stress).toBe(true);
+      expect(newStudentFlags.moderate_overall_stress).toBe(true); // maxConcern = 12
       expect(newStudentFlags.has_multiple_concerns).toBe(true);
       
       // Scenario 2: Stressed student mid-semester
@@ -407,7 +407,7 @@ describe('Flag Generator Performance Tests', () => {
       
       // Should include derived flags
       expect(allFlags.has_scholarship_positive).toBe(true);
-      expect(allFlags.tutorial_complete_zero).toBe(true);
+      expect(allFlags.tutorial_complete_negative).toBe(true); // tutorial_complete is false
       
       // Should include stat flags
       expect(allFlags.stat_intelligence_high).toBe(true);

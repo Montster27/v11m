@@ -1,338 +1,209 @@
 import { describe, test, expect } from 'vitest'
 import { 
   validateStorylet, 
-  validateChoice, 
-  validateEffect, 
-  validateTrigger,
-  findOrphanedStorylets,
-  findCircularDependencies 
+  validateStoryletName, 
+  validateStoryletDescription,
+  validateChoiceText,
+  ValidationError,
+  validateSliderSum,
+  validateSleepHours,
+  checkCrashConditions
 } from '../validation'
-import type { Storylet, Choice, Effect, Trigger } from '../../types/storylet'
+import type { Storylet } from '../../types/storylet'
 
 describe('validation', () => {
+  describe('validateStoryletName', () => {
+    test('should validate a correct name', () => {
+      const result = validateStoryletName('Test Storylet')
+      expect(result).toBe('Test Storylet')
+    })
+
+    test('should throw error for empty name', () => {
+      expect(() => validateStoryletName('')).toThrow(ValidationError)
+      expect(() => validateStoryletName('')).toThrow('Storylet name is required')
+    })
+
+    test('should throw error for null/undefined name', () => {
+      expect(() => validateStoryletName(null as any)).toThrow(ValidationError)
+      expect(() => validateStoryletName(undefined as any)).toThrow(ValidationError)
+    })
+
+    test('should throw error for non-string name', () => {
+      expect(() => validateStoryletName(123 as any)).toThrow(ValidationError)
+    })
+
+    test('should throw error for name too long', () => {
+      const longName = 'a'.repeat(201)
+      expect(() => validateStoryletName(longName)).toThrow(ValidationError)
+      expect(() => validateStoryletName(longName)).toThrow('too long')
+    })
+  })
+
+  describe('validateStoryletDescription', () => {
+    test('should validate a correct description', () => {
+      const result = validateStoryletDescription('A test description')
+      expect(result).toBe('A test description')
+    })
+
+    test('should return empty string for null/undefined description', () => {
+      expect(validateStoryletDescription(null as any)).toBe('')
+      expect(validateStoryletDescription(undefined as any)).toBe('')
+    })
+
+    test('should throw error for description too long', () => {
+      const longDesc = 'a'.repeat(5001)
+      expect(() => validateStoryletDescription(longDesc)).toThrow(ValidationError)
+      expect(() => validateStoryletDescription(longDesc)).toThrow('too long')
+    })
+  })
+
+  describe('validateChoiceText', () => {
+    test('should validate correct choice text', () => {
+      const result = validateChoiceText('Test choice')
+      expect(result).toBe('Test choice')
+    })
+
+    test('should throw error for empty choice text', () => {
+      expect(() => validateChoiceText('')).toThrow(ValidationError)
+      expect(() => validateChoiceText('')).toThrow('Choice text is required')
+    })
+
+    test('should throw error for null/undefined choice text', () => {
+      expect(() => validateChoiceText(null as any)).toThrow(ValidationError)
+      expect(() => validateChoiceText(undefined as any)).toThrow(ValidationError)
+    })
+  })
+
   describe('validateStorylet', () => {
-    test('should validate a correct storylet', () => {
-      const validStorylet: Storylet = {
+    test('should validate a basic storylet', () => {
+      const storylet = {
         id: 'test-storylet',
         name: 'Test Storylet',
-        description: 'A test storylet',
-        deploymentStatus: 'live',
-        choices: [
-          {
-            id: 'choice-1',
-            text: 'Test choice',
-            effects: []
-          }
-        ]
+        description: 'A test storylet'
       }
       
-      const result = validateStorylet(validStorylet)
-      expect(result.isValid).toBe(true)
-      expect(result.errors).toHaveLength(0)
+      const result = validateStorylet(storylet)
+      expect(result).toBeDefined()
+      expect((result as any).id).toBe('test-storylet')
+      expect((result as any).name).toBe('Test Storylet')
+      expect((result as any).description).toBe('A test storylet')
     })
 
-    test('should detect missing required fields', () => {
-      const invalidStorylet = {
-        name: 'Test',
-        description: 'Test'
-      } as Storylet
-      
-      const result = validateStorylet(invalidStorylet)
-      expect(result.isValid).toBe(false)
-      expect(result.errors).toContain('ID is required')
+    test('should throw error for null storylet', () => {
+      expect(() => validateStorylet(null)).toThrow(ValidationError)
+      expect(() => validateStorylet(null)).toThrow('Storylet must be an object')
     })
 
-    test('should validate storylet with trigger', () => {
-      const storyletWithTrigger: Storylet = {
-        id: 'triggered-storylet',
-        name: 'Triggered',
-        description: 'Has a trigger',
-        deploymentStatus: 'live',
-        trigger: {
-          type: 'time',
-          conditions: { day: 5 }
-        },
-        choices: []
+    test('should throw error for non-object storylet', () => {
+      expect(() => validateStorylet('not an object')).toThrow(ValidationError)
+    })
+
+    test('should sanitize storylet fields', () => {
+      const storylet = {
+        id: '  test-id  ',
+        name: '  Test Name  ',
+        description: '  Test Description  '
       }
       
-      const result = validateStorylet(storyletWithTrigger)
-      expect(result.isValid).toBe(true)
-    })
-
-    test('should detect invalid choices', () => {
-      const storyletWithInvalidChoice: Storylet = {
-        id: 'invalid-choice-storylet',
-        name: 'Invalid Choice',
-        description: 'Has invalid choice',
-        deploymentStatus: 'live',
-        choices: [
-          {
-            id: '',
-            text: '',
-            effects: []
-          }
-        ]
-      }
-      
-      const result = validateStorylet(storyletWithInvalidChoice)
-      expect(result.isValid).toBe(false)
-      expect(result.errors.length).toBeGreaterThan(0)
+      const result = validateStorylet(storylet) as any
+      // The sanitizeText function should clean up whitespace
+      expect(result.name).toBeTruthy()
+      expect(result.description).toBeTruthy()
     })
   })
 
-  describe('validateChoice', () => {
-    test('should validate a correct choice', () => {
-      const validChoice: Choice = {
-        id: 'valid-choice',
-        text: 'Valid choice text',
-        effects: [
-          {
-            type: 'resource',
-            key: 'energy',
-            delta: 10
-          }
-        ]
-      }
-      
-      const result = validateChoice(validChoice)
+  describe('validateSliderSum', () => {
+    test('should validate correct sum', () => {
+      const result = validateSliderSum(100)
       expect(result.isValid).toBe(true)
-      expect(result.errors).toHaveLength(0)
+      expect(result.type).toBe('success')
     })
 
-    test('should detect missing ID', () => {
-      const choiceWithoutId = {
-        text: 'Choice text',
-        effects: []
-      } as Choice
-      
-      const result = validateChoice(choiceWithoutId)
-      expect(result.isValid).toBe(false)
-      expect(result.errors).toContain('Choice ID is required')
-    })
-
-    test('should detect empty text', () => {
-      const choiceWithEmptyText: Choice = {
-        id: 'choice-1',
-        text: '',
-        effects: []
-      }
-      
-      const result = validateChoice(choiceWithEmptyText)
-      expect(result.isValid).toBe(false)
-      expect(result.errors).toContain('Choice text cannot be empty')
-    })
-
-    test('should validate choice with conditions', () => {
-      const conditionalChoice: Choice = {
-        id: 'conditional',
-        text: 'Conditional choice',
-        effects: [],
-        conditions: {
-          type: 'resource',
-          conditions: { energy: { greater_than: 50 } }
-        }
-      }
-      
-      const result = validateChoice(conditionalChoice)
+    test('should warn for sum less than 100', () => {
+      const result = validateSliderSum(80)
       expect(result.isValid).toBe(true)
+      expect(result.type).toBe('warning')
+      expect(result.message).toContain('80.0%')
+    })
+
+    test('should error for sum greater than 100', () => {
+      const result = validateSliderSum(120)
+      expect(result.isValid).toBe(false)
+      expect(result.type).toBe('error')
+      expect(result.message).toContain('120.0%')
+      expect(result.message).toContain('Reduce allocations')
     })
   })
 
-  describe('validateEffect', () => {
-    test('should validate resource effects', () => {
-      const resourceEffect: Effect = {
-        type: 'resource',
-        key: 'energy',
-        delta: 10
-      }
-      
-      const result = validateEffect(resourceEffect)
+  describe('validateSleepHours', () => {
+    test('should validate normal sleep', () => {
+      const result = validateSleepHours(33.3) // ~8 hours
       expect(result.isValid).toBe(true)
+      expect(result.type).toBe('success')
     })
 
-    test('should validate flag effects', () => {
-      const flagEffect: Effect = {
-        type: 'flag',
-        key: 'quest_completed',
-        value: true
-      }
-      
-      const result = validateEffect(flagEffect)
+    test('should warn for low sleep', () => {
+      const result = validateSleepHours(20) // ~4.8 hours
       expect(result.isValid).toBe(true)
+      expect(result.type).toBe('warning')
+      expect(result.message).toContain('Low sleep')
     })
 
-    test('should validate unlock effects', () => {
-      const unlockEffect: Effect = {
-        type: 'unlock',
-        storyletId: 'next-storylet'
-      }
-      
-      const result = validateEffect(unlockEffect)
-      expect(result.isValid).toBe(true)
-    })
-
-    test('should detect invalid effect type', () => {
-      const invalidEffect = {
-        type: 'invalid'
-      } as Effect
-      
-      const result = validateEffect(invalidEffect)
+    test('should error for severe sleep deprivation', () => {
+      const result = validateSleepHours(10) // ~2.4 hours
       expect(result.isValid).toBe(false)
-      expect(result.errors.length).toBeGreaterThan(0)
-    })
-
-    test('should detect missing required fields for resource effect', () => {
-      const incompleteResourceEffect = {
-        type: 'resource',
-        key: 'energy'
-        // missing delta
-      } as Effect
-      
-      const result = validateEffect(incompleteResourceEffect)
-      expect(result.isValid).toBe(false)
-      expect(result.errors).toContain('Resource effect must have delta value')
+      expect(result.type).toBe('error')
+      expect(result.message).toContain('Severe sleep deprivation')
     })
   })
 
-  describe('validateTrigger', () => {
-    test('should validate time triggers', () => {
-      const timeTrigger: Trigger = {
-        type: 'time',
-        conditions: { day: 5 }
-      }
-      
-      const result = validateTrigger(timeTrigger)
+  describe('checkCrashConditions', () => {
+    test('should pass for normal values', () => {
+      const result = checkCrashConditions(50, 50)
       expect(result.isValid).toBe(true)
     })
 
-    test('should validate flag triggers', () => {
-      const flagTrigger: Trigger = {
-        type: 'flag',
-        conditions: { flags: ['flag1', 'flag2'] }
-      }
-      
-      const result = validateTrigger(flagTrigger)
-      expect(result.isValid).toBe(true)
-    })
-
-    test('should validate resource triggers', () => {
-      const resourceTrigger: Trigger = {
-        type: 'resource',
-        conditions: { 
-          energy: { greater_equal: 50 },
-          money: 100
-        }
-      }
-      
-      const result = validateTrigger(resourceTrigger)
-      expect(result.isValid).toBe(true)
-    })
-
-    test('should detect invalid trigger type', () => {
-      const invalidTrigger = {
-        type: 'invalid',
-        conditions: {}
-      } as Trigger
-      
-      const result = validateTrigger(invalidTrigger)
+    test('should error for zero energy', () => {
+      const result = checkCrashConditions(0, 50)
       expect(result.isValid).toBe(false)
+      expect(result.type).toBe('error')
+      expect(result.message).toContain('Energy depleted')
+    })
+
+    test('should error for maximum stress', () => {
+      const result = checkCrashConditions(50, 100)
+      expect(result.isValid).toBe(false)
+      expect(result.type).toBe('error')
+      expect(result.message).toContain('Maximum stress')
+    })
+
+    test('should warn for low energy', () => {
+      const result = checkCrashConditions(15, 50)
+      expect(result.isValid).toBe(true)
+      expect(result.type).toBe('warning')
+      expect(result.message).toContain('Low energy')
+    })
+
+    test('should warn for high stress', () => {
+      const result = checkCrashConditions(50, 85)
+      expect(result.isValid).toBe(true)
+      expect(result.type).toBe('warning')
+      expect(result.message).toContain('High stress')
     })
   })
 
-  describe('findOrphanedStorylets', () => {
-    test('should find storylets with no incoming connections', () => {
-      const storylets: Storylet[] = [
-        {
-          id: 'start',
-          name: 'Start',
-          description: 'Starting storylet',
-          deploymentStatus: 'live',
-          choices: [
-            {
-              id: 'choice-1',
-              text: 'Go to middle',
-              effects: [{ type: 'unlock', storyletId: 'middle' }]
-            }
-          ]
-        },
-        {
-          id: 'middle',
-          name: 'Middle',
-          description: 'Middle storylet',
-          deploymentStatus: 'live',
-          choices: []
-        },
-        {
-          id: 'orphan',
-          name: 'Orphan',
-          description: 'Orphaned storylet',
-          deploymentStatus: 'live',
-          choices: []
-        }
-      ]
-      
-      const orphans = findOrphanedStorylets(storylets)
-      expect(orphans).toContain('orphan')
-      expect(orphans).not.toContain('start')
-      expect(orphans).not.toContain('middle')
-    })
-  })
-
-  describe('findCircularDependencies', () => {
-    test('should detect circular dependencies', () => {
-      const storylets: Storylet[] = [
-        {
-          id: 'story-a',
-          name: 'Story A',
-          description: 'Points to B',
-          deploymentStatus: 'live',
-          choices: [
-            {
-              id: 'choice-a',
-              text: 'Go to B',
-              effects: [{ type: 'unlock', storyletId: 'story-b' }]
-            }
-          ]
-        },
-        {
-          id: 'story-b',
-          name: 'Story B',
-          description: 'Points back to A',
-          deploymentStatus: 'live',
-          choices: [
-            {
-              id: 'choice-b',
-              text: 'Go back to A',
-              effects: [{ type: 'unlock', storyletId: 'story-a' }]
-            }
-          ]
-        }
-      ]
-      
-      const cycles = findCircularDependencies(storylets)
-      expect(cycles.length).toBeGreaterThan(0)
+  describe('ValidationError', () => {
+    test('should create validation error with message', () => {
+      const error = new ValidationError('Test error')
+      expect(error.message).toBe('Test error')
+      expect(error.name).toBe('ValidationError')
     })
 
-    test('should handle storylets with no dependencies', () => {
-      const isolatedStorylets: Storylet[] = [
-        {
-          id: 'isolated-1',
-          name: 'Isolated 1',
-          description: 'No connections',
-          deploymentStatus: 'live',
-          choices: []
-        },
-        {
-          id: 'isolated-2',
-          name: 'Isolated 2',
-          description: 'No connections',
-          deploymentStatus: 'live',
-          choices: []
-        }
-      ]
-      
-      const cycles = findCircularDependencies(isolatedStorylets)
-      expect(cycles).toHaveLength(0)
+    test('should create validation error with field and code', () => {
+      const error = new ValidationError('Test error', 'testField', 'TEST_CODE')
+      expect(error.message).toBe('Test error')
+      expect(error.field).toBe('testField')
+      expect(error.code).toBe('TEST_CODE')
     })
   })
 })

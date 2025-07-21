@@ -112,13 +112,13 @@ export const useCoreGameStore = create<CoreGameState>()(
               ...state,
               player: {
                 ...state.player,
-                level: legacyAppStore.userLevel || 1,
-                experience: legacyAppStore.experience || 0,
+                level: legacyAppStore.userLevel !== undefined ? legacyAppStore.userLevel : 1,
+                experience: legacyAppStore.experience !== undefined ? legacyAppStore.experience : 0,
                 resources: legacyAppStore.resources || {}
               },
               world: {
                 ...state.world,
-                day: legacyAppStore.day || 1
+                day: legacyAppStore.day !== undefined ? legacyAppStore.day : 1
               }
             }));
           }

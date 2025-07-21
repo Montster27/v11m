@@ -79,13 +79,50 @@ global.IntersectionObserver = vi.fn().mockImplementation(() => ({
   disconnect: vi.fn(),
 }))
 
-// Enhanced auto cleanup with store isolation
+// Enhanced auto cleanup with V2 store isolation
 beforeEach(() => {
   // Mock storylet catalog loading to prevent file system access
   vi.mock('../data/storylets', () => ({ default: [] }));
   
   // Clear all mocks
   vi.clearAllMocks();
+  
+  // Initialize V2 stores with clean state
+  try {
+    const { setupV2Test } = require('./v2-setup');
+    setupV2Test();
+  } catch (error) {
+    // V2 setup might not be available in some tests, fallback to legacy
+    console.warn('V2 test setup not available, falling back to legacy store reset');
+    try {
+      const { useAppStore } = require('../stores/useAppStore');
+      const { useStoryletStore } = require('../stores/useStoryletStore');
+      
+      // Reset legacy stores as fallback
+      useAppStore.setState({
+        day: 1,
+        resources: {
+          energy: 100,
+          stress: 0,
+          money: 50,
+          knowledge: 100,
+          social: 150
+        },
+        activeCharacter: null
+      });
+      
+      useStoryletStore.setState({
+        allStorylets: {},
+        activeStoryletIds: [],
+        completedStoryletIds: [],
+        activeFlags: {},
+        storyletCooldowns: {},
+        deploymentFilter: new Set(['live', 'dev'])
+      });
+    } catch (legacyError) {
+      // Neither V2 nor legacy stores available - that's okay for some tests
+    }
+  }
 });
 
 afterEach(() => {
@@ -94,46 +131,50 @@ afterEach(() => {
   sessionStorage.clear();
   vi.clearAllMocks();
   
-  // Reset Zustand stores if they exist
+  // Reset V2 stores
   try {
-    const { useAppStore } = require('../stores/useAppStore');
-    const { useStoryletStore } = require('../stores/useStoryletStore');
-    
-    // Reset to clean state
-    useAppStore.setState({
-      day: 1,
-      resources: {
-        energy: 100,
-        stress: 0,
-        money: 50,
-        knowledge: 100,
-        social: 150
-      },
-      activeCharacter: null
-    });
-    
-    useStoryletStore.setState({
-      allStorylets: {},
-      activeStoryletIds: [],
-      completedStoryletIds: [],
-      activeFlags: {},
-      storyletCooldowns: {},
-      // Include dev storylets in tests
-      deploymentFilter: new Set(['live', 'dev'])
-    });
-
-    // Also clear the catalog store to prevent storylet accumulation
-    try {
-      const { useStoryletCatalogStore } = require('../stores/useStoryletCatalogStore');
-      useStoryletCatalogStore.setState({
-        allStorylets: {},
-        lastLoaded: 0
-      });
-    } catch (error) {
-      // Catalog store might not exist, that's okay
-    }
+    const { resetAllV2Stores } = require('./v2-setup');
+    resetAllV2Stores();
   } catch (error) {
-    // Stores might not be available in some tests, that's okay
+    // V2 stores not available, try legacy reset
+    try {
+      const { useAppStore } = require('../stores/useAppStore');
+      const { useStoryletStore } = require('../stores/useStoryletStore');
+      
+      useAppStore.setState({
+        day: 1,
+        resources: {
+          energy: 100,
+          stress: 0,
+          money: 50,
+          knowledge: 100,
+          social: 150
+        },
+        activeCharacter: null
+      });
+      
+      useStoryletStore.setState({
+        allStorylets: {},
+        activeStoryletIds: [],
+        completedStoryletIds: [],
+        activeFlags: {},
+        storyletCooldowns: {},
+        deploymentFilter: new Set(['live', 'dev'])
+      });
+
+      // Also clear the catalog store
+      try {
+        const { useStoryletCatalogStore } = require('../stores/useStoryletCatalogStore');
+        useStoryletCatalogStore.setState({
+          allStorylets: {},
+          lastLoaded: 0
+        });
+      } catch (catalogError) {
+        // Catalog store might not exist
+      }
+    } catch (legacyError) {
+      // Neither V2 nor legacy stores available
+    }
   }
 });
 

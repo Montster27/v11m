@@ -4,10 +4,9 @@ import { MemoryCardGame } from './minigames';
 import StroopTestGame from './minigames/StroopTestGame';
 import WordScrambleGame from './minigames/WordScrambleGame';
 import ColorMatchGame from './minigames/ColorMatchGame';
-import { useClueStore } from '../stores/useClueStore';
-import { useStoryletCatalogStore } from '../stores/useStoryletCatalogStore';
 import { useNarrativeStore } from '../stores/v2/useNarrativeStore';
 import { useSocialStore } from '../stores/v2/useSocialStore';
+import { useStoryletCatalogStore } from '../stores/useStoryletCatalogStore'; // Temporary for storylet creation until V2 implementation
 import type { MinigameType } from '../types/storylet';
 import type { Clue } from '../types/clue';
 
@@ -26,22 +25,21 @@ const ClueDiscoveryManager: React.FC<ClueDiscoveryManagerProps> = ({
   onComplete,
   onClose
 }) => {
-  // Legacy stores for data access (still sources of truth)
-  const { getClueById } = useClueStore();
-  const { addStorylet, allStorylets } = useStoryletCatalogStore();
-  
-  // V2 stores for enhanced functionality
-  const { unlockStorylet, setStoryletFlag } = useNarrativeStore();
+  // V2 stores for clue and flag functionality
+  const { getClue, setStoryletFlag } = useNarrativeStore();
   const { discoverClue } = useSocialStore();
+  
+  // Temporary V1 store for storylet management until V2 implementation
+  const { addStorylet, allStorylets } = useStoryletCatalogStore();
   const [discoveryState, setDiscoveryState] = useState<DiscoveryState>('description');
   const [minigameSuccess, setMinigameSuccess] = useState<boolean | null>(null);
   const [minigameStats, setMinigameStats] = useState<any>(null);
   const [clue, setClue] = useState<Clue | null>(null);
 
   useEffect(() => {
-    const foundClue = getClueById(clueId);
+    const foundClue = getClue(clueId);
     setClue(foundClue);
-  }, [clueId, getClueById]);
+  }, [clueId, getClue]);
 
   const handleStartMinigame = () => {
     setDiscoveryState('minigame');
@@ -96,8 +94,8 @@ const ClueDiscoveryManager: React.FC<ClueDiscoveryManagerProps> = ({
       // Set the flag that will unlock this storylet (V2 store)
       setStoryletFlag(`clue_discovery_${clue.id}_${success ? 'success' : 'failure'}`, true);
       
-      // Unlock the storylet immediately
-      unlockStorylet(targetId);
+      // TODO: Unlock the storylet immediately (need V2 storylet unlock functionality)
+      // unlockStorylet(targetId);
       
       return;
     }
@@ -147,8 +145,8 @@ const ClueDiscoveryManager: React.FC<ClueDiscoveryManagerProps> = ({
     // Set the flag that will unlock this storylet (V2 store)
     setStoryletFlag(`clue_discovery_${clue.id}_${success ? 'success' : 'failure'}`, true);
     
-    // Unlock the storylet immediately
-    unlockStorylet(baseId);
+    // TODO: Unlock the storylet immediately (need V2 storylet unlock functionality)
+    // unlockStorylet(baseId);
     
     console.log(`📖 Generated dynamic follow-up storylet: ${baseId}`);
   };

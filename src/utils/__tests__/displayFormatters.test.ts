@@ -154,7 +154,7 @@ describe('displayFormatters', () => {
       const longName = 'This is a very long storylet name that exceeds the limit'
       const result = formatStoryletName(longName, 25)
       expect(result).toHaveLength(25)
-      expect(result).toEndWith('...')
+      expect(result).toMatch(/\.\.\.$/)
     })
 
     test('should handle empty name', () => {

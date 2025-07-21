@@ -343,7 +343,7 @@ describe('Store Migration', () => {
         completedStoryletIds: data.storylets
           .filter((story: any) => story.completed)
           .map((story: any) => story.id),
-        unlockedAchievements: new Set(data.achievements),
+        unlockedAchievements: [...new Set(data.achievements)], // Convert Set to Array for JSON
         metadata: {
           migratedAt: new Date().toISOString()
         }

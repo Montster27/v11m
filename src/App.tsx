@@ -7,7 +7,6 @@ import MinigameManager from './components/minigames/MinigameManager';
 import ClueNotification from './components/ClueNotification';
 import ClueDiscoveryManager from './components/ClueDiscoveryManager';
 // import RefactorNotificationBanner from './components/RefactorNotificationBanner'; // Removed - refactor complete
-import AutoSaveIndicator from './components/AutoSaveIndicator';
 import { CharacterCreation, Planner, Quests, Skills, StoryletDeveloper, ContentCreator, SplashScreen } from './pages';
 import { useGameOrchestrator, useStoryletNotifications } from './hooks/useGameOrchestrator';
 import { useAutoSave } from './hooks/useAutoSave';
@@ -245,10 +244,6 @@ function App() {
         <Navigation />
         {/* <RefactorNotificationBanner /> - Removed: refactor complete */}
         
-        {/* Auto-save indicator in top-right corner */}
-        <div className="fixed top-4 right-4 z-50">
-          <AutoSaveIndicator className="bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg border" />
-        </div>
         <Routes>
           <Route path="/" element={<Navigate to="/planner" replace />} />
           <Route path="/planner" element={<Planner />} />

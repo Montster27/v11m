@@ -37,9 +37,9 @@ const Navigation: React.FC = () => {
               
               {/* Active Character */}
               {(activeCharacter || currentCharacter) && (
-                <div className="flex items-center space-x-2 text-lg">
+                <div className="flex items-center space-x-2 text-xl">
                   <div className="text-xl">👤</div>
-                  <span className="font-medium text-gray-700">
+                  <span className="font-medium text-blue-600">
                     Character: {activeCharacter ? activeCharacter.name : currentCharacter.name}
                   </span>
                 </div>
@@ -79,9 +79,6 @@ const Navigation: React.FC = () => {
               {/* Developer Tools - only in development */}
               {process.env.NODE_ENV === 'development' && (
                 <>
-                  <Link to="/storylet-developer" className={navLinkClass('/storylet-developer')}>
-                    📖 Dev
-                  </Link>
                   <Link to="/content-creator" className={navLinkClass('/content-creator')}>
                     🎨 Creator
                   </Link>

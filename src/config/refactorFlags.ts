@@ -4,6 +4,6 @@
 export const REFACTOR_CONFIG = {
   AUTO_SAVE_DISABLED: false, // Re-enable auto-save with new stores
   MANUAL_SAVE_REMINDER: false, // Hide manual save reminders
-  PARALLEL_STORES_ENABLED: true, // Enable new consolidated stores
+  PARALLEL_STORES_ENABLED: false, // Disable parallel stores during migration stabilization
   LEGACY_CLEANUP_READY: true // Enable final cleanup
 };
