@@ -48,6 +48,7 @@ interface StoryletState {
   
   // Development settings
   deploymentFilter: Set<'live' | 'stage' | 'dev'>;  // which deployment statuses to show (can be multiple)
+  _testMode?: boolean;                               // disable catalog syncing in tests
   
   // Minigame state
   activeMinigame: MinigameType | null;              // currently active minigame
@@ -179,25 +180,38 @@ const evaluateFlagTrigger = (trigger: any, activeFlags: any) => {
 const evaluateResourceTrigger = (trigger: any, appState: any) => {
   if (!appState || !trigger.conditions) return false;
   
-  // Check resource conditions (e.g., { energy: { max: 25 }, stress: { min: 75 } })
-  return Object.entries(trigger.conditions).every(([resourceKey, condition]) => {
-    if (typeof condition !== 'object') return true;
-    
-    const resourceValue = appState.resources[resourceKey as keyof typeof appState.resources];
-    if (resourceValue === undefined) return false;
-    
-    // Check min condition (inclusive)
-    if (condition.min !== undefined && resourceValue < condition.min) {
-      return false;
-    }
-    
-    // Check max condition (inclusive)
-    if (condition.max !== undefined && resourceValue > condition.max) {
-      return false;
-    }
-    
-    return true;
-  });
+  // Handle different resource condition formats:
+  // Format 1: { resources: { money: 150, energy: 80 } } - direct minimum values
+  // Format 2: { money: { min: 150, max: 200 }, energy: { min: 80 } } - explicit min/max
+  
+  if (trigger.conditions.resources) {
+    // Format 1: Simplified format with direct minimum thresholds
+    return Object.entries(trigger.conditions.resources).every(([resourceKey, minValue]) => {
+      const resourceValue = appState.resources[resourceKey as keyof typeof appState.resources];
+      if (resourceValue === undefined) return false;
+      return resourceValue >= minValue;
+    });
+  } else {
+    // Format 2: Advanced format with explicit min/max conditions
+    return Object.entries(trigger.conditions).every(([resourceKey, condition]) => {
+      if (typeof condition !== 'object') return true;
+      
+      const resourceValue = appState.resources[resourceKey as keyof typeof appState.resources];
+      if (resourceValue === undefined) return false;
+      
+      // Check min condition (inclusive)
+      if (condition.min !== undefined && resourceValue < condition.min) {
+        return false;
+      }
+      
+      // Check max condition (inclusive)
+      if (condition.max !== undefined && resourceValue > condition.max) {
+        return false;
+      }
+      
+      return true;
+    });
+  }
 };
 
 const evaluateNPCRelationshipTrigger = (trigger: any) => {
@@ -254,6 +268,18 @@ const evaluateNPCAvailabilityTrigger = (trigger: any) => {
 };
 
 const evaluateStoryletTrigger = (trigger: any, activeFlags: any, appState: any) => {
+  // Defensive check for invalid trigger
+  if (!trigger || typeof trigger !== 'object' || !trigger.type) {
+    console.warn('Invalid trigger structure:', trigger);
+    return false;
+  }
+
+  // Ensure conditions exist
+  if (!trigger.conditions) {
+    console.warn('Trigger missing conditions:', trigger);
+    return false;
+  }
+
   switch (trigger.type) {
     case 'time':
       return evaluateTimeTrigger(trigger, appState);
@@ -289,6 +315,7 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   
   // Development settings
   deploymentFilter: new Set(['live', 'dev']) as Set<'live' | 'stage' | 'dev'>,
+  _testMode: false,
   
   // Minigame state
   activeMinigame: null,
@@ -312,8 +339,11 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   },
 
   evaluateStorylets: () => {
-    // First sync from catalog store to get latest storylets
-    get().syncFromCatalogStore();
+    // First sync from catalog store to get latest storylets (unless in test mode)
+    const state = get();
+    if (!state._testMode) {
+      get().syncFromCatalogStore();
+    }
     
     // Use queue to prevent race conditions during evaluation
     evaluationQueue.add(async () => {
@@ -866,12 +896,24 @@ export const useStoryletStore = create<StoryletState>()(persist((set, get) => ({
   addStorylet: (storylet: Storylet) => {
     devLog(`🎯 addStorylet called with:`, storylet);
     
-    // Add to catalog store (source of truth)
-    const catalogStore = useStoryletCatalogStore.getState();
-    catalogStore.addStorylet(storylet);
+    const state = get();
     
-    // Sync from catalog store to update local state
-    get().syncFromCatalogStore();
+    if (state._testMode) {
+      // In test mode, add directly to the store without catalog syncing
+      set((state) => ({
+        allStorylets: {
+          ...state.allStorylets,
+          [storylet.id]: storylet
+        }
+      }));
+    } else {
+      // Add to catalog store (source of truth)
+      const catalogStore = useStoryletCatalogStore.getState();
+      catalogStore.addStorylet(storylet);
+      
+      // Sync from catalog store to update local state
+      get().syncFromCatalogStore();
+    }
     
     devLog(`🎯 After set, allStorylets keys:`, Object.keys(get().allStorylets));
     

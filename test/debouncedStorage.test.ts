@@ -1,6 +1,7 @@
 // /Users/montysharma/v11m2/test/debouncedStorage.test.ts
 // Comprehensive test suite for debounced storage implementation
 
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { debouncedStorage } from '../src/utils/debouncedStorage';
 
 describe('Debounced Storage Tests', () => {
@@ -10,14 +11,14 @@ describe('Debounced Storage Tests', () => {
     // Mock localStorage
     mockLocalStorage = {
       data: {} as Record<string, string>,
-      getItem: jest.fn((key: string) => mockLocalStorage.data[key] || null),
-      setItem: jest.fn((key: string, value: string) => {
+      getItem: vi.fn((key: string) => mockLocalStorage.data[key] || null),
+      setItem: vi.fn((key: string, value: string) => {
         mockLocalStorage.data[key] = value;
       }),
-      removeItem: jest.fn((key: string) => {
+      removeItem: vi.fn((key: string) => {
         delete mockLocalStorage.data[key];
       }),
-      clear: jest.fn(() => {
+      clear: vi.fn(() => {
         mockLocalStorage.data = {};
       })
     };
@@ -29,16 +30,16 @@ describe('Debounced Storage Tests', () => {
     });
     
     // Clear any pending timeouts
-    jest.clearAllTimers();
+    vi.clearAllTimers();
     debouncedStorage.flush();
   });
 
   afterEach(() => {
-    jest.clearAllTimers();
+    vi.clearAllTimers();
     debouncedStorage.flush();
   });
 
-  test('should debounce multiple rapid writes', (done) => {
+  it('should debounce multiple rapid writes', (done) => {
     const testKey = 'test-key';
     const testValues = ['value1', 'value2', 'value3'];
     
@@ -59,7 +60,7 @@ describe('Debounced Storage Tests', () => {
     }, 1100); // 1 second debounce + 100ms buffer
   });
 
-  test('should call save callbacks on successful write', (done) => {
+  it('should call save callbacks on successful write', (done) => {
     const mockCallback = jest.fn();
     const unsubscribe = debouncedStorage.onSave(mockCallback);
     
@@ -72,7 +73,7 @@ describe('Debounced Storage Tests', () => {
     }, 1100);
   });
 
-  test('should call save callbacks on failed write', (done) => {
+  it('should call save callbacks on failed write', (done) => {
     const mockCallback = jest.fn();
     const unsubscribe = debouncedStorage.onSave(mockCallback);
     
@@ -90,7 +91,7 @@ describe('Debounced Storage Tests', () => {
     }, 1100);
   });
 
-  test('should immediately flush pending writes', () => {
+  it('should immediately flush pending writes', () => {
     debouncedStorage.setItem('flush-test', 'test-value');
     
     // Should not have written yet
@@ -103,7 +104,7 @@ describe('Debounced Storage Tests', () => {
     expect(mockLocalStorage.setItem).toHaveBeenCalledWith('flush-test', 'test-value');
   });
 
-  test('should track statistics correctly', () => {
+  it('should track statistics correctly', () => {
     const stats = debouncedStorage.getStats();
     const initialPendingCount = stats.pendingWrites;
     
@@ -120,21 +121,21 @@ describe('Debounced Storage Tests', () => {
     expect(finalStats.pendingWrites).toBe(0);
   });
 
-  test('should handle getItem correctly', () => {
+  it('should handle getItem correctly', () => {
     mockLocalStorage.data['existing-key'] = 'existing-value';
     
     expect(debouncedStorage.getItem('existing-key')).toBe('existing-value');
     expect(debouncedStorage.getItem('non-existing-key')).toBeNull();
   });
 
-  test('should handle removeItem correctly', () => {
+  it('should handle removeItem correctly', () => {
     mockLocalStorage.data['remove-test'] = 'test-value';
     
     debouncedStorage.removeItem('remove-test');
     expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('remove-test');
   });
 
-  test('should handle multiple subscribers correctly', (done) => {
+  it('should handle multiple subscribers correctly', (done) => {
     const callback1 = jest.fn();
     const callback2 = jest.fn();
     
@@ -153,7 +154,7 @@ describe('Debounced Storage Tests', () => {
     }, 1100);
   });
 
-  test('should auto-flush on page unload', () => {
+  it('should auto-flush on page unload', () => {
     debouncedStorage.setItem('unload-test', 'test-value');
     
     // Simulate page unload
@@ -162,7 +163,7 @@ describe('Debounced Storage Tests', () => {
     expect(mockLocalStorage.setItem).toHaveBeenCalledWith('unload-test', 'test-value');
   });
 
-  test('should auto-flush on page visibility change', () => {
+  it('should auto-flush on page visibility change', () => {
     debouncedStorage.setItem('visibility-test', 'test-value');
     
     // Simulate page hide

@@ -1,6 +1,7 @@
 // /Users/montysharma/v11m2/test/storyletEvaluation.test.ts
 // Performance tests for batched storylet evaluation
 
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { 
   useAvailableStorylets, 
@@ -11,21 +12,21 @@ import { generateConcernFlags, clearFlagCache } from '../src/utils/flagGenerator
 import type { Storylet } from '../src/types/storylet';
 
 // Mock stores
-jest.mock('../src/stores/useStoryletStore', () => ({
-  useStoryletStore: jest.fn()
+vi.mock('../src/stores/useStoryletStore', () => ({
+  useStoryletStore: vi.fn()
 }));
 
-jest.mock('../src/stores/useCharacterConcernsStore', () => ({
-  useCharacterConcernsStore: jest.fn()
+vi.mock('../src/stores/useCharacterConcernsStore', () => ({
+  useCharacterConcernsStore: vi.fn()
 }));
 
-jest.mock('../src/stores/v2', () => ({
-  useCoreGameStore: jest.fn()
+vi.mock('../src/stores/v2', () => ({
+  useCoreGameStore: vi.fn()
 }));
 
-const mockUseStoryletStore = require('../src/stores/useStoryletStore').useStoryletStore;
-const mockUseCharacterConcernsStore = require('../src/stores/useCharacterConcernsStore').useCharacterConcernsStore;
-const mockUseCoreGameStore = require('../src/stores/v2').useCoreGameStore;
+const { useStoryletStore: mockUseStoryletStore } = await import('../src/stores/useStoryletStore');
+const { useCharacterConcernsStore: mockUseCharacterConcernsStore } = await import('../src/stores/useCharacterConcernsStore');
+const { useCoreGameStore: mockUseCoreGameStore } = await import('../src/stores/v2');
 
 describe('Storylet Evaluation Performance Tests', () => {
   beforeEach(() => {

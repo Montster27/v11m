@@ -57,7 +57,8 @@
       "Bash(npx depcheck:*)",
       "Bash(chmod:*)",
       "Bash(./update-store-imports.sh:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": []
   },

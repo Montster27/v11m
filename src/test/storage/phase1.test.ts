@@ -1,6 +1,7 @@
 // Phase 1: Storage Adapter Pattern Tests
 // Verify that LocalStorageAdapter maintains exact current behavior
 
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { LocalStorageAdapter } from '../../services/storage/LocalStorageAdapter';
 import { IndexedDBAdapter } from '../../services/storage/IndexedDBAdapter';
 import { StorageFactory } from '../../services/storage/StorageFactory';
@@ -82,7 +83,7 @@ describe('Phase 1: Storage Adapter Pattern', () => {
       
       // Mock localStorage to throw quota exceeded error
       const originalSetItem = localStorage.setItem;
-      localStorage.setItem = jest.fn(() => {
+      localStorage.setItem = vi.fn(() => {
         const error = new DOMException('QuotaExceededError');
         error.name = 'QuotaExceededError';
         throw error;
@@ -113,8 +114,8 @@ describe('Phase 1: Storage Adapter Pattern', () => {
     it('provides same interface as LocalStorageAdapter', async () => {
       // Mock IndexedDB
       const mockDB = {
-        transaction: jest.fn(),
-        close: jest.fn()
+        transaction: vi.fn(),
+        close: vi.fn()
       };
       
       const mockRequest = {
@@ -124,7 +125,7 @@ describe('Phase 1: Storage Adapter Pattern', () => {
       };
       
       const mockIndexedDB = {
-        open: jest.fn(() => mockRequest)
+        open: vi.fn(() => mockRequest)
       };
       
       Object.defineProperty(window, 'indexedDB', {
@@ -198,7 +199,7 @@ describe('Phase 1: Storage Adapter Pattern', () => {
       // Mock IndexedDB available
       Object.defineProperty(window, 'indexedDB', {
         value: {
-          open: jest.fn(() => ({
+          open: vi.fn(() => ({
             onsuccess: null,
             onerror: null,
             onupgradeneeded: null
@@ -248,22 +249,22 @@ describe('Phase 1: Storage Adapter Pattern', () => {
 
 // Mock IndexedDB for testing environment
 const mockIndexedDB = {
-  open: jest.fn(() => ({
+  open: vi.fn(() => ({
     onsuccess: null,
     onerror: null,
     onupgradeneeded: null,
     result: {
-      transaction: jest.fn(() => ({
-        objectStore: jest.fn(() => ({
-          get: jest.fn(),
-          put: jest.fn(),
-          delete: jest.fn(),
-          clear: jest.fn(),
-          getAllKeys: jest.fn()
+      transaction: vi.fn(() => ({
+        objectStore: vi.fn(() => ({
+          get: vi.fn(),
+          put: vi.fn(),
+          delete: vi.fn(),
+          clear: vi.fn(),
+          getAllKeys: vi.fn()
         })),
         onerror: null
       })),
-      close: jest.fn()
+      close: vi.fn()
     }
   }))
 };

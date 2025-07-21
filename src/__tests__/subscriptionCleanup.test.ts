@@ -1,6 +1,7 @@
 // /Users/montysharma/v11m2/src/__tests__/subscriptionCleanup.test.ts
 // Test suite for subscription cleanup system
 
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import subscriptionManager from '../utils/subscriptionManager';
 import { useSubscriptionCleanup, memoryLeakDetector } from '../utils/memoryLeakDetector';

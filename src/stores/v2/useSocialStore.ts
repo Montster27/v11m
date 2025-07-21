@@ -49,6 +49,11 @@ export interface SocialState {
     saveSlots: Record<string, any>;
     saveHistory: any[];
   };
+  minigameSessions: {
+    currentSessionId: string | null;
+    sessionHistory: any[];
+    activeSessions: Record<string, any>;
+  };
   
   // Actions
   resetSocial: () => void;
@@ -93,6 +98,12 @@ export interface SocialState {
   deleteSaveSlot: (saveId: string) => void;
   loadSaveSlot: (saveId: string) => void;
   addSaveHistoryEntry: (entry: any) => void;
+  
+  // Minigame session management
+  startMinigameSession: (sessionId: string, sessionData: any) => void;
+  endMinigameSession: (sessionId: string, sessionData: any) => void;
+  getCurrentMinigameSession: () => string | null;
+  getMinigameSessionHistory: () => any[];
 }
 
 const getInitialSocialState = (): Omit<SocialState, 
@@ -101,7 +112,8 @@ const getInitialSocialState = (): Omit<SocialState,
   'getClueById' | 'getAllDiscoveredClues' | 'discoverClue' | 'connectClues' | 'associateClueWithArc' | 'recordClueDiscoveryEvent' |
   'setClueArcRelationship' | 'removeClueArcRelationship' | 'getCluesByArc' | 'getNextClueInArc' |
   'initializeArcProgress' | 'updateArcDiscoveryProgress' | 'getArcCompletionPercentage' | 'getAvailableCluesForArc' |
-  'setCurrentSave' | 'createSaveSlot' | 'updateSaveSlot' | 'deleteSaveSlot' | 'loadSaveSlot' | 'addSaveHistoryEntry'
+  'setCurrentSave' | 'createSaveSlot' | 'updateSaveSlot' | 'deleteSaveSlot' | 'loadSaveSlot' | 'addSaveHistoryEntry' |
+  'startMinigameSession' | 'endMinigameSession' | 'getCurrentMinigameSession' | 'getMinigameSessionHistory'
 > => ({
   npcs: {
     relationships: {},
@@ -121,6 +133,11 @@ const getInitialSocialState = (): Omit<SocialState,
     currentSaveId: null,
     saveSlots: {},
     saveHistory: []
+  },
+  minigameSessions: {
+    currentSessionId: null,
+    sessionHistory: [],
+    activeSessions: {}
   }
 });
 
@@ -686,6 +703,56 @@ export const useSocialStore = create<SocialState>()(
             }
           };
         });
+      },
+
+      // Minigame session management methods
+      startMinigameSession: (sessionId: string, sessionData: any) => {
+        set((state) => ({
+          ...state,
+          minigameSessions: {
+            ...state.minigameSessions,
+            currentSessionId: sessionId,
+            activeSessions: {
+              ...state.minigameSessions.activeSessions,
+              [sessionId]: {
+                ...sessionData,
+                startTime: Date.now()
+              }
+            }
+          }
+        }));
+      },
+
+      endMinigameSession: (sessionId: string, sessionData: any) => {
+        set((state) => {
+          const session = state.minigameSessions.activeSessions[sessionId];
+          const sessionHistory = Array.isArray(state.minigameSessions?.sessionHistory) ? state.minigameSessions.sessionHistory : [];
+          
+          return {
+            ...state,
+            minigameSessions: {
+              ...state.minigameSessions,
+              currentSessionId: state.minigameSessions.currentSessionId === sessionId ? null : state.minigameSessions.currentSessionId,
+              activeSessions: Object.fromEntries(
+                Object.entries(state.minigameSessions.activeSessions).filter(([id]) => id !== sessionId)
+              ),
+              sessionHistory: [...sessionHistory, {
+                ...session,
+                ...sessionData,
+                endTime: Date.now(),
+                sessionId
+              }]
+            }
+          };
+        });
+      },
+
+      getCurrentMinigameSession: () => {
+        return get().minigameSessions.currentSessionId;
+      },
+
+      getMinigameSessionHistory: () => {
+        return get().minigameSessions.sessionHistory || [];
       }
     }),
     {
@@ -728,6 +795,12 @@ export const useSocialStore = create<SocialState>()(
               ...(persistedState.saves || {}),
               saveSlots: { ...defaultState.saves.saveSlots, ...(persistedState.saves?.saveSlots || {}) },
               saveHistory: Array.isArray(persistedState.saves?.saveHistory) ? persistedState.saves.saveHistory : []
+            },
+            minigameSessions: { 
+              ...defaultState.minigameSessions, 
+              ...(persistedState.minigameSessions || {}),
+              sessionHistory: Array.isArray(persistedState.minigameSessions?.sessionHistory) ? persistedState.minigameSessions.sessionHistory : [],
+              activeSessions: { ...defaultState.minigameSessions.activeSessions, ...(persistedState.minigameSessions?.activeSessions || {}) }
             }
           };
         }
@@ -744,7 +817,8 @@ export const useSocialStore = create<SocialState>()(
         // Only persist data, not action functions
         npcs: state.npcs,
         clues: state.clues,
-        saves: state.saves
+        saves: state.saves,
+        minigameSessions: state.minigameSessions
       })
     }
   )

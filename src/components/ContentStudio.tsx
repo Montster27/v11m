@@ -22,7 +22,9 @@ import { StorageAdapter } from '../services/storage/StorageAdapter';
 import { LocalStorageAdapter } from '../services/storage/LocalStorageAdapter';
 import { IndexedDBAdapter } from '../services/storage/IndexedDBAdapter';
 import { ContentExportService } from '../services/ContentExportService';
+import { useUnifiedPersistence } from '../hooks/useUnifiedPersistence';
 import { v2Migration } from '../migrations/v2StoreMigration';
+import { useStoryletStoreV2 } from '../stores/useStoryletStoreV2';
 import type { Storylet } from '../types/storylet';
 
 type ContentStudioTab = 'advanced' | 'browse' | 'visual' | 'arc-manager' | 'clue-manager' | 'characters' | 'preview' | 'analytics';
@@ -36,6 +38,7 @@ const ContentStudio: React.FC<ContentStudioProps> = ({ onBackupCreate }) => {
   const narrativeStore = useNarrativeStore();
   const socialStore = useSocialStore();
   const coreGameStore = useCoreGameStore();
+  const storyletStore = useStoryletStoreV2();
   
   // Storage management
   const [storageAdapter, setStorageAdapter] = useState<StorageAdapter | null>(null);
@@ -53,6 +56,12 @@ const ContentStudio: React.FC<ContentStudioProps> = ({ onBackupCreate }) => {
     message: string;
     type: 'warning' | 'danger';
   } | null>(null);
+  
+  // Export/Import state
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [importProgress, setImportProgress] = useState(0);
 
   // Storage initialization and migration check
   useEffect(() => {
@@ -143,72 +152,33 @@ const ContentStudio: React.FC<ContentStudioProps> = ({ onBackupCreate }) => {
     redoStackSize
   } = useUndoRedo(20);
 
-  // Auto-backup before destructive actions (V2 Enhanced with unified export)
-  const createBackup = async () => {
-    try {
-      const timestamp = new Date().toISOString();
-
-      // Use new unified export service if storage adapter is available
-      if (storageAdapter) {
-        try {
-          const exportService = new ContentExportService(storageAdapter);
-          const exportPackage = await exportService.exportProject({
-            format: 'json',
-            includeMetadata: true,
-            validateDependencies: false, // Skip for quick backups
-            includePreferences: true
-          });
-
-          const backupKey = `content_backup_v2_${timestamp}`;
-          await storageAdapter.setItem(backupKey, JSON.stringify(exportPackage));
-
-          // Keep only last 5 V2 backups
-          const allKeys = await storageAdapter.getKeys();
-          const backupKeys = allKeys.filter(key => key.startsWith('content_backup_v2_'));
-          if (backupKeys.length > 5) {
-            const sortedKeys = backupKeys.sort().slice(0, -5);
-            for (const key of sortedKeys) {
-              await storageAdapter.removeItem(key);
-            }
-          }
-
-          console.log('✅ V2 Auto-backup created:', backupKey);
-          onBackupCreate?.();
-          return true;
-        } catch (exportError) {
-          console.warn('⚠️ V2 backup failed, falling back to legacy backup:', exportError);
-          // Fall through to legacy backup
-        }
-      }
-
-      // Legacy backup method (for backward compatibility)
-      const gameState = {
-        // V2 stores
-        narrative: narrativeStore,
-        social: socialStore,
-        core: coreGameStore,
-        // Legacy format compatibility (using V2 data)
-        storylets: narrativeStore.getStorylets(), // Use V2 narrative store for storylets
-        timestamp,
-        version: '2.0' // Updated version for V2 backups
-      };
-      
-      const backupKey = `content_backup_${timestamp}`;
-      localStorage.setItem(backupKey, JSON.stringify(gameState));
-      
-      // Keep only last 5 backups
-      const allKeys = Object.keys(localStorage).filter(key => key.startsWith('content_backup_'));
-      if (allKeys.length > 5) {
-        allKeys.sort().slice(0, -5).forEach(key => localStorage.removeItem(key));
-      }
-      
-      console.log('✅ Legacy auto-backup created:', backupKey);
+  // Unified persistence system
+  const {
+    createBackup,
+    createPreActionBackup,
+    isDirty,
+    isSaving,
+    lastSaved,
+    saveError,
+    backupCount,
+    markDirty,
+    clearError
+  } = useUnifiedPersistence({
+    storageAdapter,
+    autoSaveEnabled: true,
+    maxBackups: 10,
+    onBackupCreated: (backup) => {
+      console.log(`✅ Backup created: ${backup.label} (${(backup.size / 1024).toFixed(2)}KB)`);
       onBackupCreate?.();
-      return true;
-    } catch (error) {
-      console.error('❌ Backup failed:', error);
-      return false;
+    },
+    onError: (error) => {
+      console.error('❌ Persistence error:', error);
     }
+  });
+
+  // Enhanced backup function using unified persistence
+  const handleCreateBackup = async (label?: string) => {
+    return await createBackup(label);
   };
 
   const executeWithConfirmation = (
@@ -221,11 +191,11 @@ const ContentStudio: React.FC<ContentStudioProps> = ({ onBackupCreate }) => {
     setShowConfirmDialog(true);
   };
 
-  const handleConfirmedAction = () => {
+  const handleConfirmedAction = async () => {
     if (pendingAction) {
-      // Create backup before destructive actions
+      // Create pre-action backup before destructive actions
       if (pendingAction.type === 'danger') {
-        createBackup();
+        await createPreActionBackup(pendingAction.title);
       }
       
       pendingAction.action();
@@ -306,6 +276,128 @@ const ContentStudio: React.FC<ContentStudioProps> = ({ onBackupCreate }) => {
     console.log('✅ Migration skipped, continuing with localStorage');
   };
 
+  // Export function for storylets
+  const handleExportContent = async () => {
+    if (!storageAdapter) return;
+    
+    setIsExporting(true);
+    setExportProgress(0);
+    
+    try {
+      // Create backup before export
+      await createPreActionBackup('Before content export');
+      
+      // Initialize ContentExportService
+      const exportService = new ContentExportService(storageAdapter);
+      
+      const exportData = await exportService.exportProject({
+        format: 'json',
+        includeMetadata: true,
+        contentTypes: ['storylets', 'npcs', 'clues', 'arcs'],
+        onProgress: (progress, stage) => {
+          setExportProgress(progress);
+          console.log(`Export progress: ${progress}% - ${stage}`);
+        },
+        validateDependencies: true,
+        includePreferences: false,
+        compressionLevel: 3
+      });
+
+      // Create downloadable file
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: 'application/json'
+      });
+      
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `content-studio-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      console.log('✅ Content exported successfully');
+      
+    } catch (error) {
+      console.error('❌ Export failed:', error);
+      alert(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsExporting(false);
+      setExportProgress(0);
+    }
+  };
+
+  // Import function for content
+  const handleImportContent = async () => {
+    if (!storageAdapter) return;
+    
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    
+    input.onchange = async (event) => {
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      
+      setIsImporting(true);
+      setImportProgress(0);
+      
+      try {
+        // Create backup before import
+        await createPreActionBackup('Before content import');
+        
+        const text = await file.text();
+        const importData = JSON.parse(text);
+        
+        // Initialize ContentExportService for validation
+        const exportService = new ContentExportService(storageAdapter);
+        
+        // Import storylets using the storylet store
+        if (importData.content?.storylets) {
+          setImportProgress(25);
+          const storylets = Object.values(importData.content.storylets) as Storylet[];
+          await storyletStore.importStorylets(storylets);
+          console.log(`✅ Imported ${storylets.length} storylets`);
+        }
+        
+        setImportProgress(50);
+        
+        // Import other content types through the export service
+        const importResult = await exportService.importProject(importData, {
+          allowLegacyFormat: true,
+          ignoreMissingDependencies: false,
+          overwriteExisting: true,
+          validateContent: true,
+          onProgress: (progress, stage) => {
+            setImportProgress(50 + progress / 2); // Scale to 50-100%
+            console.log(`Import progress: ${progress}% - ${stage}`);
+          },
+          dryRun: false
+        });
+
+        if (!importResult.success) {
+          throw new Error(`Import failed: ${importResult.errors?.join(', ') || 'Unknown error'}`);
+        }
+
+        console.log('✅ Content imported successfully');
+        alert('Content imported successfully! The page will refresh to load the new content.');
+        
+        // Refresh to ensure all stores are updated
+        window.location.reload();
+        
+      } catch (error) {
+        console.error('❌ Import failed:', error);
+        alert(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } finally {
+        setIsImporting(false);
+        setImportProgress(0);
+      }
+    };
+    
+    input.click();
+  };
+
   // Show migration UI if needed
   if (showMigration) {
     return (
@@ -376,8 +468,57 @@ const ContentStudio: React.FC<ContentStudioProps> = ({ onBackupCreate }) => {
                   </span>
                 )}
               </div>
+              
+              {/* Export/Import Controls */}
+              <div className="flex items-center gap-1 mr-2">
+                <button
+                  onClick={handleExportContent}
+                  disabled={isExporting || !storageAdapter}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
+                    isExporting || !storageAdapter
+                      ? 'text-blue-300 cursor-not-allowed'
+                      : 'text-blue-100 hover:text-white hover:bg-blue-500'
+                  }`}
+                  title="Export all content to JSON file"
+                >
+                  {isExporting ? (
+                    <>
+                      <div className="w-3 h-3 border border-blue-300 border-t-transparent rounded-full animate-spin"></div>
+                      <span>{exportProgress}%</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>📤</span>
+                      <span className="hidden sm:inline">Export</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleImportContent}
+                  disabled={isImporting || !storageAdapter}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
+                    isImporting || !storageAdapter
+                      ? 'text-blue-300 cursor-not-allowed'
+                      : 'text-blue-100 hover:text-white hover:bg-blue-500'
+                  }`}
+                  title="Import content from JSON file"
+                >
+                  {isImporting ? (
+                    <>
+                      <div className="w-3 h-3 border border-blue-300 border-t-transparent rounded-full animate-spin"></div>
+                      <span>{importProgress}%</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>📥</span>
+                      <span className="hidden sm:inline">Import</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              
               <HelpTooltip content="Content Studio provides user-friendly tools for creating stories, characters, and quests without technical knowledge." />
-              <SafetyManager onBackupCreate={createBackup} />
+              <SafetyManager onBackupCreate={handleCreateBackup} />
             </div>
           </div>
         </div>

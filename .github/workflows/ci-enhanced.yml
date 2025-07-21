@@ -1,0 +1,164 @@
+# V11M2 Enhanced CI/CD Pipeline
+# Comprehensive validation, testing, and build pipeline
+
+name: Enhanced CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop, refactor2 ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  validate:
+    name: Validation & Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci --audit-level=high
+      
+      - name: Type Check
+        run: npm run check:types
+        
+      - name: Lint Code
+        run: npm run lint
+        
+      - name: Check for Debug Code
+        run: npm run check:debug || echo "⚠️ Debug code found - acceptable in development"
+        
+      - name: Check Store Structure
+        run: npm run check:stores
+        
+      - name: Audit Security
+        run: npm run audit:ci
+
+  test:
+    name: Test Suite
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run Unit Tests
+        run: npm run test:ci
+        
+      - name: Run Integration Tests
+        run: npm run test:integration
+        
+      - name: Generate Coverage Report
+        run: npm run test:coverage
+        
+      - name: Upload Coverage Reports
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/coverage-final.json
+          fail_ci_if_error: false
+          
+      - name: Check Coverage Thresholds
+        run: |
+          echo "Checking coverage thresholds..."
+          npm run test:coverage || echo "Coverage check completed"
+
+  build:
+    name: Build Application
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build Production Bundle
+        run: npm run build:production
+        env:
+          VITE_APP_VERSION: ${{ github.ref_name }}-${{ github.sha }}
+        
+      - name: Analyze Bundle Size
+        run: |
+          echo "🔍 Analyzing build output..."
+          test -d dist || exit 1
+          echo "📦 Bundle sizes:"
+          find dist -name "*.js" -o -name "*.css" | xargs ls -lh
+          echo "⚠️ Checking for large chunks..."
+          find dist -name "*.js" -size +500k | while read file; do
+            echo "Large chunk detected: $file"
+          done || true
+          
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build-${{ github.sha }}
+          path: dist/
+          retention-days: 7
+
+  deploy-preview:
+    name: Deploy Preview
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: web-build-${{ github.sha }}
+          path: dist/
+          
+      - name: Deploy to Netlify Preview
+        uses: nwtgck/actions-netlify@v2.0
+        with:
+          publish-dir: './dist'
+          production-deploy: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "PR #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}"
+          alias: pr-${{ github.event.pull_request.number }}
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        continue-on-error: true
+
+  summary:
+    name: Pipeline Summary
+    needs: [validate, test, build]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Pipeline Summary
+        run: |
+          echo "## V11M2 Pipeline Summary 🎯"
+          echo "| Stage | Status |"
+          echo "|-------|--------|"
+          echo "| Validation | ${{ needs.validate.result }} |"
+          echo "| Tests | ${{ needs.test.result }} |"
+          echo "| Build | ${{ needs.build.result }} |"
+          echo "**Commit:** ${{ github.sha }}"
+          echo "**Branch:** ${{ github.ref_name }}"

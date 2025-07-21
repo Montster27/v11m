@@ -1,6 +1,7 @@
 // /Users/montysharma/v11m2/src/__tests__/memoryLeakStress.test.ts
 // Stress tests for memory leak detection and prevention
 
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { render, unmount } from '@testing-library/react';
 import subscriptionManager from '../utils/subscriptionManager';

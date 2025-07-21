@@ -1,28 +1,29 @@
 // /Users/montysharma/v11m2/test/saveManager.test.ts
 // Comprehensive test suite for SaveManager atomic save operations
 
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { saveManager, SaveGame } from '../src/utils/saveManager';
 import { useCoreGameStore, useNarrativeStore, useSocialStore } from '../src/stores/v2';
 
 // Mock localStorage for testing
 const mockLocalStorage = {
   data: {} as Record<string, string>,
-  getItem: jest.fn((key: string) => mockLocalStorage.data[key] || null),
-  setItem: jest.fn((key: string, value: string) => {
+  getItem: vi.fn((key: string) => mockLocalStorage.data[key] || null),
+  setItem: vi.fn((key: string, value: string) => {
     mockLocalStorage.data[key] = value;
   }),
-  removeItem: jest.fn((key: string) => {
+  removeItem: vi.fn((key: string) => {
     delete mockLocalStorage.data[key];
   }),
-  clear: jest.fn(() => {
+  clear: vi.fn(() => {
     mockLocalStorage.data = {};
   })
 };
 
 // Mock compression functions
-jest.mock('lz-string', () => ({
-  compress: jest.fn((str: string) => `compressed:${str}`),
-  decompress: jest.fn((str: string) => str.replace('compressed:', ''))
+vi.mock('lz-string', () => ({
+  compress: vi.fn((str: string) => `compressed:${str}`),
+  decompress: vi.fn((str: string) => str.replace('compressed:', ''))
 }));
 
 describe('SaveManager Integration Tests', () => {
@@ -35,10 +36,7 @@ describe('SaveManager Integration Tests', () => {
     
     // Clear mock data
     mockLocalStorage.data = {};
-    mockLocalStorage.getItem.mockClear();
-    mockLocalStorage.setItem.mockClear();
-    mockLocalStorage.removeItem.mockClear();
-    mockLocalStorage.clear.mockClear();
+    vi.clearAllMocks();
     
     // Reset stores to initial state
     useCoreGameStore.setState(useCoreGameStore.getInitialState?.() || {});
@@ -50,7 +48,7 @@ describe('SaveManager Integration Tests', () => {
   });
 
   describe('Atomic Save Operations', () => {
-    test('should save all store states atomically', async () => {
+    it('should save all store states atomically', async () => {
       // Set different data in each store
       useCoreGameStore.setState({
         world: { day: 5, gameState: 'playing', playtime: 1000 },
@@ -83,7 +81,7 @@ describe('SaveManager Integration Tests', () => {
       );
     });
 
-    test('should load all store states atomically', async () => {
+    it('should load all store states atomically', async () => {
       // Create test save data
       const testSaveData: SaveGame = {
         version: 1,
@@ -134,7 +132,7 @@ describe('SaveManager Integration Tests', () => {
       expect(socialState.npcs.relationships['npc1']).toBe(15);
     });
 
-    test('should handle Map serialization correctly', async () => {
+    it('should handle Map serialization correctly', async () => {
       // Set Maps in narrative store
       useNarrativeStore.setState({
         flags: {
@@ -160,7 +158,7 @@ describe('SaveManager Integration Tests', () => {
   });
 
   describe('Data Integrity', () => {
-    test('should detect corrupted saves with checksum mismatch', async () => {
+    it('should detect corrupted saves with checksum mismatch', async () => {
       // Create valid save
       await saveManager.saveGame();
 
@@ -174,7 +172,7 @@ describe('SaveManager Integration Tests', () => {
       expect(loadResult).toBe(false);
     });
 
-    test('should fallback to backup on corruption', async () => {
+    it('should fallback to backup on corruption', async () => {
       // Create initial save
       useCoreGameStore.setState({ world: { day: 5 } });
       await saveManager.saveGame();
@@ -191,7 +189,7 @@ describe('SaveManager Integration Tests', () => {
       expect(loadResult).toBe(true);
     });
 
-    test('should handle compression failures gracefully', async () => {
+    it('should handle compression failures gracefully', async () => {
       // Mock compression to fail
       const { compress } = require('lz-string');
       compress.mockImplementationOnce(() => {
@@ -204,7 +202,7 @@ describe('SaveManager Integration Tests', () => {
   });
 
   describe('Export/Import Functionality', () => {
-    test('should export save data as string', async () => {
+    it('should export save data as string', async () => {
       // Set some data and save
       useCoreGameStore.setState({ world: { day: 7 } });
       await saveManager.saveGame();
@@ -215,7 +213,7 @@ describe('SaveManager Integration Tests', () => {
       expect(exportedSave).toBeTruthy();
     });
 
-    test('should import save data from string', async () => {
+    it('should import save data from string', async () => {
       // Create test save data
       const testSave = {
         version: 1,
@@ -240,7 +238,7 @@ describe('SaveManager Integration Tests', () => {
       expect(coreState.player.level).toBe(7);
     });
 
-    test('should reject invalid import data', async () => {
+    it('should reject invalid import data', async () => {
       const invalidSave = 'invalid-save-data';
       const importResult = await saveManager.importSave(invalidSave);
       expect(importResult).toBe(false);
@@ -248,7 +246,7 @@ describe('SaveManager Integration Tests', () => {
   });
 
   describe('Metadata Operations', () => {
-    test('should extract save metadata without full load', async () => {
+    it('should extract save metadata without full load', async () => {
       // Set up data and save
       useCoreGameStore.setState({
         world: { day: 20, playtime: 5000 },
@@ -267,12 +265,12 @@ describe('SaveManager Integration Tests', () => {
       });
     });
 
-    test('should return null metadata for missing save', () => {
+    it('should return null metadata for missing save', () => {
       const metadata = saveManager.getSaveMetadata();
       expect(metadata).toBeNull();
     });
 
-    test('should track save statistics', async () => {
+    it('should track save statistics', async () => {
       // Perform saves
       await saveManager.saveGame();
       await saveManager.saveGame();
@@ -285,7 +283,7 @@ describe('SaveManager Integration Tests', () => {
   });
 
   describe('Save Management', () => {
-    test('should clear all save data', () => {
+    it('should clear all save data', () => {
       // Create some localStorage data
       mockLocalStorage.data['v11m2-unified-save'] = 'test-save';
       mockLocalStorage.data['mmv-core-game-store'] = 'legacy-save';
@@ -296,7 +294,7 @@ describe('SaveManager Integration Tests', () => {
       expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('mmv-core-game-store');
     });
 
-    test('should detect save existence', async () => {
+    it('should detect save existence', async () => {
       expect(saveManager.hasSave()).toBe(false);
 
       await saveManager.saveGame();
@@ -308,7 +306,7 @@ describe('SaveManager Integration Tests', () => {
   });
 
   describe('Error Handling', () => {
-    test('should handle localStorage quota exceeded', async () => {
+    it('should handle localStorage quota exceeded', async () => {
       // Mock localStorage to throw quota error
       mockLocalStorage.setItem.mockImplementationOnce(() => {
         throw new DOMException('QuotaExceededError');
@@ -318,14 +316,14 @@ describe('SaveManager Integration Tests', () => {
       expect(saveResult).toBe(false);
     });
 
-    test('should handle malformed JSON in localStorage', async () => {
+    it('should handle malformed JSON in localStorage', async () => {
       mockLocalStorage.data['v11m2-unified-save'] = 'compressed:{invalid-json}';
 
       const loadResult = await saveManager.loadGame();
       expect(loadResult).toBe(false);
     });
 
-    test('should handle missing store methods gracefully', async () => {
+    it('should handle missing store methods gracefully', async () => {
       // Mock store to have missing setState
       const originalSetState = useCoreGameStore.setState;
       delete (useCoreGameStore as any).setState;

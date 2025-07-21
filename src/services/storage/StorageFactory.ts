@@ -1,19 +1,29 @@
-// Storage Factory - provides storage adapter selection logic
+// Storage Factory - provides storage adapter selection logic with error handling
 
 import { StorageAdapter } from './StorageAdapter';
 import { LocalStorageAdapter } from './LocalStorageAdapter';
 import { IndexedDBAdapter } from './IndexedDBAdapter';
+import { ChunkedStorageAdapter } from './ChunkedStorageAdapter';
+import { createErrorHandledAdapter, ErrorRecoveryStrategy } from './ErrorHandlingService';
 
-export type StorageType = 'auto' | 'localStorage' | 'indexedDB';
+export type StorageType = 'auto' | 'localStorage' | 'indexedDB' | 'chunked';
 
 export interface StorageConfig {
   type?: StorageType;
   fallbackToLocalStorage?: boolean;
+  enableChunking?: boolean; // Enable automatic chunking for large data
+  enableErrorHandling?: boolean; // Enable progressive error handling
+  chunkingOptions?: {
+    chunkSizeBytes?: number;
+    maxChunks?: number;
+    compressionEnabled?: boolean;
+  };
   indexedDBConfig?: {
     dbName?: string;
     storeName?: string;
     version?: number;
   };
+  errorHandlingOptions?: Partial<ErrorRecoveryStrategy>;
 }
 
 export class StorageFactory {
@@ -24,13 +34,39 @@ export class StorageFactory {
     const {
       type = 'auto',
       fallbackToLocalStorage = true,
-      indexedDBConfig
+      enableChunking = false,
+      enableErrorHandling = true,
+      chunkingOptions,
+      indexedDBConfig,
+      errorHandlingOptions
     } = config;
+
+    // Helper function to wrap adapter with features
+    const wrapAdapter = (adapter: StorageAdapter): StorageAdapter => {
+      let wrapped = adapter;
+      
+      // Apply error handling first (innermost wrapper)
+      if (enableErrorHandling) {
+        wrapped = createErrorHandledAdapter(wrapped, {
+          maxRetries: 3,
+          retryDelayMs: 1000,
+          backoffMultiplier: 2,
+          ...errorHandlingOptions
+        });
+      }
+      
+      // Apply chunking on top (outermost wrapper)
+      if (enableChunking) {
+        wrapped = new ChunkedStorageAdapter(wrapped, chunkingOptions);
+      }
+      
+      return wrapped;
+    };
 
     // If specific type requested, try to create it
     if (type === 'localStorage') {
       if (LocalStorageAdapter.isAvailable()) {
-        return new LocalStorageAdapter();
+        return wrapAdapter(new LocalStorageAdapter());
       }
       throw new Error('localStorage is not available');
     }
@@ -39,9 +75,20 @@ export class StorageFactory {
       if (IndexedDBAdapter.isAvailable()) {
         const adapter = new IndexedDBAdapter(indexedDBConfig);
         await adapter.initialize();
-        return adapter;
+        return wrapAdapter(adapter);
       }
       throw new Error('IndexedDB is not available');
+    }
+
+    if (type === 'chunked') {
+      // Force chunking with best available base adapter
+      const baseAdapter = await this.createAdapter({ 
+        type: 'auto', 
+        fallbackToLocalStorage, 
+        indexedDBConfig,
+        enableChunking: false // Prevent recursion
+      });
+      return new ChunkedStorageAdapter(baseAdapter, chunkingOptions);
     }
 
     // Auto-selection logic
@@ -54,13 +101,13 @@ export class StorageFactory {
           const adapter = new IndexedDBAdapter(indexedDBConfig);
           await adapter.initialize();
           console.log('🗄️ Using IndexedDB storage adapter');
-          return adapter;
+          return wrapAdapter(adapter);
         } catch (error) {
           console.warn('Failed to initialize IndexedDB, falling back to localStorage:', error);
           
           if (fallbackToLocalStorage && LocalStorageAdapter.isAvailable()) {
             console.log('📦 Falling back to localStorage adapter');
-            return new LocalStorageAdapter();
+            return wrapAdapter(new LocalStorageAdapter());
           }
           throw error;
         }
@@ -69,7 +116,7 @@ export class StorageFactory {
       // Default to localStorage for now
       if (LocalStorageAdapter.isAvailable()) {
         console.log('📦 Using localStorage adapter');
-        return new LocalStorageAdapter();
+        return wrapAdapter(new LocalStorageAdapter());
       }
 
       // Last resort: try IndexedDB
@@ -78,7 +125,7 @@ export class StorageFactory {
           const adapter = new IndexedDBAdapter(indexedDBConfig);
           await adapter.initialize();
           console.log('🗄️ Using IndexedDB storage adapter (fallback)');
-          return adapter;
+          return wrapAdapter(adapter);
         } catch (error) {
           console.error('Failed to initialize any storage adapter:', error);
           throw new Error('No storage adapters available');
@@ -93,7 +140,7 @@ export class StorageFactory {
    * Get information about available storage options
    */
   static getAvailableStorageTypes(): StorageType[] {
-    const available: StorageType[] = ['auto'];
+    const available: StorageType[] = ['auto', 'chunked'];
     
     if (LocalStorageAdapter.isAvailable()) {
       available.push('localStorage');

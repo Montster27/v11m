@@ -1,0 +1,103 @@
+# V11M2 Production Deployment Pipeline
+# Deploys tagged releases to production
+
+name: Deploy Production
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (e.g., v1.0.0)'
+        required: true
+
+jobs:
+  deploy:
+    name: Production Deployment
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version || github.ref }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Set Version
+        run: |
+          VERSION=${{ github.event.inputs.version || github.ref_name }}
+          echo "VITE_APP_VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "Deploying version: ${VERSION}"
+          
+      - name: Build Production
+        run: npm run build:production
+        env:
+          NODE_ENV: production
+          VITE_APP_VERSION: ${{ env.VITE_APP_VERSION }}
+        
+      - name: Validate Build
+        run: |
+          echo "🔍 Validating production build..."
+          test -d dist || { echo "❌ Build directory not found"; exit 1; }
+          test -f dist/index.html || { echo "❌ index.html not found"; exit 1; }
+          
+          # Check for critical assets
+          find dist -name "*.js" | head -1 | xargs test -f || { echo "❌ No JS files found"; exit 1; }
+          find dist -name "*.css" | head -1 | xargs test -f || { echo "❌ No CSS files found"; exit 1; }
+          
+          echo "✅ Build validation passed"
+          
+      - name: Deploy to Netlify
+        uses: nwtgck/actions-netlify@v2.0
+        with:
+          publish-dir: './dist'
+          production-deploy: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "🚀 Production deployment ${{ env.VITE_APP_VERSION }}"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.VITE_APP_VERSION }}
+          name: "V11M2 ${{ env.VITE_APP_VERSION }}"
+          body: |
+            ## 🎮 V11M2 ${{ env.VITE_APP_VERSION }}
+            
+            ### What's New
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for detailed changes.
+            
+            ### 🌐 Live Version
+            **Play now:** [https://v11m2.netlify.app](https://v11m2.netlify.app)
+            
+            ### 📦 Downloads
+            - Web version is available immediately at the link above
+            - Desktop versions (if available) are attached below
+            
+            ### 🐛 Found a Bug?
+            Please report issues on our [GitHub Issues](https://github.com/${{ github.repository }}/issues) page.
+          draft: false
+          prerelease: false
+          files: |
+            dist/**/*
+            
+      - name: Deployment Summary
+        run: |
+          echo "## 🚀 Deployment Complete!"
+          echo ""
+          echo "**Version:** ${{ env.VITE_APP_VERSION }}"
+          echo "**Live URL:** https://v11m2.netlify.app"
+          echo "**GitHub Release:** https://github.com/${{ github.repository }}/releases/tag/${{ env.VITE_APP_VERSION }}"
+          echo "**Deployed at:** $(date)"

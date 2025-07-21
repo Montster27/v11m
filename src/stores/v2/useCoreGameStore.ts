@@ -31,6 +31,13 @@ export interface CoreGameState {
     day: number;
     timeAllocation: Record<string, any>;
     isTimePaused: boolean;
+    gameState: string;
+    playtime: number;
+  };
+  minigames: {
+    playerStats: Record<string, any>;
+    preferences: Record<string, any>;
+    metadata: Record<string, any>;
   };
   
   // Actions
@@ -40,9 +47,16 @@ export interface CoreGameState {
   updateCharacter: (updates: Partial<CoreGameState['character']>) => void;
   updateSkills: (updates: Partial<CoreGameState['skills']>) => void;
   updateWorld: (updates: Partial<CoreGameState['world']>) => void;
+  
+  // Minigame actions
+  recordGameResult: (gameId: string, result: any, difficulty: string) => void;
+  getGameStats: (gameId: string) => any;
+  updateGamePreferences: (gameId: string, preferences: any) => void;
+  updateMinigamePreferences: (preferences: any) => void;
+  getOverallMinigameStats: () => any;
 }
 
-const getInitialCoreState = (): Omit<CoreGameState, 'resetGame' | 'migrateFromLegacyStores' | 'updatePlayer' | 'updateCharacter' | 'updateSkills' | 'updateWorld'> => ({
+const getInitialCoreState = (): Omit<CoreGameState, 'resetGame' | 'migrateFromLegacyStores' | 'updatePlayer' | 'updateCharacter' | 'updateSkills' | 'updateWorld' | 'recordGameResult' | 'getGameStats' | 'updateGamePreferences' | 'updateMinigamePreferences' | 'getOverallMinigameStats'> => ({
   player: {
     level: 1,
     experience: 0,
@@ -64,7 +78,14 @@ const getInitialCoreState = (): Omit<CoreGameState, 'resetGame' | 'migrateFromLe
   world: {
     day: 1,
     timeAllocation: {},
-    isTimePaused: false
+    isTimePaused: false,
+    gameState: 'playing',
+    playtime: 0
+  },
+  minigames: {
+    playerStats: {},
+    preferences: {},
+    metadata: {}
   }
 });
 
@@ -165,6 +186,97 @@ export const useCoreGameStore = create<CoreGameState>()(
           ...state,
           world: { ...state.world, ...updates }
         }));
+      },
+
+      // Minigame methods
+      recordGameResult: (gameId: string, result: any, difficulty: string) => {
+        set((state) => {
+          const currentStats = state.minigames.playerStats[gameId] || {
+            totalPlays: 0,
+            totalWins: 0,
+            totalLosses: 0,
+            bestScore: 0,
+            averageScore: 0,
+            averageTime: 0,
+            bestTime: Infinity
+          };
+
+          const newTotalPlays = currentStats.totalPlays + 1;
+          const newTotalWins = currentStats.totalWins + (result.success ? 1 : 0);
+          const newTotalLosses = currentStats.totalLosses + (result.success ? 0 : 1);
+          const newBestScore = Math.max(currentStats.bestScore, result.stats?.score || 0);
+          const newBestTime = result.stats?.timeElapsed ? Math.min(currentStats.bestTime, result.stats.timeElapsed) : currentStats.bestTime;
+
+          return {
+            ...state,
+            minigames: {
+              ...state.minigames,
+              playerStats: {
+                ...state.minigames.playerStats,
+                [gameId]: {
+                  ...currentStats,
+                  lastResult: result,
+                  lastDifficulty: difficulty,
+                  totalPlays: newTotalPlays,
+                  totalWins: newTotalWins,
+                  totalLosses: newTotalLosses,
+                  bestScore: newBestScore,
+                  bestTime: newBestTime === Infinity ? undefined : newBestTime,
+                  lastPlayed: Date.now()
+                }
+              }
+            }
+          };
+        });
+      },
+
+      getGameStats: (gameId: string) => {
+        return get().minigames.playerStats[gameId] || null;
+      },
+
+      updateGamePreferences: (gameId: string, preferences: any) => {
+        set((state) => ({
+          ...state,
+          minigames: {
+            ...state.minigames,
+            preferences: {
+              ...state.minigames.preferences,
+              [gameId]: { ...state.minigames.preferences[gameId], ...preferences }
+            }
+          }
+        }));
+      },
+
+      updateMinigamePreferences: (preferences: any) => {
+        set((state) => ({
+          ...state,
+          minigames: {
+            ...state.minigames,
+            preferences: { ...state.minigames.preferences, ...preferences }
+          }
+        }));
+      },
+
+      getOverallMinigameStats: () => {
+        const stats = get().minigames.playerStats;
+        const gameIds = Object.keys(stats);
+        const gameStats = Object.values(stats);
+        
+        const totalGames = gameIds.length;
+        const totalPlays = gameStats.reduce((sum: number, game: any) => sum + (game.totalPlays || 0), 0);
+        const totalWins = gameStats.reduce((sum: number, game: any) => sum + (game.totalWins || 0), 0);
+        const totalLosses = gameStats.reduce((sum: number, game: any) => sum + (game.totalLosses || 0), 0);
+        const overallWinRate = totalPlays > 0 ? totalWins / totalPlays : 0;
+        
+        return { 
+          totalGames, 
+          totalPlays, 
+          totalWins,
+          totalLosses,
+          overallWinRate,
+          gamesPlayed: gameIds,
+          games: stats 
+        };
       }
     }),
     {

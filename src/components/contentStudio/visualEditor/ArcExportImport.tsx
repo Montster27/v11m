@@ -1,5 +1,13 @@
 // /Users/montysharma/V11M2/src/components/contentStudio/visualEditor/ArcExportImport.tsx
 // Arc export/import functionality for saving and loading story arcs
+// 
+// ⚠️ DEPRECATED: This component is being phased out in favor of UnifiedPersistenceService
+// For new implementations, use:
+// - UnifiedPersistenceService for backup/restore operations
+// - ContentExportService for project-wide exports
+// - useUnifiedPersistence hook for React integration
+//
+// This component remains for backward compatibility with existing visual editor workflows.
 
 import React, { useState } from 'react';
 import { StoryArc, FlowNode, FlowConnection } from './types';
